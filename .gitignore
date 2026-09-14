@@ -1,0 +1,16 @@
+node_modules/
+dist/
+.env
+.env.*
+!.env.example
+coverage/
+*.log
+.DS_Store
+
+# Local test artifacts
+*-register.json
+*-login.json
+*-refresh.json
+*-logout.json
+GOTIT_BACKEND_*.zip
+B1_*_APPLY.md

@@ -1,0 +1,9 @@
+services:
+  api:
+    build: .
+    env_file:
+      - .env
+    ports:
+      - "${PORT:-3001}:${PORT:-3001}"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
