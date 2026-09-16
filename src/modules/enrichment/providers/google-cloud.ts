@@ -78,7 +78,16 @@ export class GoogleCloudTranslationProvider implements EnrichmentProvider {
     );
     return {
       sourceLanguageCode,
-      candidates: [{ text, variants: [], partOfSpeech: null, examples: [], contextUsed: false }],
+      candidates: [
+        {
+          text,
+          variants: [],
+          partOfSpeech: null,
+          explanation: null,
+          examples: [],
+          contextUsed: false,
+        },
+      ],
     };
   }
 }

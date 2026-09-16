@@ -12,17 +12,17 @@ remain unchanged.
 `app.ts` is excluded from the build. Public `GET /api/v1` lists **41 product
 routes** from [api-catalog.ts](src/shared/http/api-catalog.ts).
 
-| Prefix under /api/v1 | Behavior |
-| --- | --- |
-| /profile, /capabilities | Languages, interests, learning preferences and configured capabilities |
-| /captures | Manual/provider preview, sense decisions, atomic save and original replay |
-| /learning-items, /tags | Filtered library, edits, bulk actions, restore, mastery, translations, contexts, examples and tags |
-| /practice | Sessions, private single-use exercises, matching and authoritative scored attempts |
-| /learning | Smart queue and versioned learning/reward configuration |
-| /dashboard, /gamification | Progress, daily activity, XP, levels and streaks |
-| /reading | Generated preview, encrypted publication, opened-content persistence and article quizzes |
-| /pronunciation, /learning-items/:id/audio | Transient validated WAV and speech interfaces; provider unselected |
-| /export, /import | Paginated library/progress export and idempotent capture-request import |
+| Prefix under /api/v1                      | Behavior                                                                                           |
+| ----------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| /profile, /capabilities                   | Languages, interests, learning preferences and configured capabilities                             |
+| /captures                                 | Manual/provider preview, sense decisions, atomic save and original replay                          |
+| /learning-items, /tags                    | Filtered library, edits, bulk actions, restore, mastery, translations, contexts, examples and tags |
+| /practice                                 | Sessions, private single-use exercises, matching and authoritative scored attempts                 |
+| /learning                                 | Smart queue and versioned learning/reward configuration                                            |
+| /dashboard, /gamification                 | Progress, daily activity, XP, levels and streaks                                                   |
+| /reading                                  | Generated preview, encrypted publication, opened-content persistence and article quizzes           |
+| /pronunciation, /learning-items/:id/audio | Transient validated WAV and speech interfaces; provider unselected                                 |
+| /export, /import                          | Paginated library/progress export and idempotent capture-request import                            |
 
 Product routes authenticate once through Core. `GET /health` checks liveness;
 `GET /ready` checks PostgreSQL and fails during draining. Startup separately
@@ -153,10 +153,10 @@ privileges and product-only role OK. No normalization mismatches or sequence
 conflicts were found. The verified Core URL is set in ignored local `.env` and
 `render.yaml`. Local baseline data and Core source were not changed.
 
-Render `https://gotit-backend.onrender.com` returns 200 on health/ready but lacks
-the new API catalog; V1 changes are still local. The configured Anthropic key
-returned 401 on a read-only model-list check. A valid local key, Web/extension
-origins, production administrator access, selected speech provider, real
-Core/provider smoke, calibrated level estimation and retention policy remain
-outstanding. Core's pre-existing broken local worktree was left untouched.
-No commit, push, existing database migration, role change or deployment was performed.
+On 2026-09-16, `https://gotit-backend.onrender.com` returned 200 on health,
+readiness and the current 41-route API catalog. A provider-authenticated smoke
+test still requires a valid production session. Claude translation requires
+`ANTHROPIC_API_KEY`, `AI_TRANSLATION_MODEL` and `ENRICHMENT_SIGNING_SECRET`
+together, followed by a new deployment. Web/extension origins, production
+administrator access, selected speech provider, calibrated level estimation and
+retention policy still require deployment-specific verification.

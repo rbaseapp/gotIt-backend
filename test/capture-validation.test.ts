@@ -73,6 +73,7 @@ test('selection proof binds scope, accepted fields and context; expiry/key rotat
       text: 'fee',
       variants: ['price', 'cost'],
       partOfSpeech: null,
+      explanation: null,
       phoneticText: null,
       phoneticScheme: null,
       examples: [],

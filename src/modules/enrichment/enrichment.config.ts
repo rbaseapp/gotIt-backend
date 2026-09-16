@@ -48,6 +48,12 @@ export function createEnrichment(
   },
   additionalProviders: EnrichmentProvider[] = [],
 ) {
+  if (!settings.ENRICHMENT_PROFILES_JSON) {
+    if (settings.ANTHROPIC_API_KEY && !settings.AI_TRANSLATION_MODEL)
+      throw new Error('ANTHROPIC_API_KEY requires AI_TRANSLATION_MODEL');
+    if (settings.AI_TRANSLATION_MODEL && !settings.ANTHROPIC_API_KEY)
+      throw new Error('AI_TRANSLATION_MODEL requires ANTHROPIC_API_KEY');
+  }
   const providers = [...additionalProviders];
   if (settings.ANTHROPIC_API_KEY) providers.push(new AnthropicProvider(settings.ANTHROPIC_API_KEY));
   if (settings.GOOGLE_TRANSLATION_API) {
@@ -78,7 +84,10 @@ export function createEnrichment(
         structuredOutput: settings.CLAUDE_STRUCTURED_OUTPUT ?? false,
         thinkingMode: settings.CLAUDE_THINKING_MODE,
       });
-      routes = { ai: { profiles: ['claude_default'], timeoutMs: 20000 } };
+      routes = {
+        auto: { profiles: ['claude_default'], timeoutMs: 20000 },
+        ai: { profiles: ['claude_default'], timeoutMs: 20000 },
+      };
     }
     if (settings.GOOGLE_TRANSLATION_API) {
       profiles.push({

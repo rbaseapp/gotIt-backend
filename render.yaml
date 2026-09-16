@@ -24,5 +24,13 @@ services:
         value: '0'
       - key: ENRICHMENT_SIGNING_SECRET
         generateValue: true
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: AI_TRANSLATION_MODEL
+        value: claude-sonnet-5
+      - key: CLAUDE_THINKING_MODE
+        value: disabled
+      - key: CLAUDE_STRUCTURED_OUTPUT
+        value: 'true'
 # Migration administrator credentials belong in a separate one-off migration job.
-# Add optional provider secrets/models after validating the enabled API and access.
+# Provider credentials remain secret Render values and are never bundled with clients.

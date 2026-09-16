@@ -72,6 +72,7 @@ export const candidateSchema = z
     text: textSchema(1000),
     variants: z.array(textSchema(1000)).max(10).default([]),
     partOfSpeech: textSchema(100).nullable().default(null),
+    explanation: textSchema(1000).nullable().default(null),
     phoneticText: textSchema(500).nullable().default(null),
     phoneticScheme: textSchema(100).nullable().default(null),
     examples: z.array(contextTextSchema(4000)).max(5).default([]),

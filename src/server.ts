@@ -59,7 +59,11 @@ const rateLimiter = new PostgresRateLimiter(pool);
 const readingModel = env.AI_READING_MODEL ?? env.AI_TRANSLATION_MODEL;
 const readingGenerator =
   env.ANTHROPIC_API_KEY && readingModel
-    ? new AnthropicReadingGenerator(env.ANTHROPIC_API_KEY, readingModel)
+    ? new AnthropicReadingGenerator(
+        env.ANTHROPIC_API_KEY,
+        readingModel,
+        env.CLAUDE_STRUCTURED_OUTPUT,
+      )
     : undefined;
 
 const app = createApp({

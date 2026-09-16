@@ -17,7 +17,16 @@ const input = {
   translationLanguageCode: 'he',
   sentenceText: 'They charge a fee.',
 };
-const output = { sourceLanguageCode: 'en', candidates: [{ text: 'fee', contextUsed: true }] };
+const output = {
+  sourceLanguageCode: 'en',
+  candidates: [
+    {
+      text: 'fee',
+      explanation: 'A concise explanation of the meaning in this sentence.',
+      contextUsed: true,
+    },
+  ],
+};
 function provider(id: string, kind: 'ai' | 'translation_api' = 'ai'): EnrichmentProvider {
   return {
     id,
@@ -88,6 +97,48 @@ test('providers and model profiles can change without capture-specific vendor br
     }),
     { status: 'not_configured' },
   );
+});
+test('default Claude configuration serves auto as well as explicit AI until Google overrides auto', async () => {
+  const configured = createEnrichment({
+    ANTHROPIC_API_KEY: 'test-key',
+    AI_TRANSLATION_MODEL: 'configured-model',
+    ENRICHMENT_SIGNING_SECRET: 's'.repeat(32),
+  });
+  const registryConfig = configured.registry as unknown as {
+    routes: Record<string, { profiles: string[]; timeoutMs: number }>;
+  };
+  assert.deepEqual(registryConfig.routes.auto, {
+    profiles: ['claude_default'],
+    timeoutMs: 20000,
+  });
+  assert.deepEqual(registryConfig.routes.ai, {
+    profiles: ['claude_default'],
+    timeoutMs: 20000,
+  });
+  assert.throws(() => createEnrichment({ ANTHROPIC_API_KEY: 'test-key' }), /AI_TRANSLATION_MODEL/u);
+});
+test('Anthropic can detect a missing source language before translating', async () => {
+  const adapter = new AnthropicProvider('test-only-key', async (_url, init) => {
+    const request = JSON.parse(String(init?.body));
+    const supplied = JSON.parse(request.messages[0].content).untrustedTranslationData;
+    assert.equal(supplied.sourceLanguageCode, null);
+    return Response.json({
+      model: 'claude-sonnet-5',
+      stop_reason: 'end_turn',
+      content: [{ type: 'text', text: JSON.stringify(output) }],
+    });
+  });
+  const registry = new EnrichmentRegistry(
+    [adapter],
+    [profile('chosen', 'anthropic', 'claude-sonnet-5')],
+    { ai: { profiles: ['chosen'], timeoutMs: 1000 } },
+  );
+  const result = await registry.enrich(
+    'ai',
+    { ...input, sourceLanguageCode: null },
+    async () => {},
+  );
+  assert.equal(result.status, 'succeeded');
 });
 test('fallback occurs only through a configured route and all attempts share one deadline with no retries', async () => {
   let firstCalls = 0,
@@ -194,6 +245,11 @@ test('direct Anthropic uses configured model/schema and safe bounded output; ref
     assert.equal(payload.model, 'chosen-model');
     assert.equal(payload.max_tokens, 4096);
     assert.equal(payload.output_config.format.type, 'json_schema');
+    assert.equal(
+      payload.output_config.format.schema.properties.candidates.items.properties.explanation
+        .anyOf[0].type,
+      'string',
+    );
     const supplied = JSON.parse(payload.messages[0].content).untrustedTranslationData;
     assert.deepEqual(supplied, input);
     assert.equal('pageUrl' in supplied, false);
