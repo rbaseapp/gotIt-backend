@@ -80,13 +80,13 @@ export function createEnrichment(
         id: 'claude_default',
         providerId: 'anthropic',
         model: settings.AI_TRANSLATION_MODEL,
-        timeoutMs: 20000,
+        timeoutMs: 8000,
         structuredOutput: settings.CLAUDE_STRUCTURED_OUTPUT ?? false,
         thinkingMode: settings.CLAUDE_THINKING_MODE,
       });
       routes = {
-        auto: { profiles: ['claude_default'], timeoutMs: 20000 },
-        ai: { profiles: ['claude_default'], timeoutMs: 20000 },
+        auto: { profiles: ['claude_default'], timeoutMs: 8000 },
+        ai: { profiles: ['claude_default'], timeoutMs: 8000 },
       };
     }
     if (settings.GOOGLE_TRANSLATION_API) {

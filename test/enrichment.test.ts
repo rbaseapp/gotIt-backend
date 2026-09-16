@@ -109,11 +109,11 @@ test('default Claude configuration serves auto as well as explicit AI until Goog
   };
   assert.deepEqual(registryConfig.routes.auto, {
     profiles: ['claude_default'],
-    timeoutMs: 20000,
+    timeoutMs: 8000,
   });
   assert.deepEqual(registryConfig.routes.ai, {
     profiles: ['claude_default'],
-    timeoutMs: 20000,
+    timeoutMs: 8000,
   });
   assert.throws(() => createEnrichment({ ANTHROPIC_API_KEY: 'test-key' }), /AI_TRANSLATION_MODEL/u);
 });
@@ -243,7 +243,7 @@ test('direct Anthropic uses configured model/schema and safe bounded output; ref
     assert.equal(url, 'https://api.anthropic.com/v1/messages');
     const payload = JSON.parse(String(init?.body));
     assert.equal(payload.model, 'chosen-model');
-    assert.equal(payload.max_tokens, 4096);
+    assert.equal(payload.max_tokens, 1200);
     assert.equal(payload.output_config.format.type, 'json_schema');
     assert.equal(
       payload.output_config.format.schema.properties.explanation.type,
@@ -317,8 +317,8 @@ test('Anthropic normalizes harmless whitespace, empty nullable fields and duplic
         type: 'text',
         text: JSON.stringify({
           sourceLanguageCode: ' en-US ',
-          text: ' חיוני ',
-          variants: ['חיוני', ' הכרחי ', 'הכרחי'],
+          text: ' חִיּוּנִי ',
+          variants: ['חִיּוּנִי', ' הֶכְרֵחִי ', 'הֶכְרֵחִי'],
           partOfSpeech: ' שם תואר ',
           explanation: '   ',
           contextUsed: true,
@@ -340,15 +340,92 @@ test('Anthropic normalizes harmless whitespace, empty nullable fields and duplic
   if (result.status !== 'succeeded') return;
   assert.equal(result.output.sourceLanguageCode, 'en');
   assert.deepEqual(result.output.candidates[0], {
-    text: 'חיוני',
-    variants: ['הכרחי'],
+    text: 'חִיּוּנִי',
+    variants: ['הֶכְרֵחִי'],
     partOfSpeech: 'שם תואר',
     explanation: null,
     phoneticText: null,
     phoneticScheme: null,
-    examples: ['This is essential.'],
+    examples: [],
     contextUsed: true,
   });
+});
+test('Anthropic requires niqqud for Hebrew translations and Hebrew source pronunciation', async () => {
+  const response = (body: unknown) =>
+    Response.json({
+      model: 'claude-sonnet-5',
+      stop_reason: 'end_turn',
+      content: [{ type: 'text', text: JSON.stringify(body) }],
+    });
+  const translate = async (raw: unknown, enrichmentInput = input) => {
+    const adapter = new AnthropicProvider('test-only-key', async () => response(raw));
+    return new EnrichmentRegistry(
+      [adapter],
+      [profile('chosen', 'anthropic', 'claude-sonnet-5')],
+      { ai: { profiles: ['chosen'], timeoutMs: 1000 } },
+    ).enrich('ai', enrichmentInput, async () => {});
+  };
+  const hebrewTranslation = {
+    sourceLanguageCode: 'en',
+    text: 'חִיּוּב',
+    variants: ['תַּשְׁלוּם'],
+    partOfSpeech: 'שם עצם',
+    explanation: 'סכום שנדרש לשלם.',
+    phoneticText: null,
+    phoneticScheme: null,
+    contextUsed: true,
+    examples: [],
+  };
+  assert.equal((await translate(hebrewTranslation)).status, 'succeeded');
+  assert.equal(
+    (await translate({ ...hebrewTranslation, text: 'חיוב' })).status,
+    'succeeded',
+  );
+
+  const hebrewSourceInput = {
+    sourceText: 'ספר',
+    sourceLanguageCode: 'he',
+    translationLanguageCode: 'en',
+    sentenceText: 'קראתי ספר חדש.',
+  };
+  const sourceResult = await translate(
+    {
+      sourceLanguageCode: 'he',
+      text: 'book',
+      variants: [],
+      partOfSpeech: 'noun',
+      explanation: 'A written work.',
+      phoneticText: 'סֵפֶר',
+      phoneticScheme: 'hebrew_niqqud',
+      contextUsed: true,
+      examples: [],
+    },
+    hebrewSourceInput,
+  );
+  assert.equal(sourceResult.status, 'succeeded');
+  if (sourceResult.status === 'succeeded') {
+    assert.equal(sourceResult.output.candidates[0]?.phoneticText, 'סֵפֶר');
+    assert.equal(sourceResult.output.candidates[0]?.phoneticScheme, 'hebrew_niqqud');
+  }
+  assert.equal(
+    (
+      await translate(
+        {
+          sourceLanguageCode: 'he',
+          text: 'book',
+          variants: [],
+          partOfSpeech: 'noun',
+          explanation: 'A written work.',
+          phoneticText: null,
+          phoneticScheme: null,
+          contextUsed: true,
+          examples: [],
+        },
+        hebrewSourceInput,
+      )
+    ).status,
+    'succeeded',
+  );
 });
 test('Anthropic handles adaptive-thinking blocks and configurable thinking mode without leaking reasoning into candidates', async () => {
   for (const thinkingMode of [undefined, 'adaptive', 'disabled'] as const) {
