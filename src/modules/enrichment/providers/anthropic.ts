@@ -18,7 +18,6 @@ const messageSchema = z
   })
   .passthrough();
 // Vendor-supported structural constraints; B2 count/length limits are enforced locally.
-const nullableString = { anyOf: [{ type: 'string' }, { type: 'null' }] };
 const outputShape = {
   type: 'object',
   additionalProperties: false,
@@ -34,8 +33,8 @@ const outputShape = {
         properties: {
           text: { type: 'string' },
           variants: { type: 'array', items: { type: 'string' } },
-          partOfSpeech: nullableString,
-          explanation: nullableString,
+          partOfSpeech: { type: 'string' },
+          explanation: { type: 'string' },
           contextUsed: { type: 'boolean' },
           examples: { type: 'array', items: { type: 'string' } },
         },
@@ -52,45 +51,45 @@ function normalizedText(value: string): string {
   return value.normalize('NFKC').replace(/\s+/gu, ' ').trim();
 }
 
-function normalizeUniqueStrings(value: unknown, excluded = '', limit = 10): unknown {
-  if (!Array.isArray(value)) return value;
+function boundedText(value: unknown, limit: number): string | null {
+  if (typeof value !== 'string') return null;
+  const normalized = normalizedText(value);
+  return normalized ? [...normalized].slice(0, limit).join('') : null;
+}
+
+function normalizeUniqueStrings(
+  value: unknown,
+  excluded = '',
+  limit = 10,
+  textLimit = 1000,
+): string[] {
+  if (!Array.isArray(value)) return [];
   const seen = new Set(excluded ? [normalizedText(excluded).toLocaleLowerCase()] : []);
   return value.flatMap((entry) => {
-    if (typeof entry !== 'string') return [];
-    const text = normalizedText(entry);
+    const text = boundedText(entry, textLimit);
+    if (!text) return [];
     const key = text.toLocaleLowerCase();
-    if (!text || seen.has(key)) return [];
+    if (seen.has(key)) return [];
     seen.add(key);
     return [text];
   }).slice(0, limit);
 }
 
 /** Normalize harmless model variation before strict domain validation. */
-function normalizeModelOutput(raw: unknown, hasContext: boolean): unknown {
+function normalizeModelOutput(raw: unknown, input: EnrichmentInput): unknown {
   if (!isRecord(raw) || !Array.isArray(raw.candidates)) return raw;
   return {
-    ...raw,
-    sourceLanguageCode:
-      typeof raw.sourceLanguageCode === 'string'
-        ? normalizedText(raw.sourceLanguageCode)
-        : raw.sourceLanguageCode,
+    sourceLanguageCode: input.sourceLanguageCode ?? boundedText(raw.sourceLanguageCode, 64),
     candidates: raw.candidates.slice(0, 5).map((candidate) => {
       if (!isRecord(candidate)) return candidate;
-      const text = typeof candidate.text === 'string' ? normalizedText(candidate.text) : '';
+      const text = boundedText(candidate.text, 1000);
       return {
-        ...candidate,
-        ...(typeof candidate.text === 'string' ? { text } : {}),
-        variants: normalizeUniqueStrings(candidate.variants, text),
-        partOfSpeech:
-          typeof candidate.partOfSpeech === 'string'
-            ? normalizedText(candidate.partOfSpeech) || null
-            : candidate.partOfSpeech,
-        explanation:
-          typeof candidate.explanation === 'string'
-            ? normalizedText(candidate.explanation) || null
-            : candidate.explanation,
-        examples: normalizeUniqueStrings(candidate.examples, '', 5),
-        contextUsed: hasContext ? candidate.contextUsed : false,
+        text,
+        variants: normalizeUniqueStrings(candidate.variants, text ?? ''),
+        partOfSpeech: boundedText(candidate.partOfSpeech, 100),
+        explanation: boundedText(candidate.explanation, 1000),
+        examples: normalizeUniqueStrings(candidate.examples, '', 5, 4000),
+        contextUsed: Boolean(input.sentenceText && candidate.contextUsed === true),
       };
     }),
   };
@@ -143,12 +142,11 @@ export class AnthropicProvider implements EnrichmentProvider {
     const textBlocks = message.content.filter((c) => c.type === 'text');
     if (!textBlocks.length || textBlocks.length > 5)
       throw new Error('Anthropic text output is missing or oversized');
-    const raw: unknown = normalizeModelOutput(
-      JSON.parse(textBlocks.map((c) => c.text).join('')),
-      Boolean(input.sentenceText),
-    );
-    if (!raw || typeof raw !== 'object' || Array.isArray(raw) || 'providerModel' in raw)
+    const parsed: unknown = JSON.parse(textBlocks.map((c) => c.text).join(''));
+    if (!isRecord(parsed) || 'providerModel' in parsed)
       throw new Error('Invalid Anthropic output');
+    const raw = normalizeModelOutput(parsed, input);
+    if (!isRecord(raw)) throw new Error('Invalid Anthropic output');
     return { ...raw, providerModel: message.model };
   }
 }

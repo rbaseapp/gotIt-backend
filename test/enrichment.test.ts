@@ -246,8 +246,7 @@ test('direct Anthropic uses configured model/schema and safe bounded output; ref
     assert.equal(payload.max_tokens, 4096);
     assert.equal(payload.output_config.format.type, 'json_schema');
     assert.equal(
-      payload.output_config.format.schema.properties.candidates.items.properties.explanation
-        .anyOf[0].type,
+      payload.output_config.format.schema.properties.candidates.items.properties.explanation.type,
       'string',
     );
     const supplied = JSON.parse(payload.messages[0].content).untrustedTranslationData;
@@ -316,7 +315,7 @@ test('Anthropic normalizes harmless whitespace, empty nullable fields and duplic
       content: [{
         type: 'text',
         text: JSON.stringify({
-          sourceLanguageCode: ' en ',
+          sourceLanguageCode: ' en-US ',
           candidates: [{
             text: ' חיוני ',
             variants: ['חיוני', ' הכרחי ', 'הכרחי'],
@@ -324,6 +323,7 @@ test('Anthropic normalizes harmless whitespace, empty nullable fields and duplic
             explanation: '   ',
             contextUsed: true,
             examples: ['This is essential.', ' This is essential. '],
+            harmlessExtraField: 'discarded',
           }],
         }),
       }],
