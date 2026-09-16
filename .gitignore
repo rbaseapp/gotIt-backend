@@ -14,3 +14,4 @@ coverage/
 *-logout.json
 GOTIT_BACKEND_*.zip
 B1_*_APPLY.md
+.local-backups/

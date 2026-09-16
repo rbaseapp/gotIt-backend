@@ -22,6 +22,7 @@ export type ProfileLanguage = {
 };
 
 export type GotItProfile = {
+  learningPreferences?: { enabledSkills: import('../learning/learning.policy.js').Skill[] };
   defaultTranslationLanguage: string | null;
   timezone: string;
   dailyGoal: {
@@ -35,6 +36,7 @@ export type GotItProfile = {
 };
 
 export type ProfilePatchInput = {
+  learningPreferences?: { enabledSkills: import('../learning/learning.policy.js').Skill[] };
   defaultTranslationLanguage?: string | null;
   timezone?: string;
   dailyGoal?: {
@@ -57,6 +59,7 @@ export type ProfileDefaults = Pick<
   | 'dailyGoal'
   | 'defaultNewItemsPerDay'
   | 'translationMethodPreference'
+  | 'learningPreferences'
 >;
 
 export interface ProfileServiceContract {

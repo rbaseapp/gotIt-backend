@@ -7,3 +7,10 @@ test
 .gitignore
 README.md
 *.log
+coverage
+*-register.json
+*-login.json
+*-refresh.json
+*-logout.json
+GOTIT_BACKEND_*.zip
+B1_*_APPLY.md

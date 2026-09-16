@@ -7,8 +7,12 @@ import { CoreAuthClient } from '../src/shared/core/core-auth.client.js';
 
 const logger = pino({ enabled: false });
 const profileService = {
-  getProfile: async () => { throw new Error('not used'); },
-  patchProfile: async () => { throw new Error('not used'); },
+  getProfile: async () => {
+    throw new Error('not used');
+  },
+  patchProfile: async () => {
+    throw new Error('not used');
+  },
 };
 
 const coreAuthClient = new CoreAuthClient({

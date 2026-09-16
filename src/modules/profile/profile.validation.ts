@@ -1,9 +1,5 @@
 import { z } from 'zod';
-import {
-  CEFR_LEVELS,
-  DAILY_GOAL_TYPES,
-  TRANSLATION_METHODS,
-} from './profile.types.js';
+import { CEFR_LEVELS, DAILY_GOAL_TYPES, TRANSLATION_METHODS } from './profile.types.js';
 
 function canonicalLanguageCode(value: string) {
   try {
@@ -31,14 +27,9 @@ const languageCodeSchema = z
     message: 'Invalid BCP-47 language code',
   });
 
-const timeZoneSchema = z
-  .string()
-  .trim()
-  .min(1)
-  .max(100)
-  .refine(isValidTimeZone, {
-    message: 'Invalid IANA timezone',
-  });
+const timeZoneSchema = z.string().trim().min(1).max(100).refine(isValidTimeZone, {
+  message: 'Invalid IANA timezone',
+});
 
 const languageSchema = z
   .object({
@@ -49,6 +40,16 @@ const languageSchema = z
 
 export const profilePatchSchema = z
   .object({
+    learningPreferences: z
+      .object({
+        enabledSkills: z
+          .array(z.enum(['recognition', 'recall', 'listening', 'spelling', 'pronunciation']))
+          .min(1)
+          .max(5)
+          .refine((v) => new Set(v).size === v.length, 'Duplicate enabled skills'),
+      })
+      .strict()
+      .optional(),
     defaultTranslationLanguage: languageCodeSchema.nullable().optional(),
     timezone: timeZoneSchema.optional(),
     dailyGoal: z

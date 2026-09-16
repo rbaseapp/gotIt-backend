@@ -1,12 +1,32 @@
 import { Router } from 'express';
+import { createCaptureRoutes, createLearningItemRoutes } from './modules/capture/capture.routes.js';
 import { createProfileRoutes } from './modules/profile/profile.routes.js';
+import { createLibraryRoutes, createTagRoutes } from './modules/library/library.routes.js';
+import { createLearningRoutes, createPracticeRoutes } from './modules/practice/practice.routes.js';
+import {
+  createDashboardRoutes,
+  createGamificationRoutes,
+} from './modules/dashboard/dashboard.routes.js';
+import { createTransferRoutes } from './modules/transfer/transfer.routes.js';
+import { createReadingRoutes } from './modules/reading/reading.routes.js';
+import {
+  createPronunciationRoutes,
+  createSpeechItemRoutes,
+} from './modules/speech/speech.routes.js';
+import { createRateLimit } from './shared/middleware/rate-limit.js';
+import { API_ROUTES } from './shared/http/api-catalog.js';
 import { AppError } from './shared/errors/app-error.js';
 import type { AppDependencies } from './shared/http/dependencies.js';
 import { createAuthenticateMiddleware } from './shared/middleware/authenticate.js';
 
 export function createRoutes(dependencies: AppDependencies) {
   const router = Router();
-  const authenticate = createAuthenticateMiddleware(dependencies.coreAuthClient);
+  const authenticate = dependencies.rateLimiter
+    ? [
+        createAuthenticateMiddleware(dependencies.coreAuthClient),
+        createRateLimit(dependencies.rateLimiter, 'user', 120),
+      ]
+    : [createAuthenticateMiddleware(dependencies.coreAuthClient)];
 
   router.get('/health', (request, response) => {
     response.status(200).json({
@@ -43,13 +63,59 @@ export function createRoutes(dependencies: AppDependencies) {
   router.get('/api/v1', (request, response) => {
     response.status(200).json({
       name: 'GotIt Backend API',
+      routes: API_ROUTES,
       version: 'v1',
       service: 'gotit-backend',
       requestId: request.id,
     });
   });
 
-  router.use('/api/v1/profile', authenticate, createProfileRoutes(dependencies.profileService));
+  router.use('/api/v1', ...authenticate);
+  router.get('/api/v1/capabilities', async (req, res) => {
+    const profile = await dependencies.profileService.getProfile(req.gotitAuth!);
+    res.json({
+      configured: {
+        library: Boolean(dependencies.libraryService),
+        practice: Boolean(dependencies.practiceService),
+        dashboard: Boolean(dependencies.dashboardService),
+        readingGeneration: dependencies.readingService?.available ?? false,
+        speech: dependencies.speechService?.available ?? false,
+      },
+      learningLanguages: profile.languages.map((l) => ({
+        languageCode: l.languageCode,
+        enabledSkills: dependencies.practiceService?.availableSkills(profile, l.languageCode) ?? [],
+      })),
+      requestId: req.id,
+    });
+  });
+  router.use('/api/v1/profile', createProfileRoutes(dependencies.profileService));
+  if (dependencies.libraryService) {
+    router.use('/api/v1/learning-items', createLibraryRoutes(dependencies.libraryService));
+    router.use('/api/v1/tags', createTagRoutes(dependencies.libraryService));
+  }
+  if (dependencies.practiceService) {
+    router.use('/api/v1/practice', createPracticeRoutes(dependencies.practiceService));
+    router.use('/api/v1/learning', createLearningRoutes(dependencies.practiceService));
+  }
+  if (dependencies.dashboardService) {
+    router.use('/api/v1/dashboard', createDashboardRoutes(dependencies.dashboardService));
+    router.use('/api/v1/gamification', createGamificationRoutes(dependencies.dashboardService));
+  }
+  if (dependencies.readingService)
+    router.use('/api/v1/reading', createReadingRoutes(dependencies.readingService));
+  if (dependencies.speechService) {
+    router.use('/api/v1/learning-items', createSpeechItemRoutes(dependencies.speechService));
+    router.use('/api/v1/pronunciation', createPronunciationRoutes(dependencies.speechService));
+  }
+  if (dependencies.transferPool && dependencies.captureService)
+    router.use(
+      '/api/v1',
+      createTransferRoutes(dependencies.transferPool, dependencies.captureService),
+    );
+  if (dependencies.captureService) {
+    router.use('/api/v1/captures', createCaptureRoutes(dependencies.captureService));
+    router.use('/api/v1/learning-items', createLearningItemRoutes(dependencies.captureService));
+  }
 
   return router;
 }

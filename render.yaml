@@ -1,0 +1,28 @@
+services:
+  - type: web
+    name: gotit-backend
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /ready
+    # Optional on a verified paid service: preDeployCommand: node scripts/preflight.js
+    autoDeployTrigger: off
+    maxShutdownDelaySeconds: 90
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: LOG_LEVEL
+        value: info
+      - key: DATABASE_URL
+        sync: false
+      - key: CORE_API_BASE_URL
+        value: https://rbase-core-api.onrender.com
+      - key: CORE_APPLICATION_KEY
+        value: gotit
+      - key: CORS_ORIGINS
+        sync: false
+      - key: TRUST_PROXY_HOPS
+        value: '0'
+      - key: ENRICHMENT_SIGNING_SECRET
+        generateValue: true
+# Migration administrator credentials belong in a separate one-off migration job.
+# Add optional provider secrets/models after validating the enabled API and access.

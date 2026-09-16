@@ -1,0 +1,48 @@
+name: Backend validation
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: gotit-backend
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          path: gotit-backend
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: gotit-backend/package-lock.json
+      - run: npm ci
+      - run: npm run format:check
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+      - name: Require a pinned read-only Core baseline for integration
+        env:
+          CORE_REPOSITORY: ${{ vars.CORE_PLATFORM_REPOSITORY }}
+          CORE_REF: ${{ vars.CORE_PLATFORM_REF }}
+        run: |
+          test -n "$CORE_REPOSITORY" || { echo 'Configure CORE_PLATFORM_REPOSITORY'; exit 1; }
+          [[ "$CORE_REF" =~ ^[a-fA-F0-9]{40}$ ]] || { echo 'Configure CORE_PLATFORM_REF with the reviewed Core commit SHA'; exit 1; }
+      - uses: actions/checkout@v7
+        with:
+          repository: ${{ vars.CORE_PLATFORM_REPOSITORY }}
+          ref: ${{ vars.CORE_PLATFORM_REF }}
+          token: ${{ secrets.CORE_PLATFORM_READ_TOKEN || github.token }}
+          path: core-platform
+          persist-credentials: false
+      - name: Install historical migration tooling without changing Core source
+        run: npm ci --ignore-scripts --prefix ../core-platform
+      - run: npm run test:integration
+      - run: docker build -t gotit-backend:ci .

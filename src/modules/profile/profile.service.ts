@@ -14,10 +14,7 @@ export class ProfileService implements ProfileServiceContract {
     return this.repository.ensureAndGet(scope, PROFILE_DEFAULTS);
   }
 
-  async patchProfile(
-    scope: ProfileScope,
-    input: ProfilePatchInput,
-  ): Promise<GotItProfile> {
+  async patchProfile(scope: ProfileScope, input: ProfilePatchInput): Promise<GotItProfile> {
     const normalized = normalizePatch(input);
     return this.repository.patch(scope, PROFILE_DEFAULTS, normalized);
   }

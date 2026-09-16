@@ -1,15 +1,19 @@
 import { z } from 'zod';
 import { AppError } from '../errors/app-error.js';
 
-const coreMeResponseSchema = z.object({
-  user: z.object({
-    id: z.string().uuid(),
-    applicationId: z.string().uuid(),
-    email: z.string().email().optional(),
-    emailVerified: z.boolean().optional(),
-    status: z.string().optional(),
-  }).passthrough(),
-}).passthrough();
+const coreMeResponseSchema = z
+  .object({
+    user: z
+      .object({
+        id: z.string().uuid(),
+        applicationId: z.string().uuid(),
+        email: z.string().email().optional(),
+        emailVerified: z.boolean().optional(),
+        status: z.string().optional(),
+      })
+      .passthrough(),
+  })
+  .passthrough();
 
 export type CoreAuthenticatedIdentity = {
   applicationId: string;
@@ -61,11 +65,7 @@ export class CoreAuthClient {
     }
 
     if (!response.ok) {
-      throw new AppError(
-        503,
-        'CORE_AUTH_UNAVAILABLE',
-        'Authentication service is unavailable',
-      );
+      throw new AppError(503, 'CORE_AUTH_UNAVAILABLE', 'Authentication service is unavailable');
     }
 
     let payload: unknown;
