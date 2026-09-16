@@ -21,7 +21,7 @@ export type EnrichmentResult =
 export type ProviderTrace = {
   provider: EnrichmentProvider;
   profile: ModelProfile;
-  status: 'succeeded' | 'failed' | 'timed_out';
+  status: 'succeeded' | 'failed_provider' | 'failed_validation' | 'timed_out';
   latencyMs: number;
   sourceLanguageCode: string | null;
 };
@@ -98,10 +98,12 @@ export class EnrichmentRegistry {
       const controller = new AbortController();
       let timer: ReturnType<typeof setTimeout> | undefined;
       let output: z.output<typeof outputSchema> | undefined;
-      let status: ProviderTrace['status'] = 'failed';
+      let status: ProviderTrace['status'] = 'failed_provider';
+      const failureStage: { value: 'provider' | 'validation' } = { value: 'provider' };
       try {
         output = await Promise.race([
           provider.enrich(input, profile, controller.signal).then((raw) => {
+            failureStage.value = 'validation';
             // Aggregate budget also bounds tickets with five candidates.
             if (Buffer.byteLength(JSON.stringify(raw)) > 40000)
               throw new Error('Oversized provider output');
@@ -133,7 +135,11 @@ export class EnrichmentRegistry {
         ]);
         status = 'succeeded';
       } catch {
-        status = controller.signal.aborted ? 'timed_out' : 'failed';
+        status = controller.signal.aborted
+          ? 'timed_out'
+          : failureStage.value === 'validation'
+            ? 'failed_validation'
+            : 'failed_provider';
       } finally {
         if (timer) clearTimeout(timer);
       }
@@ -144,7 +150,7 @@ export class EnrichmentRegistry {
         : profile;
       if (output?.providerModel && !provider.capabilities.models) {
         output = undefined;
-        status = 'failed';
+        status = 'failed_validation';
       }
       await record({
         provider,
