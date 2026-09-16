@@ -61,7 +61,7 @@ export class PracticeService {
             sourceText: r.source_text,
             sourceLanguageCode: r.source_language_code,
             translationLanguageCode: r.translation_language_code,
-            primaryTranslation: r.primary,
+            primaryTranslation: r.primary_translation,
             learningStatus: r.learning_status,
             nextReviewAt: r.next_review_at,
             queueScore: Number(r.queue_score),
@@ -81,7 +81,7 @@ export class PracticeService {
     return (
       await tx.query(
         `WITH candidates AS(SELECT li.*,
-      (SELECT translation_text FROM product_gotit.item_translations t WHERE t.application_id=li.application_id AND t.application_user_id=li.application_user_id AND t.learning_item_id=li.id AND t.is_current AND is_primary) primary,
+      (SELECT translation_text FROM product_gotit.item_translations t WHERE t.application_id=li.application_id AND t.application_user_id=li.application_user_id AND t.learning_item_id=li.id AND t.is_current AND is_primary) primary_translation,
       (CASE WHEN li.next_review_at<=now() THEN 100+LEAST(100,EXTRACT(epoch FROM now()-li.next_review_at)/86400) ELSE 0 END
        +(100-li.overall_mastery_score)/2+CASE WHEN li.user_priority='high' THEN 30 ELSE 0 END
        +CASE WHEN li.manual_hard THEN 20 ELSE 0 END+COALESCE(li.system_difficulty,0)*20
@@ -89,7 +89,7 @@ export class PracticeService {
        +CASE WHEN li.learning_status='new' THEN 15 ELSE 0 END) queue_score,
       row_number() OVER(PARTITION BY learning_status ORDER BY created_at,id) new_rank
       FROM product_gotit.learning_items li WHERE application_id=$1 AND application_user_id=$2 AND user_status='active' AND deleted_at IS NULL)
-      SELECT * FROM candidates WHERE primary IS NOT NULL AND
+      SELECT * FROM candidates WHERE primary_translation IS NOT NULL AND
       (learning_status<>'new' OR new_rank<=GREATEST(0,$3-(SELECT count(DISTINCT a.learning_item_id) FROM product_gotit.practice_attempts a
        JOIN product_gotit.learning_items i ON i.application_id=a.application_id AND i.application_user_id=a.application_user_id AND i.id=a.learning_item_id
        WHERE a.application_id=$1 AND a.application_user_id=$2 AND (a.created_at AT TIME ZONE $4)::date=(now() AT TIME ZONE $4)::date AND a.result<>'skipped' AND NOT EXISTS(SELECT 1 FROM product_gotit.practice_attempts older WHERE older.application_id=a.application_id AND older.application_user_id=a.application_user_id AND older.learning_item_id=a.learning_item_id AND older.result<>'skipped' AND (older.created_at AT TIME ZONE $4)::date<(now() AT TIME ZONE $4)::date))))
