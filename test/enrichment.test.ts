@@ -308,6 +308,49 @@ test('direct Anthropic uses configured model/schema and safe bounded output; ref
     assert.equal(failureCalls, 1);
   }
 });
+test('Anthropic normalizes harmless whitespace, empty nullable fields and duplicate forms before strict validation', async () => {
+  const adapter = new AnthropicProvider('test-only-key', async () =>
+    Response.json({
+      model: 'claude-sonnet-5',
+      stop_reason: 'end_turn',
+      content: [{
+        type: 'text',
+        text: JSON.stringify({
+          sourceLanguageCode: ' en ',
+          candidates: [{
+            text: ' חיוני ',
+            variants: ['חיוני', ' הכרחי ', 'הכרחי'],
+            partOfSpeech: ' שם תואר ',
+            explanation: '   ',
+            contextUsed: true,
+            examples: ['This is essential.', ' This is essential. '],
+          }],
+        }),
+      }],
+    }),
+  );
+  const registry = new EnrichmentRegistry(
+    [adapter],
+    [profile('chosen', 'anthropic', 'claude-sonnet-5')],
+    { ai: { profiles: ['chosen'], timeoutMs: 1000 } },
+  );
+
+  const result = await registry.enrich('ai', input, async () => {});
+
+  assert.equal(result.status, 'succeeded');
+  if (result.status !== 'succeeded') return;
+  assert.equal(result.output.sourceLanguageCode, 'en');
+  assert.deepEqual(result.output.candidates[0], {
+    text: 'חיוני',
+    variants: ['הכרחי'],
+    partOfSpeech: 'שם תואר',
+    explanation: null,
+    phoneticText: null,
+    phoneticScheme: null,
+    examples: ['This is essential.'],
+    contextUsed: true,
+  });
+});
 test('Anthropic handles adaptive-thinking blocks and configurable thinking mode without leaking reasoning into candidates', async () => {
   for (const thinkingMode of [undefined, 'adaptive', 'disabled'] as const) {
     let calls = 0;
