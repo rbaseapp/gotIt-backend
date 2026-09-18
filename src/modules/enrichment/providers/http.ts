@@ -4,6 +4,8 @@ export type ProviderFailureCode =
   | 'permission'
   | 'rate_limit'
   | 'invalid_request'
+  | 'timeout'
+  | 'invalid_response'
   | 'upstream';
 
 export class ProviderHttpError extends Error {

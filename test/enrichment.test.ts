@@ -176,7 +176,10 @@ test('fallback occurs only through a configured route and all attempts share one
   const noFallback = new EnrichmentRegistry([first, second], profiles, {
     auto: { profiles: ['first'], timeoutMs: 1000 },
   });
-  assert.equal((await noFallback.enrich('auto', input, async () => {})).status, 'unavailable');
+  assert.deepEqual(await noFallback.enrich('auto', input, async () => {}), {
+    status: 'unavailable',
+    reason: 'upstream',
+  });
   assert.equal(secondCalls, 0);
   const fallback = new EnrichmentRegistry([first, second], profiles, {
     auto: { profiles: ['first', 'second'], timeoutMs: 1000 },
@@ -200,13 +203,11 @@ test('fallback occurs only through a configured route and all attempts share one
     auto: { profiles: ['first', 'second'], timeoutMs: 20 },
   });
   const traces: ProviderTrace[] = [];
-  assert.equal(
-    (
-      await deadline.enrich('auto', input, async (trace) => {
-        traces.push(trace);
-      })
-    ).status,
-    'unavailable',
+  assert.deepEqual(
+    await deadline.enrich('auto', input, async (trace) => {
+      traces.push(trace);
+    }),
+    { status: 'unavailable', reason: 'timeout' },
   );
   assert.equal(aborted, true);
   assert.equal(traces[0]?.status, 'timed_out');
@@ -238,7 +239,10 @@ test('invalid output, oversized aggregate and false capabilities become manual u
     const registry = new EnrichmentRegistry([adapter], [profile('test', 'test')], {
       ai: { profiles: ['test'], timeoutMs: 1000 },
     });
-    assert.equal((await registry.enrich('ai', input, async () => {})).status, 'unavailable');
+    assert.deepEqual(await registry.enrich('ai', input, async () => {}), {
+      status: 'unavailable',
+      reason: 'invalid_response',
+    });
   }
   const registry = new EnrichmentRegistry([provider('test')], [profile('test', 'test')], {
     ai: { profiles: ['test'], timeoutMs: 1000 },

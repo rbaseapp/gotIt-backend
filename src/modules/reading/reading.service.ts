@@ -122,6 +122,12 @@ export class ReadingService {
       ]);
     } catch (error) {
       const providerFailure = providerFailureCode(error);
+      if (controller.signal.aborted)
+        throw new AppError(
+          503,
+          'READING_PROVIDER_TIMEOUT',
+          'The AI provider did not respond before the generation deadline',
+        );
       if (providerFailure === 'authentication')
         throw new AppError(
           503,
@@ -152,10 +158,22 @@ export class ReadingService {
           'READING_PROVIDER_REQUEST_INVALID',
           'The AI provider rejected the generation request',
         );
+      if (providerFailure === 'upstream')
+        throw new AppError(
+          503,
+          'READING_PROVIDER_UPSTREAM',
+          'The AI provider is temporarily unavailable',
+        );
+      if (error instanceof SyntaxError || error instanceof z.ZodError)
+        throw new AppError(
+          503,
+          'READING_PROVIDER_RESPONSE_INVALID',
+          'The AI provider returned an invalid generation response',
+        );
       throw new AppError(
         503,
-        'READING_UNAVAILABLE',
-        'Reading generation is temporarily unavailable',
+        'READING_PROVIDER_UPSTREAM',
+        'The AI provider request failed before a valid response was received',
       );
     } finally {
       clearTimeout(timer);
@@ -164,7 +182,11 @@ export class ReadingService {
       .extend({ providerModel: z.string().max(200).nullable() })
       .safeParse(generated);
     if (!parsedContent.success)
-      throw new AppError(503, 'READING_UNAVAILABLE', 'Reading provider returned invalid content');
+      throw new AppError(
+        503,
+        'READING_PROVIDER_RESPONSE_INVALID',
+        'Reading provider returned invalid content',
+      );
     const { providerModel, ...content } = parsedContent.data;
     const bound = targets.map((target) => {
       const ranges: { start: number; end: number }[] = [],
@@ -178,7 +200,7 @@ export class ReadingService {
       if (!ranges.length)
         throw new AppError(
           503,
-          'READING_UNAVAILABLE',
+          'READING_PROVIDER_RESPONSE_INVALID',
           'Generated passage did not include all targets',
         );
       return { ...target, occurrenceCount: ranges.length, ranges };

@@ -138,12 +138,18 @@ export class EnrichmentRegistry {
         ]);
         status = 'succeeded';
       } catch (error) {
-        lastFailure = providerFailureCode(error);
         status = controller.signal.aborted
           ? 'timed_out'
           : failureStage.value === 'validation'
             ? 'failed_validation'
             : 'failed_provider';
+        lastFailure =
+          providerFailureCode(error) ??
+          (status === 'timed_out'
+            ? 'timeout'
+            : status === 'failed_validation'
+              ? 'invalid_response'
+              : 'upstream');
       } finally {
         if (timer) clearTimeout(timer);
       }
