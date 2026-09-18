@@ -38,3 +38,24 @@ test('provider 404 is treated as an inaccessible workspace or model', async () =
     (error: unknown) => providerFailureCode(error) === 'permission',
   );
 });
+
+test('provider safely distinguishes workspace and model access failures', async () => {
+  for (const [status, message, expected] of [
+    [404, 'Workspace `wrkspc_private` not found.', 'workspace'],
+    [400, 'anthropic-workspace-id is required for this API key.', 'workspace'],
+    [404, 'The requested model does not exist or you do not have access to it.', 'model_access'],
+  ] as const) {
+    await assert.rejects(
+      readProviderJson(
+        Response.json({ error: { type: 'not_found_error', message } }, { status }),
+        new AbortController().signal,
+      ),
+      (error: unknown) => {
+        assert.ok(error instanceof ProviderHttpError);
+        assert.equal(providerFailureCode(error), expected);
+        assert.equal(error.message.includes(message), false);
+        return true;
+      },
+    );
+  }
+});

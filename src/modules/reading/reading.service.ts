@@ -146,6 +146,18 @@ export class ReadingService {
           'READING_PROVIDER_PERMISSION',
           'The configured API key cannot access the requested AI model or workspace',
         );
+      if (providerFailure === 'workspace')
+        throw new AppError(
+          503,
+          'READING_PROVIDER_WORKSPACE',
+          'The configured Anthropic workspace does not match the API key',
+        );
+      if (providerFailure === 'model_access')
+        throw new AppError(
+          503,
+          'READING_PROVIDER_MODEL_ACCESS',
+          'The configured Anthropic model is unavailable to this API key',
+        );
       if (providerFailure === 'rate_limit')
         throw new AppError(
           503,

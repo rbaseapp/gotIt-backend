@@ -345,6 +345,36 @@ test('Anthropic authentication failures remain actionable without exposing the u
     reason: 'authentication',
   });
 });
+test('Anthropic translation retries without a stale optional workspace', async () => {
+  const workspaceHeaders: Array<string | null> = [];
+  const adapter = new AnthropicProvider(
+    'test-only-key',
+    async (_url, init) => {
+      workspaceHeaders.push(new Headers(init?.headers).get('anthropic-workspace-id'));
+      if (workspaceHeaders.length === 1)
+        return Response.json(
+          { error: { type: 'not_found_error', message: 'Workspace not found.' } },
+          { status: 404 },
+        );
+      return Response.json({
+        model: 'claude-haiku-4-5-20251001',
+        stop_reason: 'end_turn',
+        content: [{ type: 'text', text: JSON.stringify(output) }],
+      });
+    },
+    'wrkspc_stale',
+  );
+  const registry = new EnrichmentRegistry(
+    [adapter],
+    [profile('chosen', 'anthropic', 'claude-haiku-4-5-20251001')],
+    { ai: { profiles: ['chosen'], timeoutMs: 1000 } },
+  );
+
+  const result = await registry.enrich('ai', input, async () => {});
+
+  assert.equal(result.status, 'succeeded');
+  assert.deepEqual(workspaceHeaders, ['wrkspc_stale', null]);
+});
 test('Anthropic normalizes harmless whitespace, empty nullable fields and duplicate forms before strict validation', async () => {
   const adapter = new AnthropicProvider('test-only-key', async () =>
     Response.json({

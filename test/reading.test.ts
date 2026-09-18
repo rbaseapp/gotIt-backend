@@ -86,6 +86,39 @@ test('reading generation accepts fenced JSON and ignores thinking blocks', async
   assert.match(result.bodyText, /train station/u);
 });
 
+test('reading generation retries without a stale optional workspace', async () => {
+  const workspaceHeaders: Array<string | null> = [];
+  const generator = new AnthropicReadingGenerator(
+    'test-key',
+    'claude-sonnet-5',
+    false,
+    async (_url, init) => {
+      workspaceHeaders.push(new Headers(init?.headers).get('anthropic-workspace-id'));
+      if (workspaceHeaders.length === 1)
+        return Response.json(
+          { error: { type: 'not_found_error', message: 'Workspace not found.' } },
+          { status: 404 },
+        );
+      return Response.json({
+        model: 'claude-sonnet-5',
+        stop_reason: 'end_turn',
+        content: [
+          {
+            type: 'text',
+            text: '{"title":"A journey","bodyText":"The train station was busy."}',
+          },
+        ],
+      });
+    },
+    'wrkspc_stale',
+  );
+
+  const result = await generator.generate(input, new AbortController().signal);
+
+  assert.deepEqual(workspaceHeaders, ['wrkspc_stale', null]);
+  assert.equal(result.title, 'A journey');
+});
+
 const requestSchema = {
   type: 'object',
   additionalProperties: false,
