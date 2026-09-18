@@ -23,7 +23,9 @@ export function providerFailureCode(error: unknown): ProviderFailureCode | undef
 function failureCode(status: number): ProviderFailureCode {
   if (status === 401) return 'authentication';
   if (status === 402) return 'billing';
-  if (status === 403) return 'permission';
+  // Anthropic deliberately returns 404 for an inaccessible or incorrect
+  // workspace/model, so surface it as an actionable permission problem.
+  if (status === 403 || status === 404) return 'permission';
   if (status === 429) return 'rate_limit';
   if (status === 400) return 'invalid_request';
   return 'upstream';

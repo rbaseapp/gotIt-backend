@@ -31,3 +31,10 @@ test('provider HTTP failures retain only a safe actionable category', async () =
     );
   }
 });
+
+test('provider 404 is treated as an inaccessible workspace or model', async () => {
+  await assert.rejects(
+    readProviderJson(new Response(null, { status: 404 }), new AbortController().signal),
+    (error: unknown) => providerFailureCode(error) === 'permission',
+  );
+});
