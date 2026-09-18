@@ -37,9 +37,9 @@ function route() {
 export function createEnrichment(
   settings: {
     ANTHROPIC_API_KEY?: string;
+    ANTHROPIC_WORKSPACE_ID?: string;
     AI_TRANSLATION_MODEL?: string;
     CLAUDE_STRUCTURED_OUTPUT?: boolean;
-    CLAUDE_THINKING_MODE?: 'adaptive' | 'disabled';
     ENRICHMENT_SIGNING_SECRET?: string;
     ENRICHMENT_PROFILES_JSON?: string;
     GOOGLE_TRANSLATION_API?: 'cloud_basic_v2';
@@ -55,7 +55,10 @@ export function createEnrichment(
       throw new Error('AI_TRANSLATION_MODEL requires ANTHROPIC_API_KEY');
   }
   const providers = [...additionalProviders];
-  if (settings.ANTHROPIC_API_KEY) providers.push(new AnthropicProvider(settings.ANTHROPIC_API_KEY));
+  if (settings.ANTHROPIC_API_KEY)
+    providers.push(
+      new AnthropicProvider(settings.ANTHROPIC_API_KEY, fetch, settings.ANTHROPIC_WORKSPACE_ID),
+    );
   if (settings.GOOGLE_TRANSLATION_API) {
     if (!settings.GOOGLE_TRANSLATE_API_KEY)
       throw new Error('Configured Google translation requires credentials');
@@ -80,13 +83,11 @@ export function createEnrichment(
         id: 'claude_default',
         providerId: 'anthropic',
         model: settings.AI_TRANSLATION_MODEL,
-        timeoutMs: 8000,
+        timeoutMs: 20000,
         structuredOutput: settings.CLAUDE_STRUCTURED_OUTPUT ?? false,
-        thinkingMode: settings.CLAUDE_THINKING_MODE,
       });
       routes = {
-        auto: { profiles: ['claude_default'], timeoutMs: 8000 },
-        ai: { profiles: ['claude_default'], timeoutMs: 8000 },
+        ai: { profiles: ['claude_default'], timeoutMs: 20000 },
       };
     }
     if (settings.GOOGLE_TRANSLATION_API) {

@@ -98,7 +98,7 @@ test('providers and model profiles can change without capture-specific vendor br
     { status: 'not_configured' },
   );
 });
-test('default Claude configuration serves auto as well as explicit AI until Google overrides auto', async () => {
+test('default Claude configuration serves only explicit AI while Google owns automatic translation', async () => {
   const configured = createEnrichment({
     ANTHROPIC_API_KEY: 'test-key',
     AI_TRANSLATION_MODEL: 'configured-model',
@@ -107,13 +107,32 @@ test('default Claude configuration serves auto as well as explicit AI until Goog
   const registryConfig = configured.registry as unknown as {
     routes: Record<string, { profiles: string[]; timeoutMs: number }>;
   };
-  assert.deepEqual(registryConfig.routes.auto, {
-    profiles: ['claude_default'],
-    timeoutMs: 8000,
-  });
+  assert.equal(registryConfig.routes.auto, undefined);
   assert.deepEqual(registryConfig.routes.ai, {
     profiles: ['claude_default'],
-    timeoutMs: 8000,
+    timeoutMs: 20000,
+  });
+
+  const withGoogle = createEnrichment({
+    ANTHROPIC_API_KEY: 'test-key',
+    AI_TRANSLATION_MODEL: 'configured-model',
+    GOOGLE_TRANSLATION_API: 'cloud_basic_v2',
+    GOOGLE_TRANSLATE_API_KEY: 'google-test-key',
+    ENRICHMENT_SIGNING_SECRET: 's'.repeat(32),
+  }).registry as unknown as {
+    routes: Record<string, { profiles: string[]; timeoutMs: number }>;
+  };
+  assert.deepEqual(withGoogle.routes.auto, {
+    profiles: ['google_default'],
+    timeoutMs: 5000,
+  });
+  assert.deepEqual(withGoogle.routes.dictionary, {
+    profiles: ['google_default'],
+    timeoutMs: 5000,
+  });
+  assert.deepEqual(withGoogle.routes.ai, {
+    profiles: ['claude_default'],
+    timeoutMs: 20000,
   });
   assert.throws(() => createEnrichment({ ANTHROPIC_API_KEY: 'test-key' }), /AI_TRANSLATION_MODEL/u);
 });
@@ -241,14 +260,12 @@ test('direct Anthropic uses configured model/schema and safe bounded output; ref
   const fetchImpl: typeof fetch = async (url, init) => {
     calls++;
     assert.equal(url, 'https://api.anthropic.com/v1/messages');
+    assert.equal(new Headers(init?.headers).get('anthropic-workspace-id'), 'wrkspc_test');
     const payload = JSON.parse(String(init?.body));
     assert.equal(payload.model, 'chosen-model');
     assert.equal(payload.max_tokens, 1200);
     assert.equal(payload.output_config.format.type, 'json_schema');
-    assert.equal(
-      payload.output_config.format.schema.properties.explanation.type,
-      'string',
-    );
+    assert.equal(payload.output_config.format.schema.properties.explanation.type, 'string');
     assert.equal(payload.output_config.format.schema.properties.candidates, undefined);
     const supplied = JSON.parse(payload.messages[0].content).untrustedTranslationData;
     assert.deepEqual(supplied, input);
@@ -259,7 +276,7 @@ test('direct Anthropic uses configured model/schema and safe bounded output; ref
       content: [{ type: 'text', text: JSON.stringify(output) }],
     });
   };
-  const adapter = new AnthropicProvider('test-only-key', fetchImpl);
+  const adapter = new AnthropicProvider('test-only-key', fetchImpl, 'wrkspc_test');
   const registry = new EnrichmentRegistry(
     [adapter],
     [{ ...profile('chosen', 'anthropic', 'chosen-model'), structuredOutput: true }],
@@ -308,24 +325,42 @@ test('direct Anthropic uses configured model/schema and safe bounded output; ref
     assert.equal(failureCalls, 1);
   }
 });
+test('Anthropic authentication failures remain actionable without exposing the upstream body', async () => {
+  const adapter = new AnthropicProvider(
+    'test-only-key',
+    async () => new Response('private provider error', { status: 401 }),
+  );
+  const registry = new EnrichmentRegistry(
+    [adapter],
+    [profile('chosen', 'anthropic', 'claude-haiku-4-5-20251001')],
+    { ai: { profiles: ['chosen'], timeoutMs: 1000 } },
+  );
+
+  assert.deepEqual(await registry.enrich('ai', input, async () => {}), {
+    status: 'unavailable',
+    reason: 'authentication',
+  });
+});
 test('Anthropic normalizes harmless whitespace, empty nullable fields and duplicate forms before strict validation', async () => {
   const adapter = new AnthropicProvider('test-only-key', async () =>
     Response.json({
       model: 'claude-sonnet-5',
       stop_reason: 'end_turn',
-      content: [{
-        type: 'text',
-        text: JSON.stringify({
-          sourceLanguageCode: ' en-US ',
-          text: ' חִיּוּנִי ',
-          variants: ['חִיּוּנִי', ' הֶכְרֵחִי ', 'הֶכְרֵחִי'],
-          partOfSpeech: ' שם תואר ',
-          explanation: '   ',
-          contextUsed: true,
-          examples: ['This is essential.', ' This is essential. '],
-          harmlessExtraField: 'discarded',
-        }),
-      }],
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify({
+            sourceLanguageCode: ' en-US ',
+            text: ' חִיּוּנִי ',
+            variants: ['חִיּוּנִי', ' הֶכְרֵחִי ', 'הֶכְרֵחִי'],
+            partOfSpeech: ' שם תואר ',
+            explanation: '   ',
+            contextUsed: true,
+            examples: ['This is essential.', ' This is essential. '],
+            harmlessExtraField: 'discarded',
+          }),
+        },
+      ],
     }),
   );
   const registry = new EnrichmentRegistry(
@@ -350,7 +385,7 @@ test('Anthropic normalizes harmless whitespace, empty nullable fields and duplic
     contextUsed: true,
   });
 });
-test('Anthropic requires niqqud for Hebrew translations and Hebrew source pronunciation', async () => {
+test('Anthropic requests niqqud but keeps a usable translation when optional niqqud is absent', async () => {
   const response = (body: unknown) =>
     Response.json({
       model: 'claude-sonnet-5',
@@ -359,11 +394,9 @@ test('Anthropic requires niqqud for Hebrew translations and Hebrew source pronun
     });
   const translate = async (raw: unknown, enrichmentInput = input) => {
     const adapter = new AnthropicProvider('test-only-key', async () => response(raw));
-    return new EnrichmentRegistry(
-      [adapter],
-      [profile('chosen', 'anthropic', 'claude-sonnet-5')],
-      { ai: { profiles: ['chosen'], timeoutMs: 1000 } },
-    ).enrich('ai', enrichmentInput, async () => {});
+    return new EnrichmentRegistry([adapter], [profile('chosen', 'anthropic', 'claude-sonnet-5')], {
+      ai: { profiles: ['chosen'], timeoutMs: 1000 },
+    }).enrich('ai', enrichmentInput, async () => {});
   };
   const hebrewTranslation = {
     sourceLanguageCode: 'en',
@@ -377,10 +410,7 @@ test('Anthropic requires niqqud for Hebrew translations and Hebrew source pronun
     examples: [],
   };
   assert.equal((await translate(hebrewTranslation)).status, 'succeeded');
-  assert.equal(
-    (await translate({ ...hebrewTranslation, text: 'חיוב' })).status,
-    'succeeded',
-  );
+  assert.equal((await translate({ ...hebrewTranslation, text: 'חיוב' })).status, 'succeeded');
 
   const hebrewSourceInput = {
     sourceText: 'ספר',

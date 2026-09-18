@@ -63,6 +63,8 @@ const readingGenerator =
         env.ANTHROPIC_API_KEY,
         readingModel,
         env.CLAUDE_STRUCTURED_OUTPUT,
+        fetch,
+        env.ANTHROPIC_WORKSPACE_ID,
       )
     : undefined;
 

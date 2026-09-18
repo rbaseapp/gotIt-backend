@@ -28,6 +28,7 @@ test('reading generation requests structured JSON when enabled', async () => {
     true,
     async (_url, init) => {
       request = JSON.parse(String(init?.body));
+      assert.equal(new Headers(init?.headers).get('anthropic-workspace-id'), 'wrkspc_test');
       return Response.json({
         model: 'claude-sonnet-5',
         stop_reason: 'end_turn',
@@ -42,6 +43,7 @@ test('reading generation requests structured JSON when enabled', async () => {
         ],
       });
     },
+    'wrkspc_test',
   );
 
   const result = await generator.generate(input, new AbortController().signal);
@@ -49,6 +51,16 @@ test('reading generation requests structured JSON when enabled', async () => {
   assert.deepEqual(request?.output_config, {
     format: { type: 'json_schema', schema: requestSchema },
   });
+  assert.match(String(request?.system), /requiredTopic is mandatory/u);
+  const messages = request?.messages as Array<{ content: string }>;
+  const userPayload = JSON.parse(messages[0]?.content ?? '{}') as {
+    untrustedReadingData?: {
+      requiredTopic?: string;
+      vocabularyTargets?: Array<{ text?: string }>;
+    };
+  };
+  assert.equal(userPayload.untrustedReadingData?.requiredTopic, 'Travel');
+  assert.equal(userPayload.untrustedReadingData?.vocabularyTargets?.[0]?.text, 'train station');
   assert.equal(result.providerModel, 'claude-sonnet-5');
   assert.match(result.bodyText, /train station/u);
 });

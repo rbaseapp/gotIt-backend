@@ -50,14 +50,6 @@ function baseLanguage(value: string | null): string | null {
   return value?.split('-')[0]?.toLowerCase() ?? null;
 }
 
-function containsHebrew(value: string): boolean {
-  return /[\u05d0-\u05ea]/u.test(value);
-}
-
-function containsNiqqud(value: string): boolean {
-  return /[\u05b0-\u05bd\u05bf\u05c1\u05c2\u05c4\u05c5\u05c7]/u.test(value);
-}
-
 function boundedText(value: unknown, limit: number): string | null {
   if (typeof value !== 'string') return null;
   const normalized = normalizedText(value);
@@ -72,14 +64,16 @@ function normalizeUniqueStrings(
 ): string[] {
   if (!Array.isArray(value)) return [];
   const seen = new Set(excluded ? [normalizedText(excluded).toLocaleLowerCase()] : []);
-  return value.flatMap((entry) => {
-    const text = boundedText(entry, textLimit);
-    if (!text) return [];
-    const key = text.toLocaleLowerCase();
-    if (seen.has(key)) return [];
-    seen.add(key);
-    return [text];
-  }).slice(0, limit);
+  return value
+    .flatMap((entry) => {
+      const text = boundedText(entry, textLimit);
+      if (!text) return [];
+      const key = text.toLocaleLowerCase();
+      if (seen.has(key)) return [];
+      seen.add(key);
+      return [text];
+    })
+    .slice(0, limit);
 }
 
 /** Normalize harmless model variation before strict domain validation. */
@@ -121,6 +115,7 @@ export class AnthropicProvider implements EnrichmentProvider {
   constructor(
     private readonly apiKey: string,
     private readonly fetchImpl: typeof fetch = fetch,
+    private readonly workspaceId?: string,
   ) {
     if (!apiKey) throw new Error('Anthropic API key is required');
   }
@@ -133,6 +128,7 @@ export class AnthropicProvider implements EnrichmentProvider {
         'content-type': 'application/json',
         'x-api-key': this.apiKey,
         'anthropic-version': '2023-06-01',
+        ...(this.workspaceId ? { 'anthropic-workspace-id': this.workspaceId } : {}),
       },
       body: JSON.stringify({
         model: profile.model,
@@ -161,34 +157,9 @@ export class AnthropicProvider implements EnrichmentProvider {
     if (!textBlocks.length || textBlocks.length > 5)
       throw new Error('Anthropic text output is missing or oversized');
     const parsed: unknown = JSON.parse(textBlocks.map((c) => c.text).join(''));
-    if (!isRecord(parsed) || 'providerModel' in parsed)
-      throw new Error('Invalid Anthropic output');
+    if (!isRecord(parsed) || 'providerModel' in parsed) throw new Error('Invalid Anthropic output');
     const raw = normalizeModelOutput(parsed, input);
     if (!isRecord(raw)) throw new Error('Invalid Anthropic output');
-    const candidates = Array.isArray(raw.candidates) ? raw.candidates : [];
-    if (
-      baseLanguage(input.translationLanguageCode) === 'he' &&
-      candidates.some((candidate) => {
-        if (!isRecord(candidate) || typeof candidate.text !== 'string') return false;
-        const forms = [candidate.text, ...(Array.isArray(candidate.variants) ? candidate.variants : [])];
-        return forms.some(
-          (form) => typeof form === 'string' && containsHebrew(form) && !containsNiqqud(form),
-        );
-      })
-    )
-      throw new Error('Hebrew translation is missing niqqud');
-    if (
-      baseLanguage(typeof raw.sourceLanguageCode === 'string' ? raw.sourceLanguageCode : null) ===
-        'he' &&
-      containsHebrew(input.sourceText) &&
-      candidates.some(
-        (candidate) =>
-          !isRecord(candidate) ||
-          typeof candidate.phoneticText !== 'string' ||
-          !containsNiqqud(candidate.phoneticText),
-      )
-    )
-      throw new Error('Hebrew source is missing niqqud');
     return { ...raw, providerModel: message.model };
   }
 }

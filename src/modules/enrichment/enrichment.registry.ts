@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { candidateSchema, languageSchema, textSchema } from '../capture/capture.validation.js';
 import type { EnrichmentInput, EnrichmentProvider, ModelProfile } from './enrichment.types.js';
+import { providerFailureCode, type ProviderFailureCode } from './providers/http.js';
 
 const outputSchema = z
   .object({
@@ -10,7 +11,8 @@ const outputSchema = z
   })
   .strict();
 export type EnrichmentResult =
-  | { status: 'not_configured' | 'needs_language_selection' | 'unavailable' }
+  | { status: 'not_configured' | 'needs_language_selection' }
+  | { status: 'unavailable'; reason?: ProviderFailureCode }
   | {
       status: 'succeeded';
       output: z.output<typeof outputSchema>;
@@ -87,6 +89,7 @@ export class EnrichmentRegistry {
     if (!route) return { status: 'not_configured' };
     const routeEnd = Date.now() + route.timeoutMs;
     let attempted = false;
+    let lastFailure: ProviderFailureCode | undefined;
     for (const id of route.profiles) {
       const profile = this.profiles.get(id)!;
       const provider = this.providers.get(profile.providerId)!;
@@ -134,7 +137,8 @@ export class EnrichmentRegistry {
           }),
         ]);
         status = 'succeeded';
-      } catch {
+      } catch (error) {
+        lastFailure = providerFailureCode(error);
         status = controller.signal.aborted
           ? 'timed_out'
           : failureStage.value === 'validation'
@@ -162,6 +166,8 @@ export class EnrichmentRegistry {
       if (output)
         return { status: 'succeeded', output, provider, profile: actualProfile, latencyMs };
     }
-    return { status: attempted ? 'unavailable' : 'needs_language_selection' };
+    return attempted
+      ? { status: 'unavailable', ...(lastFailure ? { reason: lastFailure } : {}) }
+      : { status: 'needs_language_selection' };
   }
 }

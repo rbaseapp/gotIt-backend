@@ -104,7 +104,15 @@ export class CaptureService {
         status: enriched.status,
         candidates,
         ...(enriched.status === 'unavailable'
-          ? { warnings: [{ code: 'ENRICHMENT_UNAVAILABLE' }] }
+          ? {
+              warnings: [
+                {
+                  code: enriched.reason
+                    ? `ENRICHMENT_${enriched.reason.toUpperCase()}`
+                    : 'ENRICHMENT_UNAVAILABLE',
+                },
+              ],
+            }
           : {}),
       },
       existingSenses,

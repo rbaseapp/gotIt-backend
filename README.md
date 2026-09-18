@@ -86,11 +86,11 @@ and shares bounded deadlines, without automatic retries. Manual capture works
 without providers. Capture traces persist bounded metadata only.
 
 Direct Anthropic translation and reading are implemented. Set
-`ANTHROPIC_API_KEY`, `AI_TRANSLATION_MODEL`, optional `AI_READING_MODEL`
+`ANTHROPIC_API_KEY`, optional `ANTHROPIC_WORKSPACE_ID`, `AI_TRANSLATION_MODEL`, optional `AI_READING_MODEL`
 (falls back to the translation model) and independent
 `ENRICHMENT_SIGNING_SECRET` of at least 32 bytes. No model is silently selected.
-Recommended model as of 2026-09-15: `claude-sonnet-5`; optionally use
-`CLAUDE_THINKING_MODE=disabled` for short tasks. Structured output is opt-in.
+The default requests omit model-specific thinking options for translation;
+reading with `claude-sonnet-5` explicitly disables thinking. Structured output is opt-in.
 Reading receives target expressions with their confirmed meanings; unopened
 content is not saved. Actual quality, access and latency require live evaluation.
 

@@ -26,11 +26,17 @@ services:
         generateValue: true
       - key: ANTHROPIC_API_KEY
         sync: false
+      - key: ANTHROPIC_WORKSPACE_ID
+        sync: false
       - key: AI_TRANSLATION_MODEL
         value: claude-haiku-4-5-20251001
       - key: AI_READING_MODEL
         value: claude-sonnet-5
       - key: CLAUDE_STRUCTURED_OUTPUT
         value: 'true'
+      - key: GOOGLE_TRANSLATION_API
+        value: cloud_basic_v2
+      - key: GOOGLE_TRANSLATE_API_KEY
+        sync: false
 # Migration administrator credentials belong in a separate one-off migration job.
 # Provider credentials remain secret Render values and are never bundled with clients.

@@ -7,6 +7,7 @@ import { scopeValues, itemSnapshot, itemNotFound } from '../library/library.repo
 import type { ProfileScope, ProfileServiceContract } from '../profile/profile.types.js';
 import type { PracticeService } from '../practice/practice.service.js';
 import { fingerprint } from '../enrichment/selection-proof.js';
+import { providerFailureCode } from '../enrichment/providers/http.js';
 import {
   generatedReadingSchema,
   readingInputSchema,
@@ -119,7 +120,38 @@ export class ReadingService {
           }),
         ),
       ]);
-    } catch {
+    } catch (error) {
+      const providerFailure = providerFailureCode(error);
+      if (providerFailure === 'authentication')
+        throw new AppError(
+          503,
+          'READING_PROVIDER_AUTHENTICATION',
+          'The AI provider rejected the configured API key',
+        );
+      if (providerFailure === 'billing')
+        throw new AppError(
+          503,
+          'READING_PROVIDER_BILLING',
+          'The AI provider account requires billing attention',
+        );
+      if (providerFailure === 'permission')
+        throw new AppError(
+          503,
+          'READING_PROVIDER_PERMISSION',
+          'The configured API key cannot access the requested AI model or workspace',
+        );
+      if (providerFailure === 'rate_limit')
+        throw new AppError(
+          503,
+          'READING_PROVIDER_RATE_LIMIT',
+          'The AI provider rate limit was reached',
+        );
+      if (providerFailure === 'invalid_request')
+        throw new AppError(
+          503,
+          'READING_PROVIDER_REQUEST_INVALID',
+          'The AI provider rejected the generation request',
+        );
       throw new AppError(
         503,
         'READING_UNAVAILABLE',

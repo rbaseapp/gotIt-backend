@@ -1,8 +1,39 @@
+export type ProviderFailureCode =
+  | 'authentication'
+  | 'billing'
+  | 'permission'
+  | 'rate_limit'
+  | 'invalid_request'
+  | 'upstream';
+
+export class ProviderHttpError extends Error {
+  constructor(
+    readonly status: number,
+    readonly failureCode: ProviderFailureCode,
+  ) {
+    super(`Provider request failed (${failureCode})`);
+    this.name = 'ProviderHttpError';
+  }
+}
+
+export function providerFailureCode(error: unknown): ProviderFailureCode | undefined {
+  return error instanceof ProviderHttpError ? error.failureCode : undefined;
+}
+
+function failureCode(status: number): ProviderFailureCode {
+  if (status === 401) return 'authentication';
+  if (status === 402) return 'billing';
+  if (status === 403) return 'permission';
+  if (status === 429) return 'rate_limit';
+  if (status === 400) return 'invalid_request';
+  return 'upstream';
+}
+
 /** Bounds upstream response bytes before JSON parsing. No upstream error body escapes. */
 export async function readProviderJson(response: Response, signal: AbortSignal): Promise<unknown> {
   if (!response.ok || !response.body) {
     await response.body?.cancel();
-    throw new Error('Provider unavailable');
+    throw new ProviderHttpError(response.status, failureCode(response.status));
   }
   const reader = response.body.getReader();
   const cancel = () => {

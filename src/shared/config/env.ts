@@ -14,13 +14,17 @@ const envSchema = z
     CORE_APPLICATION_KEY: z.string().min(1).default('gotit'),
     CORE_AUTH_TIMEOUT_MS: z.coerce.number().int().positive().max(30_000).default(3000),
     ANTHROPIC_API_KEY: z.string().min(1).optional(),
+    ANTHROPIC_WORKSPACE_ID: z
+      .string()
+      .trim()
+      .regex(/^wrkspc_[A-Za-z0-9]+$/u)
+      .optional(),
     AI_TRANSLATION_MODEL: z.string().min(1).max(200).optional(),
     AI_READING_MODEL: z.string().min(1).max(200).optional(),
     CLAUDE_STRUCTURED_OUTPUT: z
       .enum(['true', 'false'])
       .default('false')
       .transform((v) => v === 'true'),
-    CLAUDE_THINKING_MODE: z.enum(['adaptive', 'disabled']).optional(),
     ENRICHMENT_SIGNING_SECRET: z.string().min(32).optional(),
     ENRICHMENT_PROFILES_JSON: z.string().min(1).max(32000).optional(),
     GOOGLE_TRANSLATION_API: z.enum(['cloud_basic_v2']).optional(),
