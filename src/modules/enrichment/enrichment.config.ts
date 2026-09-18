@@ -31,6 +31,7 @@ function route() {
     .object({
       profiles: z.array(z.string().min(1).max(100)).min(1).max(5),
       timeoutMs: z.number().int().min(1).max(60000),
+      maxAttempts: z.number().int().min(1).max(3).optional(),
     })
     .strict();
 }
@@ -87,7 +88,7 @@ export function createEnrichment(
         structuredOutput: settings.CLAUDE_STRUCTURED_OUTPUT ?? false,
       });
       routes = {
-        ai: { profiles: ['claude_default'], timeoutMs: 20000 },
+        ai: { profiles: ['claude_default'], timeoutMs: 30000, maxAttempts: 2 },
       };
     }
     if (settings.GOOGLE_TRANSLATION_API) {
@@ -97,8 +98,8 @@ export function createEnrichment(
         model: null,
         timeoutMs: 5000,
       });
-      routes.auto = { profiles: ['google_default'], timeoutMs: 5000 };
-      routes.dictionary = { profiles: ['google_default'], timeoutMs: 5000 };
+      routes.auto = { profiles: ['google_default'], timeoutMs: 10000, maxAttempts: 2 };
+      routes.dictionary = { profiles: ['google_default'], timeoutMs: 10000, maxAttempts: 2 };
     }
   }
   if (profiles.length && !settings.ENRICHMENT_SIGNING_SECRET)

@@ -46,6 +46,12 @@ function normalizedText(value: string): string {
   return value.normalize('NFKC').replace(/\s+/gu, ' ').trim();
 }
 
+function parseModelJson(text: string): unknown {
+  const trimmed = text.trim();
+  const fenced = /^```(?:json)?\s*([\s\S]*?)\s*```$/iu.exec(trimmed);
+  return JSON.parse(fenced?.[1] ?? trimmed);
+}
+
 function baseLanguage(value: string | null): string | null {
   return value?.split('-')[0]?.toLowerCase() ?? null;
 }
@@ -165,7 +171,7 @@ export class AnthropicProvider implements EnrichmentProvider {
     );
     if (!textBlocks.length || textBlocks.length > 5)
       throw new Error('Anthropic text output is missing or oversized');
-    const parsed: unknown = JSON.parse(textBlocks.map((c) => c.text).join(''));
+    const parsed = parseModelJson(textBlocks.map((c) => c.text).join(''));
     if (!isRecord(parsed) || 'providerModel' in parsed) throw new Error('Invalid Anthropic output');
     const raw = normalizeModelOutput(parsed, input);
     if (!isRecord(raw)) throw new Error('Invalid Anthropic output');

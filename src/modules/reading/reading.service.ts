@@ -15,6 +15,7 @@ import {
   type ReadingGenerator,
   type ReadingTarget,
 } from './reading.validation.js';
+import { bindReadingTargets, completeMissingTargets } from './reading-content.js';
 
 const targetSchema = z
   .object({
@@ -47,6 +48,89 @@ const ticketSchema = z
   })
   .strict();
 const missing = () => new AppError(404, 'NOT_FOUND', 'Reading content not found');
+const retryableProviderFailures = new Set([
+  'rate_limit',
+  'timeout',
+  'invalid_response',
+  'upstream',
+]);
+
+function readingFailure(error: unknown, timedOut = false): AppError {
+  if (error instanceof AppError) return error;
+  const providerFailure = timedOut ? 'timeout' : providerFailureCode(error);
+  if (providerFailure === 'authentication')
+    return new AppError(
+      503,
+      'READING_PROVIDER_AUTHENTICATION',
+      'The AI provider rejected the configured API key',
+    );
+  if (providerFailure === 'billing')
+    return new AppError(
+      503,
+      'READING_PROVIDER_BILLING',
+      'The AI provider account requires billing attention',
+    );
+  if (providerFailure === 'permission')
+    return new AppError(
+      503,
+      'READING_PROVIDER_PERMISSION',
+      'The configured API key cannot access the requested AI model or workspace',
+    );
+  if (providerFailure === 'workspace')
+    return new AppError(
+      503,
+      'READING_PROVIDER_WORKSPACE',
+      'The configured Anthropic workspace does not match the API key',
+    );
+  if (providerFailure === 'model_access')
+    return new AppError(
+      503,
+      'READING_PROVIDER_MODEL_ACCESS',
+      'The configured Anthropic model is unavailable to this API key',
+    );
+  if (providerFailure === 'rate_limit')
+    return new AppError(
+      503,
+      'READING_PROVIDER_RATE_LIMIT',
+      'The AI provider rate limit was reached',
+    );
+  if (providerFailure === 'invalid_request')
+    return new AppError(
+      503,
+      'READING_PROVIDER_REQUEST_INVALID',
+      'The AI provider rejected the generation request',
+    );
+  if (providerFailure === 'timeout')
+    return new AppError(
+      503,
+      'READING_PROVIDER_TIMEOUT',
+      'The AI provider did not respond before the generation deadline',
+    );
+  if (
+    providerFailure === 'invalid_response' ||
+    error instanceof SyntaxError ||
+    error instanceof z.ZodError
+  )
+    return new AppError(
+      503,
+      'READING_PROVIDER_RESPONSE_INVALID',
+      'The AI provider returned an invalid generation response',
+    );
+  return new AppError(
+    503,
+    'READING_PROVIDER_UPSTREAM',
+    providerFailure === 'upstream'
+      ? 'The AI provider is temporarily unavailable'
+      : 'The AI provider request failed before a valid response was received',
+  );
+}
+
+function retryableReadingFailure(error: unknown, timedOut: boolean) {
+  if (error instanceof AppError) return false;
+  if (timedOut || error instanceof SyntaxError || error instanceof z.ZodError) return true;
+  return retryableProviderFailures.has(providerFailureCode(error) ?? 'upstream');
+}
+
 export class ReadingService {
   private readonly key: Buffer | undefined;
   constructor(
@@ -108,115 +192,98 @@ export class ReadingService {
       },
       true,
     );
-    const controller = new AbortController(),
-      timer = setTimeout(() => controller.abort(), 30000);
-    let generated: Awaited<ReturnType<ReadingGenerator['generate']>>;
-    try {
-      generated = await Promise.race([
-        this.generator.generate({ ...input, topic, effectiveLevel, targets }, controller.signal),
-        new Promise<never>((_resolve, reject) =>
-          controller.signal.addEventListener('abort', () => reject(new Error('Reading deadline')), {
-            once: true,
-          }),
-        ),
-      ]);
-    } catch (error) {
-      const providerFailure = providerFailureCode(error);
-      if (controller.signal.aborted)
-        throw new AppError(
-          503,
-          'READING_PROVIDER_TIMEOUT',
-          'The AI provider did not respond before the generation deadline',
-        );
-      if (providerFailure === 'authentication')
-        throw new AppError(
-          503,
-          'READING_PROVIDER_AUTHENTICATION',
-          'The AI provider rejected the configured API key',
-        );
-      if (providerFailure === 'billing')
-        throw new AppError(
-          503,
-          'READING_PROVIDER_BILLING',
-          'The AI provider account requires billing attention',
-        );
-      if (providerFailure === 'permission')
-        throw new AppError(
-          503,
-          'READING_PROVIDER_PERMISSION',
-          'The configured API key cannot access the requested AI model or workspace',
-        );
-      if (providerFailure === 'workspace')
-        throw new AppError(
-          503,
-          'READING_PROVIDER_WORKSPACE',
-          'The configured Anthropic workspace does not match the API key',
-        );
-      if (providerFailure === 'model_access')
-        throw new AppError(
-          503,
-          'READING_PROVIDER_MODEL_ACCESS',
-          'The configured Anthropic model is unavailable to this API key',
-        );
-      if (providerFailure === 'rate_limit')
-        throw new AppError(
-          503,
-          'READING_PROVIDER_RATE_LIMIT',
-          'The AI provider rate limit was reached',
-        );
-      if (providerFailure === 'invalid_request')
-        throw new AppError(
-          503,
-          'READING_PROVIDER_REQUEST_INVALID',
-          'The AI provider rejected the generation request',
-        );
-      if (providerFailure === 'upstream')
-        throw new AppError(
-          503,
-          'READING_PROVIDER_UPSTREAM',
-          'The AI provider is temporarily unavailable',
-        );
-      if (error instanceof SyntaxError || error instanceof z.ZodError)
-        throw new AppError(
-          503,
-          'READING_PROVIDER_RESPONSE_INVALID',
-          'The AI provider returned an invalid generation response',
-        );
-      throw new AppError(
-        503,
-        'READING_PROVIDER_UPSTREAM',
-        'The AI provider request failed before a valid response was received',
+    const generationDeadline = Date.now() + 45000;
+    const maxAttempts = 3;
+    let content: z.output<typeof generatedReadingSchema> | undefined;
+    let fallbackContent: z.output<typeof generatedReadingSchema> | undefined;
+    let providerModel: string | null = null;
+    let bound: ReturnType<typeof bindReadingTargets>['bound'] | undefined;
+    let repair: Parameters<ReadingGenerator['generate']>[0]['repair'];
+    let lastError: unknown;
+    let lastTimedOut = false;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      const remaining = generationDeadline - Date.now();
+      if (remaining <= 0) {
+        lastTimedOut = true;
+        break;
+      }
+      const controller = new AbortController();
+      const attemptsLeft = maxAttempts - attempt + 1;
+      const timer = setTimeout(
+        () => controller.abort(),
+        Math.min(20000, Math.max(1, Math.floor(remaining / attemptsLeft))),
       );
-    } finally {
-      clearTimeout(timer);
-    }
-    const parsedContent = generatedReadingSchema
-      .extend({ providerModel: z.string().max(200).nullable() })
-      .safeParse(generated);
-    if (!parsedContent.success)
-      throw new AppError(
-        503,
-        'READING_PROVIDER_RESPONSE_INVALID',
-        'Reading provider returned invalid content',
-      );
-    const { providerModel, ...content } = parsedContent.data;
-    const bound = targets.map((target) => {
-      const ranges: { start: number; end: number }[] = [],
-        points = [...content.bodyText],
-        needle = [...target.sourceText];
-      for (let index = 0; index <= points.length - needle.length; index++)
-        if (needle.every((point, i) => point === points[index + i])) {
-          ranges.push({ start: index, end: index + needle.length });
-          index += needle.length - 1;
+      try {
+        const generated = await Promise.race([
+          this.generator.generate(
+            { ...input, topic, effectiveLevel, targets, ...(repair ? { repair } : {}) },
+            controller.signal,
+          ),
+          new Promise<never>((_resolve, reject) =>
+            controller.signal.addEventListener(
+              'abort',
+              () => reject(new Error('Reading deadline')),
+              { once: true },
+            ),
+          ),
+        ]);
+        const parsed = generatedReadingSchema
+          .extend({ providerModel: z.string().max(200).nullable() })
+          .parse(generated);
+        providerModel = parsed.providerModel;
+        const { providerModel: _providerModel, ...candidate } = parsed;
+        const binding = bindReadingTargets(candidate.bodyText, targets);
+        if (!binding.missing.length) {
+          content = candidate;
+          bound = binding.bound;
+          break;
         }
-      if (!ranges.length)
-        throw new AppError(
-          503,
-          'READING_PROVIDER_RESPONSE_INVALID',
-          'Generated passage did not include all targets',
-        );
-      return { ...target, occurrenceCount: ranges.length, ranges };
-    });
+        fallbackContent = candidate;
+        if (attempt < maxAttempts) {
+          repair = {
+            previousTitle: candidate.title,
+            previousBodyText: candidate.bodyText,
+            missingTargetTexts: binding.missing.map((target) => target.sourceText),
+          };
+          continue;
+        }
+        const completed = completeMissingTargets(candidate, targets);
+        if (!completed)
+          throw new AppError(
+            503,
+            'READING_UNAVAILABLE',
+            'Reading targets exceed the publication limit',
+          );
+        const completedBinding = bindReadingTargets(completed.bodyText, targets);
+        if (completedBinding.missing.length)
+          throw new AppError(503, 'READING_UNAVAILABLE', 'Reading targets could not be bound');
+        content = completed;
+        bound = completedBinding.bound;
+        break;
+      } catch (error) {
+        lastError = error;
+        lastTimedOut = controller.signal.aborted;
+        if (
+          attempt === maxAttempts ||
+          !retryableReadingFailure(error, lastTimedOut) ||
+          generationDeadline <= Date.now()
+        )
+          break;
+      } finally {
+        clearTimeout(timer);
+      }
+    }
+    if ((!content || !bound) && fallbackContent) {
+      const completed = completeMissingTargets(fallbackContent, targets);
+      if (completed) {
+        const completedBinding = bindReadingTargets(completed.bodyText, targets);
+        if (!completedBinding.missing.length) {
+          content = completed;
+          bound = completedBinding.bound;
+        }
+      }
+    }
+    if (!content || !bound) throw readingFailure(lastError, lastTimedOut);
     const ticket = ticketSchema.parse({
       version: 1,
       id: randomUUID(),

@@ -39,14 +39,20 @@ export type ReadingTarget = {
   partOfSpeech: string | null;
   snapshotHash: string;
 };
+export type ReadingGenerationInput = ReadingInput & {
+  topic: string;
+  effectiveLevel: string | null;
+  targets: ReadingTarget[];
+  repair?: {
+    previousTitle: string;
+    previousBodyText: string;
+    missingTargetTexts: string[];
+  };
+};
 export interface ReadingGenerator {
   readonly id: string;
   generate(
-    input: ReadingInput & {
-      topic: string;
-      effectiveLevel: string | null;
-      targets: ReadingTarget[];
-    },
+    input: ReadingGenerationInput,
     signal: AbortSignal,
   ): Promise<GeneratedReading & { providerModel: string | null }>;
 }

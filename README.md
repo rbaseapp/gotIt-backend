@@ -81,9 +81,11 @@ This initial policy does not implement calibrated automatic CEFR estimation.
 ## Providers
 
 Vendor adapters and server model profiles are independent of capture. Clients
-select `auto`, `dictionary` or `ai`; fallback requires explicit server routes
-and shares bounded deadlines, without automatic retries. Manual capture works
-without providers. Capture traces persist bounded metadata only.
+select `auto`, `dictionary` or `ai`; retryable provider, timeout and response
+validation failures receive bounded retries inside one route deadline, then any
+explicitly configured fallback is used. Authentication, billing, permission and
+invalid-request failures are not retried. Manual capture works without providers.
+Capture traces persist bounded metadata for every attempt.
 
 Direct Anthropic translation and reading are implemented. Set
 `ANTHROPIC_API_KEY`, optional `ANTHROPIC_WORKSPACE_ID`, `AI_TRANSLATION_MODEL`, optional `AI_READING_MODEL`
@@ -92,7 +94,9 @@ Direct Anthropic translation and reading are implemented. Set
 The default requests omit model-specific thinking options for translation;
 reading with `claude-sonnet-5` explicitly disables thinking. Structured output is opt-in.
 Reading receives target expressions with their confirmed meanings; unopened
-content is not saved. Actual quality, access and latency require live evaluation.
+content is not saved. Missing vocabulary is repaired with a bounded regeneration;
+if the model still omits it, exact targets are appended and rebound locally so a
+usable passage is returned. Actual quality, access and latency require live evaluation.
 
 Google Cloud Translation Basic v2 is an opt-in adapter. Confirm the enabled API,
 then configure `GOOGLE_TRANSLATION_API=cloud_basic_v2` and

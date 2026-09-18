@@ -105,12 +105,13 @@ test('default Claude configuration serves only explicit AI while Google owns aut
     ENRICHMENT_SIGNING_SECRET: 's'.repeat(32),
   });
   const registryConfig = configured.registry as unknown as {
-    routes: Record<string, { profiles: string[]; timeoutMs: number }>;
+    routes: Record<string, { profiles: string[]; timeoutMs: number; maxAttempts?: number }>;
   };
   assert.equal(registryConfig.routes.auto, undefined);
   assert.deepEqual(registryConfig.routes.ai, {
     profiles: ['claude_default'],
-    timeoutMs: 20000,
+    timeoutMs: 30000,
+    maxAttempts: 2,
   });
 
   const withGoogle = createEnrichment({
@@ -120,19 +121,22 @@ test('default Claude configuration serves only explicit AI while Google owns aut
     GOOGLE_TRANSLATE_API_KEY: 'google-test-key',
     ENRICHMENT_SIGNING_SECRET: 's'.repeat(32),
   }).registry as unknown as {
-    routes: Record<string, { profiles: string[]; timeoutMs: number }>;
+    routes: Record<string, { profiles: string[]; timeoutMs: number; maxAttempts?: number }>;
   };
   assert.deepEqual(withGoogle.routes.auto, {
     profiles: ['google_default'],
-    timeoutMs: 5000,
+    timeoutMs: 10000,
+    maxAttempts: 2,
   });
   assert.deepEqual(withGoogle.routes.dictionary, {
     profiles: ['google_default'],
-    timeoutMs: 5000,
+    timeoutMs: 10000,
+    maxAttempts: 2,
   });
   assert.deepEqual(withGoogle.routes.ai, {
     profiles: ['claude_default'],
-    timeoutMs: 20000,
+    timeoutMs: 30000,
+    maxAttempts: 2,
   });
   assert.throws(() => createEnrichment({ ANTHROPIC_API_KEY: 'test-key' }), /AI_TRANSLATION_MODEL/u);
 });
@@ -159,7 +163,7 @@ test('Anthropic can detect a missing source language before translating', async 
   );
   assert.equal(result.status, 'succeeded');
 });
-test('fallback occurs only through a configured route and all attempts share one deadline with no retries', async () => {
+test('retryable enrichment failures retry within one deadline before using configured fallback', async () => {
   let firstCalls = 0,
     secondCalls = 0;
   const first = provider('first');
@@ -185,7 +189,7 @@ test('fallback occurs only through a configured route and all attempts share one
     auto: { profiles: ['first', 'second'], timeoutMs: 1000 },
   });
   assert.equal((await fallback.enrich('auto', input, async () => {})).status, 'succeeded');
-  assert.equal(firstCalls, 2);
+  assert.equal(firstCalls, 4);
   assert.equal(secondCalls, 1);
   let aborted = false;
   first.enrich = async (_input, _profile, signal) =>
@@ -211,7 +215,29 @@ test('fallback occurs only through a configured route and all attempts share one
   );
   assert.equal(aborted, true);
   assert.equal(traces[0]?.status, 'timed_out');
+  assert.equal(traces.length, 2);
   assert.equal(secondCalls, 1);
+});
+test('a transient provider failure succeeds on the bounded retry and records both attempts', async () => {
+  let calls = 0;
+  const transient = provider('transient');
+  transient.enrich = async () => {
+    calls++;
+    if (calls === 1) throw new Error('private temporary failure');
+    return output;
+  };
+  const traces: ProviderTrace[] = [];
+  const result = await new EnrichmentRegistry([transient], [profile('transient', 'transient')], {
+    ai: { profiles: ['transient'], timeoutMs: 1000, maxAttempts: 2 },
+  }).enrich('ai', input, async (trace) => {
+    traces.push(trace);
+  });
+  assert.equal(result.status, 'succeeded');
+  assert.equal(calls, 2);
+  assert.deepEqual(
+    traces.map((trace) => trace.status),
+    ['failed_provider', 'succeeded'],
+  );
 });
 test('invalid output, oversized aggregate and false capabilities become manual unavailability; trace failures propagate', async () => {
   for (const raw of [
@@ -293,7 +319,7 @@ test('direct Anthropic uses configured model/schema and safe bounded output; ref
   assert.equal(result.status, 'succeeded');
   assert.equal(calls, 1);
   assert.equal(traces[0]?.profile.model, 'actual-model-version');
-  for (const response of [
+  const failureResponses = [
     ...[401, 403, 429, 500, 503].map(
       (status) => () => new Response('secret provider error', { status }),
     ),
@@ -316,7 +342,8 @@ test('direct Anthropic uses configured model/schema and safe bounded output; ref
         content: [{ type: 'text', text: 'not json' }],
       }),
     () => new Response('a'.repeat(131073)),
-  ]) {
+  ];
+  for (const [index, response] of failureResponses.entries()) {
     let failureCalls = 0;
     const failing = new AnthropicProvider('test-only-key', async () => {
       failureCalls++;
@@ -326,7 +353,7 @@ test('direct Anthropic uses configured model/schema and safe bounded output; ref
       ai: { profiles: ['chosen'], timeoutMs: 1000 },
     });
     assert.equal((await failureRegistry.enrich('ai', input, async () => {})).status, 'unavailable');
-    assert.equal(failureCalls, 1);
+    assert.equal(failureCalls, index < 2 ? 1 : 2);
   }
 });
 test('Anthropic authentication failures remain actionable without exposing the upstream body', async () => {
@@ -374,6 +401,21 @@ test('Anthropic translation retries without a stale optional workspace', async (
 
   assert.equal(result.status, 'succeeded');
   assert.deepEqual(workspaceHeaders, ['wrkspc_stale', null]);
+});
+test('Anthropic translation accepts harmless fenced JSON output', async () => {
+  const adapter = new AnthropicProvider('test-only-key', async () =>
+    Response.json({
+      model: 'claude-sonnet-5',
+      stop_reason: 'end_turn',
+      content: [{ type: 'text', text: `\`\`\`json\n${JSON.stringify(output)}\n\`\`\`` }],
+    }),
+  );
+  const result = await new EnrichmentRegistry(
+    [adapter],
+    [profile('chosen', 'anthropic', 'claude-sonnet-5')],
+    { ai: { profiles: ['chosen'], timeoutMs: 1000 } },
+  ).enrich('ai', input, async () => {});
+  assert.equal(result.status, 'succeeded');
 });
 test('Anthropic normalizes harmless whitespace, empty nullable fields and duplicate forms before strict validation', async () => {
   const adapter = new AnthropicProvider('test-only-key', async () =>

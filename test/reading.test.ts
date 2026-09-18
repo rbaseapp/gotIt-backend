@@ -1,6 +1,12 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { AnthropicReadingGenerator } from '../src/modules/reading/anthropic-reading.js';
+import {
+  bindReadingTargets,
+  completeMissingTargets,
+  targetRanges,
+} from '../src/modules/reading/reading-content.js';
+import { ReadingService } from '../src/modules/reading/reading.service.js';
 
 const input = {
   topic: 'Travel',
@@ -117,6 +123,147 @@ test('reading generation retries without a stale optional workspace', async () =
 
   assert.deepEqual(workspaceHeaders, ['wrkspc_stale', null]);
   assert.equal(result.title, 'A journey');
+});
+
+test('reading target matching tolerates harmless case, Unicode and whitespace variation', () => {
+  assert.deepEqual(targetRanges('The TRAIN   STATION opened.', 'train station'), [
+    { start: 4, end: 19 },
+  ]);
+  assert.equal(targetRanges('We ordered café.', 'café').length, 1);
+});
+
+test('missing reading targets are completed deterministically and rebound', () => {
+  const content = completeMissingTargets(
+    {
+      title: 'A journey',
+      bodyText: 'This valid passage deliberately starts without the required expression.',
+    },
+    input.targets,
+  );
+  assert.ok(content);
+  const binding = bindReadingTargets(content.bodyText, input.targets);
+  assert.equal(binding.missing.length, 0);
+  assert.equal(binding.bound[0]?.sourceText, 'train station');
+  assert.equal(binding.bound[0]?.occurrenceCount, 1);
+});
+
+test('repair generation sends the prior draft and exact missing targets as untrusted data', async () => {
+  let supplied: Record<string, any> | undefined;
+  const generator = new AnthropicReadingGenerator(
+    'test-key',
+    'claude-sonnet-5',
+    false,
+    async (_url, init) => {
+      const request = JSON.parse(String(init?.body));
+      supplied = JSON.parse(request.messages[0].content).untrustedReadingData;
+      return Response.json({
+        model: 'claude-sonnet-5',
+        stop_reason: 'end_turn',
+        content: [
+          {
+            type: 'text',
+            text: '{"title":"A journey","bodyText":"The train station was busy."}',
+          },
+        ],
+      });
+    },
+  );
+  await generator.generate(
+    {
+      ...input,
+      repair: {
+        previousTitle: 'Draft',
+        previousBodyText: 'A draft without the target.',
+        missingTargetTexts: ['train station'],
+      },
+    },
+    new AbortController().signal,
+  );
+  assert.deepEqual(supplied?.repairRequest, {
+    previousTitle: 'Draft',
+    previousBodyText: 'A draft without the target.',
+    missingTargetTexts: ['train station'],
+  });
+});
+
+test('reading preview repairs omissions and salvages the valid draft if repair calls fail', async () => {
+  const client = {
+    query: async (query: string | { text: string }) => {
+      const text = typeof query === 'string' ? query : query.text;
+      if (text.includes('FROM product_gotit.learning_items'))
+        return {
+          rowCount: 1,
+          rows: [
+            {
+              id: input.targets[0]!.id,
+              source_text: 'train station',
+              source_language_code: 'en',
+              translation_language_code: 'he',
+              user_status: 'active',
+              deleted_at: null,
+              learning_revision: 1,
+              part_of_speech: 'noun',
+              translations: ['תחנת רכבת'],
+            },
+          ],
+        };
+      return { rowCount: 0, rows: [] };
+    },
+    release: () => {},
+  };
+  const pool = { connect: async () => client } as any;
+  const profiles = {
+    getProfile: async () => ({
+      defaultTranslationLanguage: 'he',
+      timezone: 'UTC',
+      dailyGoal: { type: 'items', value: 5 },
+      defaultNewItemsPerDay: 10,
+      translationMethodPreference: 'auto',
+      languages: [],
+      interests: [],
+    }),
+  } as any;
+  let calls = 0;
+  const repairs: unknown[] = [];
+  const service = new ReadingService(
+    pool,
+    profiles,
+    {} as any,
+    {
+      id: 'test',
+      generate: async (generationInput) => {
+        calls++;
+        repairs.push(generationInput.repair);
+        if (calls > 1) throw new Error('temporary provider failure');
+        return {
+          title: 'A journey',
+          bodyText: 'This is a valid draft about travel, but it omitted the selected expression.',
+          providerModel: 'test-model',
+        };
+      },
+    },
+    's'.repeat(32),
+  );
+  const result = await service.preview(
+    {
+      applicationId: 'b6ee48fc-d538-4b49-8d31-f89f399342aa',
+      applicationUserId: '455910fe-0d25-4ef8-8674-2bcc80aebf8e',
+    },
+    {
+      topic: 'Travel',
+      targetLanguageCode: 'en',
+      contentType: 'article',
+      lengthPreset: 'short',
+      learningItemIds: [input.targets[0]!.id],
+    },
+  );
+  assert.equal(calls, 3);
+  assert.equal(repairs[0], undefined);
+  assert.deepEqual((repairs[1] as { missingTargetTexts: string[] }).missingTargetTexts, [
+    'train station',
+  ]);
+  assert.equal(result.reading.targets[0]?.occurrenceCount, 1);
+  assert.match(result.reading.bodyText, /train station/u);
 });
 
 const requestSchema = {
