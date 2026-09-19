@@ -306,7 +306,8 @@ test('direct Anthropic uses configured model/schema and safe bounded output; ref
     assert.equal(payload.model, 'chosen-model');
     assert.equal(payload.max_tokens, 1200);
     assert.equal(payload.output_config.format.type, 'json_schema');
-    assert.equal(payload.output_config.format.schema.properties.candidates.maxItems, 5);
+    assert.equal(payload.output_config.format.schema.properties.candidates.minItems, 1);
+    assert.equal(payload.output_config.format.schema.properties.candidates.maxItems, undefined);
     assert.equal(
       payload.output_config.format.schema.properties.candidates.items.properties.explanation.type,
       'string',
