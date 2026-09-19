@@ -1,7 +1,9 @@
 import type { ProfileDefaults } from './profile.types.js';
 
 export const PROFILE_DEFAULTS: ProfileDefaults = {
-  learningPreferences: { enabledSkills: ['recognition', 'recall', 'spelling'] },
+  learningPreferences: {
+    enabledSkills: ['recognition', 'recall', 'listening', 'spelling', 'pronunciation'],
+  },
   defaultTranslationLanguage: null,
   timezone: 'UTC',
   dailyGoal: {

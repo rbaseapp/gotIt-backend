@@ -42,7 +42,13 @@ export class PracticeService {
   }
   availableSkills(profile: GotItProfile, language: string): Skill[] {
     return (
-      profile.learningPreferences?.enabledSkills ?? ['recognition', 'recall', 'spelling']
+      profile.learningPreferences?.enabledSkills ?? [
+        'recognition',
+        'recall',
+        'listening',
+        'spelling',
+        'pronunciation',
+      ]
     ).filter(
       (s) =>
         !['listening', 'pronunciation'].includes(s) ||
@@ -441,8 +447,15 @@ export class PracticeService {
                     ];
         const enabled = this.availableSkills(profile, row.source_language_code);
         skills = skills.filter((s) => enabled.includes(s.skill));
+        const requiredSpeechSkill =
+          type === 'listening_spelling'
+            ? 'listening'
+            : type === 'pronunciation'
+              ? 'pronunciation'
+              : null;
         if (
           !skills.length ||
+          (requiredSpeechSkill !== null && !enabled.includes(requiredSpeechSkill)) ||
           (['listening_spelling', 'pronunciation'].includes(type) &&
             !this.speechAvailable(
               row.source_language_code,

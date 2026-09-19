@@ -3,6 +3,31 @@ import test from 'node:test';
 
 import { PracticeService } from '../src/modules/practice/practice.service.js';
 
+test('speech skills are enabled by default and remain gated by provider support', () => {
+  const profiles = { async getProfile() {} };
+  const available = new PracticeService(
+    {} as never,
+    profiles as never,
+    undefined,
+    (language) => language === 'en',
+  );
+  const unavailable = new PracticeService({} as never, profiles as never);
+  const profile = {} as never;
+
+  assert.deepEqual(available.availableSkills(profile, 'en'), [
+    'recognition',
+    'recall',
+    'listening',
+    'spelling',
+    'pronunciation',
+  ]);
+  assert.deepEqual(unavailable.availableSkills(profile, 'en'), [
+    'recognition',
+    'recall',
+    'spelling',
+  ]);
+});
+
 test('learning queue uses a non-reserved translation alias and maps it to the response', async () => {
   let queueSql = '';
   const client = {
@@ -29,7 +54,11 @@ test('learning queue uses a non-reserved translation alias and maps it to the re
     },
     release() {},
   };
-  const pool = { async connect() { return client; } };
+  const pool = {
+    async connect() {
+      return client;
+    },
+  };
   const profiles = {
     async getProfile() {
       return {
