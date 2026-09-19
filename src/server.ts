@@ -9,6 +9,7 @@ import { DashboardService } from './modules/dashboard/dashboard.service.js';
 import { ReadingService } from './modules/reading/reading.service.js';
 import { AnthropicReadingGenerator } from './modules/reading/anthropic-reading.js';
 import { SpeechService } from './modules/speech/speech.service.js';
+import { AzureSpeechProvider } from './modules/speech/azure-speech.provider.js';
 import { policySchema } from './modules/learning/learning.policy.js';
 import { PostgresRateLimiter } from './shared/middleware/rate-limit.js';
 import { createApp } from './app.js';
@@ -54,7 +55,15 @@ const practiceService: PracticeService = new PracticeService(
   policySchema.parse(env.LEARNING_POLICY_JSON ? JSON.parse(env.LEARNING_POLICY_JSON) : {}),
   (...args): boolean => speechService.supports(...args),
 );
-const speechService: SpeechService = new SpeechService(pool, practiceService);
+const speechProvider =
+  env.SPEECH_PROVIDER === 'azure'
+    ? new AzureSpeechProvider(
+        env.AZURE_SPEECH_API_KEY!,
+        env.AZURE_SPEECH_REGION!,
+        env.AZURE_SPEECH_LANGUAGES_JSON,
+      )
+    : undefined;
+const speechService: SpeechService = new SpeechService(pool, practiceService, speechProvider);
 const rateLimiter = new PostgresRateLimiter(pool);
 const readingModel = env.AI_READING_MODEL ?? env.AI_TRANSLATION_MODEL;
 const readingGenerator =

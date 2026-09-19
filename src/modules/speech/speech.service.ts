@@ -240,6 +240,7 @@ export class SpeechService {
     const result = parsed.data;
     return this.practice.submitAttempt(scope, key, input, {
       score: result.score,
+      feedback: result.feedback,
       summary: JSON.stringify({
         provider: this.provider.id,
         model: result.model,

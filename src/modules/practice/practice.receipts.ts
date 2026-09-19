@@ -38,6 +38,7 @@ export const attemptReceiptSchema = z
             score: z.number().min(0).max(100),
             expectedAnswer: z.string().max(4000).nullable(),
             xpEarned: count,
+            pronunciationFeedback: z.string().max(2000).optional(),
           })
           .strict(),
         progress: z

@@ -21,7 +21,7 @@ routes** from [api-catalog.ts](src/shared/http/api-catalog.ts).
 | /learning                                 | Smart queue and versioned learning/reward configuration                                            |
 | /dashboard, /gamification                 | Progress, daily activity, XP, levels and streaks                                                   |
 | /reading                                  | Generated preview, encrypted publication, opened-content persistence and article quizzes           |
-| /pronunciation, /learning-items/:id/audio | Transient validated WAV and speech interfaces; provider unselected                                 |
+| /pronunciation, /learning-items/:id/audio | Transient validated WAV, Azure pronunciation assessment and reference audio interfaces             |
 | /export, /import                          | Paginated library/progress export and idempotent capture-request import                            |
 
 Product routes authenticate once through Core. `GET /health` checks liveness;
@@ -106,9 +106,12 @@ credential. Google does not claim contextual disambiguation, phonetics or an AI
 model. No live Google call was made.
 
 Future vendors implement `EnrichmentProvider`, `ReadingGenerator` or
-`SpeechProvider`; additional supported models use server configuration. Speech
-remains unconfigured until the user chooses a provider; endpoints return safe
-unavailable errors and never fabricate audio or scores.
+`SpeechProvider`; additional supported models use server configuration. Azure
+Speech is the first opt-in speech adapter. Set `SPEECH_PROVIDER=azure`,
+`AZURE_SPEECH_API_KEY` and `AZURE_SPEECH_REGION`; English defaults to `en-US`
+and `en-US-JennyNeural`. Add or override languages with
+`AZURE_SPEECH_LANGUAGES_JSON`. Without a configured provider the endpoints return
+safe unavailable errors and never fabricate audio or scores.
 
 ## HTTP, deployment and verification
 

@@ -459,10 +459,12 @@ export class PracticeService {
               : type === 'flashcards'
                 ? row.context
                 : hideAnswers(readingBody ?? row.context, accepted),
-          ...(type === 'listening_spelling' || type === 'pronunciation'
+          ...(kind === 'typed' || type === 'pronunciation'
             ? {
-                audioUrl: `/api/v1/learning-items/${row.id}/audio`,
-                letterCount: [...row.source_text].length,
+                ...(type === 'listening_spelling' || type === 'pronunciation'
+                  ? { audioUrl: `/api/v1/learning-items/${row.id}/audio` }
+                  : {}),
+                letterCount: [...accepted[0]!].length,
               }
             : {}),
           ...(type === 'flashcards' ? { answer: accepted[0] } : {}),
@@ -542,6 +544,7 @@ export class PracticeService {
     verifiedAssessment?: {
       score: number;
       summary: string;
+      feedback?: string;
       exerciseId: string;
       requestHash?: string;
     },
@@ -885,6 +888,9 @@ export class PracticeService {
           score: scored.score,
           expectedAnswer: scored.expectedAnswer,
           xpEarned: reward,
+          ...(verifiedAssessment?.feedback
+            ? { pronunciationFeedback: verifiedAssessment.feedback }
+            : {}),
         },
         progress,
         skills: evidence,

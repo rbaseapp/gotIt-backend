@@ -295,8 +295,11 @@ test('direct Anthropic uses configured model/schema and safe bounded output; ref
     assert.equal(payload.model, 'chosen-model');
     assert.equal(payload.max_tokens, 1200);
     assert.equal(payload.output_config.format.type, 'json_schema');
-    assert.equal(payload.output_config.format.schema.properties.explanation.type, 'string');
-    assert.equal(payload.output_config.format.schema.properties.candidates, undefined);
+    assert.equal(payload.output_config.format.schema.properties.candidates.maxItems, 5);
+    assert.equal(
+      payload.output_config.format.schema.properties.candidates.items.properties.explanation.type,
+      'string',
+    );
     const supplied = JSON.parse(payload.messages[0].content).untrustedTranslationData;
     assert.deepEqual(supplied, input);
     assert.equal('pageUrl' in supplied, false);
@@ -460,6 +463,52 @@ test('Anthropic normalizes harmless whitespace, empty nullable fields and duplic
     examples: [],
     contextUsed: true,
   });
+});
+test('Anthropic preserves multiple distinct meanings for user selection', async () => {
+  const meanings = [
+    {
+      text: 'חִיּוּב',
+      variants: ['תַּשְׁלוּם'],
+      partOfSpeech: 'שם עצם',
+      explanation: 'סכום כסף שנדרש לשלם.',
+      phoneticText: null,
+      phoneticScheme: null,
+      contextUsed: true,
+    },
+    {
+      text: 'הַאֲשָׁמָה',
+      variants: ['אִישׁוּם'],
+      partOfSpeech: 'שם עצם',
+      explanation: 'טענה שאדם ביצע מעשה אסור.',
+      phoneticText: null,
+      phoneticScheme: null,
+      contextUsed: false,
+    },
+  ];
+  const adapter = new AnthropicProvider('test-only-key', async () =>
+    Response.json({
+      model: 'claude-sonnet-5',
+      stop_reason: 'end_turn',
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify({ sourceLanguageCode: 'en', candidates: meanings }),
+        },
+      ],
+    }),
+  );
+  const result = await new EnrichmentRegistry(
+    [adapter],
+    [profile('chosen', 'anthropic', 'claude-sonnet-5')],
+    { ai: { profiles: ['chosen'], timeoutMs: 1000 } },
+  ).enrich('ai', input, async () => {});
+
+  assert.equal(result.status, 'succeeded');
+  if (result.status !== 'succeeded') return;
+  assert.deepEqual(
+    result.output.candidates.map((candidate) => candidate.text),
+    meanings.map((meaning) => meaning.text.normalize('NFKC')),
+  );
 });
 test('Anthropic requests niqqud but keeps a usable translation when optional niqqud is absent', async () => {
   const response = (body: unknown) =>

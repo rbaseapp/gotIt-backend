@@ -198,6 +198,7 @@ test(
           const exercise = issued.body.exercises[0];
           exerciseId = exercise.id;
           assert.equal(exercise.prompt.answer, undefined);
+          assert.equal(exercise.prompt.letterCount, 5);
           assert.equal(exercise.answerSpec, undefined);
           await call('post', '/practice/attempts', {
             exerciseId,

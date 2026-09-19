@@ -30,6 +30,13 @@ const envSchema = z
     GOOGLE_TRANSLATION_API: z.enum(['cloud_basic_v2']).optional(),
     GOOGLE_TRANSLATE_API_KEY: z.string().min(1).optional(),
     GOOGLE_TRANSLATION_LANGUAGES_JSON: z.string().min(1).max(16000).optional(),
+    SPEECH_PROVIDER: z.enum(['azure']).optional(),
+    AZURE_SPEECH_API_KEY: z.string().min(1).optional(),
+    AZURE_SPEECH_REGION: z
+      .string()
+      .regex(/^[a-z0-9-]{2,50}$/u)
+      .optional(),
+    AZURE_SPEECH_LANGUAGES_JSON: z.string().min(1).max(16000).optional(),
     CORS_ORIGINS: z
       .string()
       .max(8000)
@@ -57,6 +64,20 @@ const envSchema = z
         path: ['AI_READING_MODEL'],
         message: 'Reading requires credentials and signing secret',
       });
+    if (v.SPEECH_PROVIDER === 'azure') {
+      if (!v.AZURE_SPEECH_API_KEY)
+        ctx.addIssue({
+          code: 'custom',
+          path: ['AZURE_SPEECH_API_KEY'],
+          message: 'Azure speech provider requires an API key',
+        });
+      if (!v.AZURE_SPEECH_REGION)
+        ctx.addIssue({
+          code: 'custom',
+          path: ['AZURE_SPEECH_REGION'],
+          message: 'Azure speech provider requires a region',
+        });
+    }
   });
 
 const parsed = envSchema.safeParse(process.env);

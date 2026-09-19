@@ -38,5 +38,13 @@ services:
         value: cloud_basic_v2
       - key: GOOGLE_TRANSLATE_API_KEY
         sync: false
+      - key: SPEECH_PROVIDER
+        sync: false
+      - key: AZURE_SPEECH_API_KEY
+        sync: false
+      - key: AZURE_SPEECH_REGION
+        sync: false
+      - key: AZURE_SPEECH_LANGUAGES_JSON
+        sync: false
 # Migration administrator credentials belong in a separate one-off migration job.
 # Provider credentials remain secret Render values and are never bundled with clients.
