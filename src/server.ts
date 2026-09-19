@@ -10,6 +10,7 @@ import { ReadingService } from './modules/reading/reading.service.js';
 import { AnthropicReadingGenerator } from './modules/reading/anthropic-reading.js';
 import { SpeechService } from './modules/speech/speech.service.js';
 import { AzureSpeechProvider } from './modules/speech/azure-speech.provider.js';
+import { GoogleSpeechProvider } from './modules/speech/google-speech.provider.js';
 import { policySchema } from './modules/learning/learning.policy.js';
 import { PostgresRateLimiter } from './shared/middleware/rate-limit.js';
 import { createApp } from './app.js';
@@ -62,7 +63,12 @@ const speechProvider =
         env.AZURE_SPEECH_REGION!,
         env.AZURE_SPEECH_LANGUAGES_JSON,
       )
-    : undefined;
+    : env.SPEECH_PROVIDER === 'google'
+      ? new GoogleSpeechProvider(
+          env.GOOGLE_SPEECH_API_KEY ?? env.GOOGLE_TRANSLATE_API_KEY!,
+          env.GOOGLE_SPEECH_LANGUAGES_JSON,
+        )
+      : undefined;
 const speechService: SpeechService = new SpeechService(pool, practiceService, speechProvider);
 const rateLimiter = new PostgresRateLimiter(pool);
 const readingModel = env.AI_READING_MODEL ?? env.AI_TRANSLATION_MODEL;

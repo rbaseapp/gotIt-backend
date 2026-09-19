@@ -138,6 +138,17 @@ test('default Claude configuration serves only explicit AI while Google owns aut
     timeoutMs: 30000,
     maxAttempts: 2,
   });
+  const withGoogleKeyOnly = createEnrichment({
+    GOOGLE_TRANSLATE_API_KEY: 'google-test-key',
+    ENRICHMENT_SIGNING_SECRET: 's'.repeat(32),
+  }).registry as unknown as {
+    routes: Record<string, { profiles: string[]; timeoutMs: number; maxAttempts?: number }>;
+  };
+  assert.deepEqual(withGoogleKeyOnly.routes.dictionary, {
+    profiles: ['google_default'],
+    timeoutMs: 10000,
+    maxAttempts: 2,
+  });
   assert.throws(() => createEnrichment({ ANTHROPIC_API_KEY: 'test-key' }), /AI_TRANSLATION_MODEL/u);
 });
 test('Anthropic can detect a missing source language before translating', async () => {

@@ -56,11 +56,14 @@ export function createEnrichment(
       throw new Error('AI_TRANSLATION_MODEL requires ANTHROPIC_API_KEY');
   }
   const providers = [...additionalProviders];
+  const googleTranslationEnabled = Boolean(
+    settings.GOOGLE_TRANSLATION_API || settings.GOOGLE_TRANSLATE_API_KEY,
+  );
   if (settings.ANTHROPIC_API_KEY)
     providers.push(
       new AnthropicProvider(settings.ANTHROPIC_API_KEY, fetch, settings.ANTHROPIC_WORKSPACE_ID),
     );
-  if (settings.GOOGLE_TRANSLATION_API) {
+  if (googleTranslationEnabled) {
     if (!settings.GOOGLE_TRANSLATE_API_KEY)
       throw new Error('Configured Google translation requires credentials');
     const languages = settings.GOOGLE_TRANSLATION_LANGUAGES_JSON
@@ -91,7 +94,7 @@ export function createEnrichment(
         ai: { profiles: ['claude_default'], timeoutMs: 30000, maxAttempts: 2 },
       };
     }
-    if (settings.GOOGLE_TRANSLATION_API) {
+    if (googleTranslationEnabled) {
       profiles.push({
         id: 'google_default',
         providerId: 'google_cloud_translation',

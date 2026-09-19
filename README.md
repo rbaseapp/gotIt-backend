@@ -21,7 +21,7 @@ routes** from [api-catalog.ts](src/shared/http/api-catalog.ts).
 | /learning                                 | Smart queue and versioned learning/reward configuration                                            |
 | /dashboard, /gamification                 | Progress, daily activity, XP, levels and streaks                                                   |
 | /reading                                  | Generated preview, encrypted publication, opened-content persistence and article quizzes           |
-| /pronunciation, /learning-items/:id/audio | Transient validated WAV, Azure pronunciation assessment and reference audio interfaces             |
+| /pronunciation, /learning-items/:id/audio | Transient validated WAV, Google speech recognition and reference audio interfaces                  |
 | /export, /import                          | Paginated library/progress export and idempotent capture-request import                            |
 
 Product routes authenticate once through Core. `GET /health` checks liveness;
@@ -106,12 +106,16 @@ credential. Google does not claim contextual disambiguation, phonetics or an AI
 model. No live Google call was made.
 
 Future vendors implement `EnrichmentProvider`, `ReadingGenerator` or
-`SpeechProvider`; additional supported models use server configuration. Azure
-Speech is the first opt-in speech adapter. Set `SPEECH_PROVIDER=azure`,
-`AZURE_SPEECH_API_KEY` and `AZURE_SPEECH_REGION`; English defaults to `en-US`
-and `en-US-JennyNeural`. Add or override languages with
-`AZURE_SPEECH_LANGUAGES_JSON`. Without a configured provider the endpoints return
-safe unavailable errors and never fabricate audio or scores.
+`SpeechProvider`; additional supported models use server configuration. Google
+Speech is the deployment default. Set `SPEECH_PROVIDER=google`, enable Cloud
+Text-to-Speech and Speech-to-Text, and optionally set `GOOGLE_SPEECH_API_KEY`;
+otherwise the existing server-side `GOOGLE_TRANSLATE_API_KEY` is reused. English
+and Hebrew have default locale/voice mappings, with overrides in
+`GOOGLE_SPEECH_LANGUAGES_JSON`. Pronunciation uses a documented composite of
+transcript similarity and recognition confidence, not a native phonetic score.
+Azure remains an optional adapter for native pronunciation assessment. Without a
+configured provider the endpoints return safe unavailable errors and never
+fabricate audio or scores.
 
 ## HTTP, deployment and verification
 
@@ -164,6 +168,6 @@ On 2026-09-16, `https://gotit-backend.onrender.com` returned 200 on health,
 readiness and the current 41-route API catalog. A provider-authenticated smoke
 test still requires a valid production session. Claude translation requires
 `ANTHROPIC_API_KEY`, `AI_TRANSLATION_MODEL` and `ENRICHMENT_SIGNING_SECRET`
-together, followed by a new deployment. Web/extension origins, production
-administrator access, selected speech provider, calibrated level estimation and
-retention policy still require deployment-specific verification.
+together, followed by a new deployment. Web/extension origins, Google Speech API
+enablement and live verification, production administrator access, calibrated
+level estimation and retention policy still require deployment-specific verification.

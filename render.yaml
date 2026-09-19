@@ -39,6 +39,10 @@ services:
       - key: GOOGLE_TRANSLATE_API_KEY
         sync: false
       - key: SPEECH_PROVIDER
+        value: google
+      - key: GOOGLE_SPEECH_API_KEY
+        sync: false
+      - key: GOOGLE_SPEECH_LANGUAGES_JSON
         sync: false
       - key: AZURE_SPEECH_API_KEY
         sync: false

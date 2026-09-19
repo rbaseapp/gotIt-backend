@@ -30,7 +30,9 @@ const envSchema = z
     GOOGLE_TRANSLATION_API: z.enum(['cloud_basic_v2']).optional(),
     GOOGLE_TRANSLATE_API_KEY: z.string().min(1).optional(),
     GOOGLE_TRANSLATION_LANGUAGES_JSON: z.string().min(1).max(16000).optional(),
-    SPEECH_PROVIDER: z.enum(['azure']).optional(),
+    SPEECH_PROVIDER: z.enum(['azure', 'google']).optional(),
+    GOOGLE_SPEECH_API_KEY: z.string().min(1).optional(),
+    GOOGLE_SPEECH_LANGUAGES_JSON: z.string().min(1).max(16000).optional(),
     AZURE_SPEECH_API_KEY: z.string().min(1).optional(),
     AZURE_SPEECH_REGION: z
       .string()
@@ -78,6 +80,12 @@ const envSchema = z
           message: 'Azure speech provider requires a region',
         });
     }
+    if (v.SPEECH_PROVIDER === 'google' && !v.GOOGLE_SPEECH_API_KEY && !v.GOOGLE_TRANSLATE_API_KEY)
+      ctx.addIssue({
+        code: 'custom',
+        path: ['GOOGLE_SPEECH_API_KEY'],
+        message: 'Google speech provider requires a Google API key',
+      });
   });
 
 const parsed = envSchema.safeParse(process.env);
