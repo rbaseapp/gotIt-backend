@@ -42,6 +42,8 @@ services:
         value: google
       - key: GOOGLE_SPEECH_API_KEY
         sync: false
+      - key: GOOGLE_SERVICE_ACCOUNT_JSON
+        sync: false
       - key: GOOGLE_SPEECH_LANGUAGES_JSON
         sync: false
       - key: AZURE_SPEECH_API_KEY

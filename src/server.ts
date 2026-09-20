@@ -20,6 +20,7 @@ import { createPool } from './shared/database/pool.js';
 import { createLogger } from './shared/logger/logger.js';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { GoogleAuth } from 'google-auth-library';
 
 const logger = createLogger(env.LOG_LEVEL);
 const pool = createPool(env.DATABASE_URL);
@@ -56,6 +57,22 @@ const practiceService: PracticeService = new PracticeService(
   policySchema.parse(env.LEARNING_POLICY_JSON ? JSON.parse(env.LEARNING_POLICY_JSON) : {}),
   (...args): boolean => speechService.supports(...args),
 );
+const googleSpeechAccessToken =
+  env.GOOGLE_SERVICE_ACCOUNT_JSON || env.GOOGLE_APPLICATION_CREDENTIALS
+    ? (() => {
+        const auth = new GoogleAuth({
+          ...(env.GOOGLE_SERVICE_ACCOUNT_JSON
+            ? { credentials: JSON.parse(env.GOOGLE_SERVICE_ACCOUNT_JSON) }
+            : {}),
+          scopes: ['https://www.googleapis.com/auth/cloud-platform'],
+        });
+        return async () => {
+          const token = await auth.getAccessToken();
+          if (!token) throw new Error('Google access token is unavailable');
+          return token;
+        };
+      })()
+    : undefined;
 const speechProvider =
   env.SPEECH_PROVIDER === 'azure'
     ? new AzureSpeechProvider(
@@ -67,6 +84,8 @@ const speechProvider =
       ? new GoogleSpeechProvider(
           env.GOOGLE_SPEECH_API_KEY ?? env.GOOGLE_TRANSLATE_API_KEY!,
           env.GOOGLE_SPEECH_LANGUAGES_JSON,
+          fetch,
+          googleSpeechAccessToken,
         )
       : undefined;
 const speechService: SpeechService = new SpeechService(pool, practiceService, speechProvider);

@@ -14,7 +14,7 @@ test('Google speech synthesizes MP3 with the server-side key and configured voic
     return Response.json({ audioContent: Buffer.from('test mp3').toString('base64') });
   }) as typeof fetch);
   assert.equal(provider.supports('en', 'listening'), true);
-  assert.equal(provider.supports('he-IL', 'pronunciation'), true);
+  assert.equal(provider.supports('he-IL', 'pronunciation'), false);
   assert.equal(provider.supports('fr', 'listening'), false);
   const result = await provider.synthesize('hello', 'en', new AbortController().signal);
   assert.equal(requestUrl, 'https://texttospeech.googleapis.com/v1/text:synthesize');
@@ -28,35 +28,89 @@ test('Google speech synthesizes MP3 with the server-side key and configured voic
 
 test('Google speech recognition produces an explicit transcript-confidence assessment', async () => {
   let requestInit: RequestInit | undefined;
-  const provider = new GoogleSpeechProvider('server-only-key', undefined, (async (url, init) => {
-    assert.equal(String(url), 'https://speech.googleapis.com/v1/speech:recognize');
-    requestInit = init;
-    return Response.json({
-      results: [
-        {
-          alternatives: [
-            {
-              transcript: 'Good morning.',
-              confidence: 0.9,
-              words: [{ word: 'morning', confidence: 0.86 }],
-            },
-          ],
-        },
-      ],
-    });
-  }) as typeof fetch);
+  const provider = new GoogleSpeechProvider(
+    'server-only-key',
+    undefined,
+    (async (url, init) => {
+      assert.equal(String(url), 'https://speech.googleapis.com/v1/speech:recognize');
+      requestInit = init;
+      return Response.json({
+        results: [
+          {
+            alternatives: [
+              {
+                transcript: 'Good morning.',
+                confidence: 0.9,
+                words: [{ word: 'morning', confidence: 0.86 }],
+              },
+            ],
+          },
+        ],
+      });
+    }) as typeof fetch,
+    async () => 'short-lived-access-token',
+  );
+  assert.equal(provider.supports('en', 'pronunciation'), true);
   const audio = Buffer.from('transient wav');
   const result = await provider.assess(
     { audio, text: 'good morning', language: 'en', idempotencyKey: 'event' },
     new AbortController().signal,
   );
   const body = JSON.parse(String(requestInit?.body));
+  assert.equal(
+    new Headers(requestInit?.headers).get('Authorization'),
+    'Bearer short-lived-access-token',
+  );
+  assert.equal(new Headers(requestInit?.headers).get('X-Goog-Api-Key'), null);
   assert.equal(body.config.languageCode, 'en-US');
+  assert.equal(body.config.model, 'latest_short');
   assert.equal(body.audio.content, audio.toString('base64'));
   assert.equal(result.score, 99);
   assert.match(result.feedback, /התאמה 100/u);
   assert.match(result.feedback, /ביטחון זיהוי 90/u);
   assert.equal(result.model, 'google-stt-confidence-v1:en-US');
+});
+
+test('Google speech recognition uses the V1 Hebrew locale and supported short model', async () => {
+  let requestInit: RequestInit | undefined;
+  const provider = new GoogleSpeechProvider(
+    'server-only-key',
+    undefined,
+    (async (_url, init) => {
+      requestInit = init;
+      return Response.json({ results: [] });
+    }) as typeof fetch,
+    async () => 'token',
+  );
+  await provider.assess(
+    { audio: Buffer.from('wav'), text: 'שלום', language: 'he', idempotencyKey: 'event' },
+    new AbortController().signal,
+  );
+  const body = JSON.parse(String(requestInit?.body));
+  assert.equal(body.config.languageCode, 'iw-IL');
+  assert.equal(body.config.model, 'command_and_search');
+});
+
+test('Google speech exposes safe actionable authentication failures', async () => {
+  const provider = new GoogleSpeechProvider(
+    'server-only-key',
+    undefined,
+    (async () =>
+      Response.json(
+        { error: { message: 'secret upstream detail' } },
+        { status: 403 },
+      )) as typeof fetch,
+    async () => 'expired-token',
+  );
+  await assert.rejects(
+    () =>
+      provider.assess(
+        { audio: Buffer.from('wav'), text: 'hello', language: 'en', idempotencyKey: 'event' },
+        new AbortController().signal,
+      ),
+    (error: any) =>
+      error.code === 'SPEECH_AUTH_FAILED' && !error.message.includes('secret upstream detail'),
+  );
 });
 
 test('Google speech assessment is deterministic for mismatch and no recognition', () => {

@@ -91,7 +91,8 @@ export class SpeechService {
           }),
         ),
       ]);
-    } catch {
+    } catch (error) {
+      if (error instanceof AppError) throw error;
       throw new AppError(503, 'SPEECH_UNAVAILABLE', 'Speech provider is temporarily unavailable');
     } finally {
       clearTimeout(timer);

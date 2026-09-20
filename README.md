@@ -109,8 +109,12 @@ Future vendors implement `EnrichmentProvider`, `ReadingGenerator` or
 `SpeechProvider`; additional supported models use server configuration. Google
 Speech is the deployment default. Set `SPEECH_PROVIDER=google`, enable Cloud
 Text-to-Speech and Speech-to-Text, and optionally set `GOOGLE_SPEECH_API_KEY`;
-otherwise the existing server-side `GOOGLE_TRANSLATE_API_KEY` is reused. English
-and Hebrew have default locale/voice mappings, with overrides in
+otherwise the existing server-side `GOOGLE_TRANSLATE_API_KEY` is reused for
+Text-to-Speech. Speech-to-Text requires Application Default Credentials: provide
+service-account JSON in `GOOGLE_SERVICE_ACCOUNT_JSON`, or point
+`GOOGLE_APPLICATION_CREDENTIALS` at a server-side secret file. Grant that service
+account `roles/speech.client` and `roles/serviceusage.serviceUsageConsumer`.
+English and Hebrew have default locale/voice/model mappings, with overrides in
 `GOOGLE_SPEECH_LANGUAGES_JSON`. Pronunciation uses a documented composite of
 transcript similarity and recognition confidence, not a native phonetic score.
 Azure remains an optional adapter for native pronunciation assessment. Without a

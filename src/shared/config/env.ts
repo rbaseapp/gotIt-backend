@@ -32,6 +32,8 @@ const envSchema = z
     GOOGLE_TRANSLATION_LANGUAGES_JSON: z.string().min(1).max(16000).optional(),
     SPEECH_PROVIDER: z.enum(['azure', 'google']).optional(),
     GOOGLE_SPEECH_API_KEY: z.string().min(1).optional(),
+    GOOGLE_SERVICE_ACCOUNT_JSON: z.string().min(1).max(32000).optional(),
+    GOOGLE_APPLICATION_CREDENTIALS: z.string().min(1).max(1000).optional(),
     GOOGLE_SPEECH_LANGUAGES_JSON: z.string().min(1).max(16000).optional(),
     AZURE_SPEECH_API_KEY: z.string().min(1).optional(),
     AZURE_SPEECH_REGION: z
@@ -86,6 +88,23 @@ const envSchema = z
         path: ['GOOGLE_SPEECH_API_KEY'],
         message: 'Google speech provider requires a Google API key',
       });
+    if (v.GOOGLE_SERVICE_ACCOUNT_JSON) {
+      try {
+        const credentials = JSON.parse(v.GOOGLE_SERVICE_ACCOUNT_JSON) as Record<string, unknown>;
+        if (
+          typeof credentials.client_email !== 'string' ||
+          typeof credentials.private_key !== 'string' ||
+          typeof credentials.project_id !== 'string'
+        )
+          throw new Error('Invalid service account');
+      } catch {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['GOOGLE_SERVICE_ACCOUNT_JSON'],
+          message: 'Google service account JSON is invalid',
+        });
+      }
+    }
   });
 
 const parsed = envSchema.safeParse(process.env);

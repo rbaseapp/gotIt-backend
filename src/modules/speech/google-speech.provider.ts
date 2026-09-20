@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { AppError } from '../../shared/errors/app-error.js';
 import type { SpeechProvider } from './speech.service.js';
 
 const languageConfigSchema = z
@@ -8,6 +9,11 @@ const languageConfigSchema = z
       .object({
         locale: z.string().regex(/^[a-z]{2,3}(?:-[A-Za-z]{2,8})+$/u),
         voice: z.string().min(3).max(100).optional(),
+        recognitionLocale: z
+          .string()
+          .regex(/^[a-z]{2,3}(?:-[A-Za-z]{2,8})+$/u)
+          .optional(),
+        recognitionModel: z.string().min(3).max(100).optional(),
       })
       .strict(),
   )
@@ -57,7 +63,25 @@ const recognitionSchema = z
 type LanguageConfig = z.infer<typeof languageConfigSchema>;
 
 async function boundedJson(response: Response, maximum: number, signal: AbortSignal) {
-  if (!response.ok || !response.body) throw new Error('Google Speech request failed');
+  if (!response.ok) {
+    await response.body?.cancel().catch(() => {});
+    if ([401, 403].includes(response.status))
+      throw new AppError(
+        503,
+        'SPEECH_AUTH_FAILED',
+        'Speech provider credentials are invalid or lack permission',
+      );
+    if (response.status === 400)
+      throw new AppError(
+        503,
+        'SPEECH_REQUEST_REJECTED',
+        'Speech provider rejected the audio or language configuration',
+      );
+    if (response.status === 429)
+      throw new AppError(503, 'SPEECH_QUOTA_EXCEEDED', 'Speech provider quota was exceeded');
+    throw new Error('Google Speech request failed');
+  }
+  if (!response.body) throw new Error('Google Speech response has no body');
   const reader = response.body.getReader();
   const cancel = () => void reader.cancel().catch(() => {});
   signal.addEventListener('abort', cancel, { once: true });
@@ -127,13 +151,24 @@ export class GoogleSpeechProvider implements SpeechProvider {
     private readonly apiKey: string,
     languagesJson?: string,
     private readonly fetcher: typeof fetch = fetch,
+    private readonly accessToken?: () => Promise<string>,
   ) {
     this.languages = languageConfigSchema.parse(
       languagesJson
         ? JSON.parse(languagesJson)
         : {
-            en: { locale: 'en-US', voice: 'en-US-Standard-C' },
-            he: { locale: 'he-IL', voice: 'he-IL-Standard-A' },
+            en: {
+              locale: 'en-US',
+              voice: 'en-US-Standard-C',
+              recognitionLocale: 'en-US',
+              recognitionModel: 'latest_short',
+            },
+            he: {
+              locale: 'he-IL',
+              voice: 'he-IL-Standard-A',
+              recognitionLocale: 'iw-IL',
+              recognitionModel: 'command_and_search',
+            },
           },
     );
   }
@@ -147,8 +182,10 @@ export class GoogleSpeechProvider implements SpeechProvider {
     );
   }
 
-  supports(language: string, _operation: 'listening' | 'pronunciation') {
-    return Boolean(this.language(language));
+  supports(language: string, operation: 'listening' | 'pronunciation') {
+    return (
+      Boolean(this.language(language)) && (operation === 'listening' || Boolean(this.accessToken))
+    );
   }
 
   async synthesize(text: string, language: string, signal: AbortSignal) {
@@ -179,11 +216,21 @@ export class GoogleSpeechProvider implements SpeechProvider {
     signal: AbortSignal,
   ) {
     const config = this.language(input.language);
-    if (!config) throw new Error('Unsupported pronunciation language');
+    if (!config || !this.accessToken) throw new Error('Unsupported pronunciation language');
+    let token: string;
+    try {
+      token = await this.accessToken();
+    } catch {
+      throw new AppError(
+        503,
+        'SPEECH_AUTH_FAILED',
+        'Speech provider credentials are invalid or unavailable',
+      );
+    }
     const response = await this.fetcher('https://speech.googleapis.com/v1/speech:recognize', {
       method: 'POST',
       headers: {
-        'X-Goog-Api-Key': this.apiKey,
+        Authorization: `Bearer ${token}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
@@ -191,8 +238,8 @@ export class GoogleSpeechProvider implements SpeechProvider {
           encoding: 'LINEAR16',
           sampleRateHertz: 16000,
           audioChannelCount: 1,
-          languageCode: config.locale,
-          model: 'latest_short',
+          languageCode: config.recognitionLocale ?? config.locale,
+          model: config.recognitionModel ?? 'command_and_search',
           enableWordConfidence: true,
         },
         audio: { content: input.audio.toString('base64') },
@@ -204,7 +251,7 @@ export class GoogleSpeechProvider implements SpeechProvider {
     const result = assessment(best?.transcript ?? '', input.text, best?.confidence);
     return {
       ...result,
-      model: `google-stt-confidence-v1:${config.locale}`,
+      model: `google-stt-confidence-v1:${config.recognitionLocale ?? config.locale}`,
     };
   }
 }
