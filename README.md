@@ -71,9 +71,12 @@ require confirmed translations and reset current evidence/review maturity while
 preserving historical attempts, XP, contexts and translation provenance.
 Same-sense variants and manual mastery preserve evidence and award no edit XP.
 
-Default policy requires score 85, three attempts on two calendar days in every
-enabled skill and mature review stage. Disabled speech skills never count as
-completed. Unique reward ledger keys and a 200-XP daily cap limit repeated rewards;
+The default policy separates `learned` from `established` retention. A word becomes
+learned after three scored attempts overall, including two successful active-recall
+answers on two profile-calendar days, recall mastery of at least 80 and a passing
+latest answer. Optional skill scores remain visible but do not block learning.
+Delayed active-recall reviews promote the word to established retention at review
+stage four. Unique reward ledger keys and a 200-XP daily cap limit repeated rewards;
 skips do not change progress, streak or XP. `GET /api/v1/learning/config` exposes
 the versioned policy; `LEARNING_POLICY_JSON` supplies validated server overrides.
 This initial policy does not implement calibrated automatic CEFR estimation.

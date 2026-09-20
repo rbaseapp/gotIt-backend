@@ -2,28 +2,21 @@ import { z } from 'zod';
 import { fingerprint } from '../enrichment/selection-proof.js';
 export const SKILLS = ['recognition', 'recall', 'listening', 'spelling', 'pronunciation'] as const;
 export type Skill = (typeof SKILLS)[number];
+export const LEARNED_REVIEW_STAGE = 2;
+export const ESTABLISHED_REVIEW_STAGE = 4;
+export type RetentionLevel = 'acquiring' | 'learned' | 'established';
 export const policySchema = z
   .object({
-    masteryThreshold: z.number().min(50).max(100).default(85),
-    minimumAttemptsPerSkill: z.number().int().min(2).max(100).default(3),
-    minimumCalendarDays: z.number().int().min(2).max(30).default(2),
-    minimumReviewStage: z.number().int().min(2).max(6).default(4),
+    masteryThreshold: z.number().min(50).max(100).default(80),
+    minimumScoredAttempts: z.number().int().min(1).max(100).default(3),
+    minimumActiveRecallSuccesses: z.number().int().min(1).max(100).default(2),
+    minimumActiveRecallCalendarDays: z.number().int().min(1).max(30).default(2),
     demotionThreshold: z.number().min(0).max(85).default(60),
     intervalsDays: z
       .array(z.number().int().min(1).max(365))
-      .min(4)
+      .min(5)
       .max(10)
       .default([1, 3, 7, 14, 30, 60]),
-    masteryWeights: z
-      .object({
-        recognition: z.number().positive().default(1),
-        recall: z.number().positive().default(1.5),
-        listening: z.number().positive().default(1),
-        spelling: z.number().positive().default(1),
-        pronunciation: z.number().positive().default(1),
-      })
-      .strict()
-      .prefault({}),
     dailyXpCap: z.number().int().min(0).max(1000).default(200),
     correctXp: z.number().int().min(0).max(50).default(10),
     partialXp: z.number().int().min(0).max(20).default(3),
@@ -61,6 +54,12 @@ export type Evidence = {
   failureCount: number;
   calendarDays: number;
 };
+export type MasteryEvidence = {
+  totalScoredAttempts: number;
+  activeRecallSuccesses: number;
+  activeRecallCalendarDays: number;
+  activeRecallMasteryScore: number;
+};
 export function projectEvidence(
   scores: number[],
   days: number,
@@ -86,62 +85,43 @@ export function projectEvidence(
 }
 export function decideProgress(
   policy: LearningPolicy,
-  evidence: Evidence[],
-  enabled: Skill[],
+  evidence: MasteryEvidence,
   current: { status: string; stage: number; masterySource: string | null },
   score: number,
   now: Date,
   recentResults: number[],
+  activeRecallAttempt: boolean,
   canAdvance = true,
 ) {
-  const relevant = evidence.filter((e) => enabled.includes(e.skillType));
-  const totalWeight = relevant.reduce((s, e) => s + policy.masteryWeights[e.skillType], 0);
-  const mastery = totalWeight
-    ? relevant.reduce((s, e) => s + e.masteryScore * policy.masteryWeights[e.skillType], 0) /
-      totalWeight
-    : 0;
   const failedPattern = recentResults.slice(-3).filter((s) => s < 50).length >= 2;
   let stage = current.stage,
     status = current.status,
     masterySource = current.masterySource;
-  const advancesStage = score >= 85 && canAdvance;
+  const advancesStage = activeRecallAttempt && score >= 85 && canAdvance;
   if (advancesStage) stage = Math.min(policy.intervalsDays.length - 1, stage + 1);
-  else if (score < 50) stage = Math.max(0, stage - 1);
+  else if (activeRecallAttempt && score < 50) stage = Math.max(0, stage - 1);
   const sufficient =
-    enabled.length > 0 &&
-    enabled.every((skill) =>
-      relevant.some(
-        (e) =>
-          e.skillType === skill &&
-          e.attemptCount >= policy.minimumAttemptsPerSkill &&
-          e.calendarDays >= policy.minimumCalendarDays &&
-          e.masteryScore >= policy.masteryThreshold,
-      ),
-    );
+    evidence.totalScoredAttempts >= policy.minimumScoredAttempts &&
+    evidence.activeRecallSuccesses >= policy.minimumActiveRecallSuccesses &&
+    evidence.activeRecallCalendarDays >= policy.minimumActiveRecallCalendarDays &&
+    evidence.activeRecallMasteryScore >= policy.masteryThreshold;
   if (current.status === 'mastered') {
     if (
       failedPattern ||
       (recentResults.slice(-3).filter((s) => s < 85).length >= 2 &&
-        relevant.some(
-          (e) =>
-            e.attemptCount >= policy.minimumAttemptsPerSkill &&
-            e.masteryScore < policy.demotionThreshold,
-        ))
+        evidence.activeRecallSuccesses >= policy.minimumActiveRecallSuccesses &&
+        evidence.activeRecallMasteryScore < policy.demotionThreshold)
     ) {
       status = 'reviewing';
       masterySource = 'system';
     } else status = 'mastered';
-  } else if (
-    sufficient &&
-    mastery >= policy.masteryThreshold &&
-    stage >= policy.minimumReviewStage &&
-    !failedPattern
-  ) {
+  } else if (sufficient && score >= 85 && stage >= LEARNED_REVIEW_STAGE && !failedPattern) {
     status = 'mastered';
     masterySource = 'system';
   } else status = stage >= 1 ? 'reviewing' : 'learning';
+  const retentionLevel = retentionLevelFor(status, stage);
   const days =
-    status === 'mastered'
+    retentionLevel === 'established'
       ? policy.intervalsDays.at(-1)!
       : score < 50
         ? 0
@@ -150,7 +130,13 @@ export function decideProgress(
     status,
     stage,
     masterySource,
-    masteryScore: Math.round(mastery * 100) / 100,
+    masteryScore: Math.round(evidence.activeRecallMasteryScore * 100) / 100,
+    retentionLevel,
     nextReviewAt: new Date(now.getTime() + days * 86400000),
   };
+}
+
+export function retentionLevelFor(status: string, stage: number): RetentionLevel {
+  if (status !== 'mastered') return 'acquiring';
+  return stage >= ESTABLISHED_REVIEW_STAGE ? 'established' : 'learned';
 }

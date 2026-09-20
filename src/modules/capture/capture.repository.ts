@@ -7,6 +7,7 @@ import { fingerprint } from '../enrichment/selection-proof.js';
 import type { ProviderTrace } from '../enrichment/enrichment.registry.js';
 import { AppError } from '../../shared/errors/app-error.js';
 import { lookupText, type SaveInput } from './capture.validation.js';
+import { ESTABLISHED_REVIEW_STAGE } from '../learning/learning.policy.js';
 
 const captureSchema = z
   .object({
@@ -482,7 +483,8 @@ export class CaptureRepository {
         translation_language_code AS "translationLanguageCode",item_type AS "itemType",part_of_speech AS "partOfSpeech",
         phonetic_text AS "phoneticText",phonetic_scheme AS "phoneticScheme",user_status AS "userStatus",learning_status AS "learningStatus",
         user_priority AS "userPriority",manual_hard AS "manualHard",system_difficulty::float8 AS "systemDifficulty",
-        overall_mastery_score::float8 AS "overallMasteryScore",mastery_source AS "masterySource",review_stage AS "reviewStage",learning_revision AS "learningRevision",
+        overall_mastery_score::float8 AS "overallMasteryScore",mastery_source AS "masterySource",review_stage AS "reviewStage",
+        CASE WHEN learning_status='mastered' AND review_stage>=${ESTABLISHED_REVIEW_STAGE} THEN 'established' WHEN learning_status='mastered' THEN 'learned' ELSE 'acquiring' END AS "retentionLevel",learning_revision AS "learningRevision",
         next_review_at AS "nextReviewAt",last_practiced_at AS "lastPracticedAt",created_at AS "createdAt",updated_at AS "updatedAt"
         FROM product_gotit.learning_items WHERE application_id=$1 AND application_user_id=$2 AND id=$3 AND deleted_at IS NULL`,
         [...scoped(scope), id],

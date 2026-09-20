@@ -280,6 +280,75 @@ test(
           );
         },
       );
+      await t.test('active recall reaches learned before established retention', async () => {
+        const captured = await call('post', '/captures', {
+            item: {
+              sourceText: 'retention',
+              sourceLanguageCode: 'en',
+              translationLanguageCode: 'he',
+              itemType: 'word',
+            },
+            translation: { text: 'retention meaning' },
+            context: { selectedText: 'retention' },
+            senseDecision: { mode: 'auto' },
+          }).expect(201),
+          learningItemId = captured.body.capture.learningItemId,
+          recallSession = (
+            await call('post', '/practice/sessions', {
+              sessionType: 'recall',
+              learningItemIds: [learningItemId],
+            }).expect(201)
+          ).body.session,
+          answer = async () => {
+            const exercise = (
+              await call('post', `/practice/sessions/${recallSession.id}/exercises`, {
+                count: 1,
+              }).expect(201)
+            ).body.exercises[0];
+            return call('post', '/practice/attempts', {
+              exerciseId: exercise.id,
+              answerText: 'retention',
+            }).expect(201);
+          };
+
+        const first = await answer();
+        assert.equal(first.body.progress.retentionLevel, 'acquiring');
+        assert.equal(first.body.progress.stage, 1);
+        await db.adminPool.query(
+          "UPDATE product_gotit.practice_attempts SET created_at=now()-interval '2 days' WHERE id=$1",
+          [first.body.attempt.id],
+        );
+
+        const second = await answer();
+        assert.equal(second.body.progress.stage, 2);
+        assert.equal(second.body.progress.status, 'reviewing');
+        const third = await answer();
+        assert.equal(third.body.progress.status, 'mastered');
+        assert.equal(third.body.progress.retentionLevel, 'learned');
+        assert.equal(third.body.progress.stage, 2);
+
+        await db.adminPool.query(
+          "UPDATE product_gotit.practice_attempts SET created_at=now()-interval '15 days' WHERE id=ANY($1::uuid[])",
+          [[second.body.attempt.id, third.body.attempt.id]],
+        );
+        const fourth = await answer();
+        assert.equal(fourth.body.progress.retentionLevel, 'learned');
+        assert.equal(fourth.body.progress.stage, 3);
+        await db.adminPool.query(
+          "UPDATE product_gotit.practice_attempts SET created_at=now()-interval '1 day' WHERE id=$1",
+          [fourth.body.attempt.id],
+        );
+
+        const fifth = await answer();
+        assert.equal(fifth.body.progress.retentionLevel, 'established');
+        assert.equal(fifth.body.progress.stage, 4);
+        assert.equal(
+          (await call('get', `/learning-items/${learningItemId}`).expect(200)).body.learningItem
+            .retentionLevel,
+          'established',
+        );
+        await call('delete', `/learning-items/${learningItemId}`).expect(200);
+      });
       await t.test(
         'new semantic revision excludes historical evidence while same-sense variants and manual mastery preserve attempts without rewards',
         async () => {
@@ -314,6 +383,8 @@ test(
           const mastered = (await call('get', `/learning-items/${ids[0]}`).expect(200)).body
             .learningItem;
           assert.equal(mastered.masterySource, 'user');
+          assert.equal(mastered.reviewStage, 2);
+          assert.equal(mastered.retentionLevel, 'learned');
           assert.equal(mastered.skills.find((s: any) => s.skillType === 'recall').attemptCount, 1);
           await call('post', `/learning-items/${ids[0]}/mastery`, { mastered: false }).expect(200);
           assert.equal(
@@ -825,7 +896,8 @@ test(
                   learningItemIds: [ids[1]],
                 }),
               ),
-            (error: any) => error.statusCode === 503 && error.code === 'READING_UNAVAILABLE',
+            (error: any) =>
+              error.statusCode === 503 && error.code === 'READING_PROVIDER_RESPONSE_INVALID',
           );
           assert.equal(
             (

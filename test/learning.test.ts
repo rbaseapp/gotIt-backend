@@ -3,7 +3,6 @@ import test from 'node:test';
 import {
   DEFAULT_LEARNING_POLICY as policy,
   decideProgress,
-  projectEvidence,
   calendarDay,
   previousDay,
   levelForXp,
@@ -12,58 +11,76 @@ import { scoreAnswer, type AnswerSpec } from '../src/modules/practice/practice.s
 import { attemptSchema } from '../src/modules/practice/practice.validation.js';
 import { validateWav } from '../src/modules/speech/speech.service.js';
 const exerciseId = '11111111-1111-4111-8111-111111111111';
-test('mastery requires all enabled skills, calendar evidence and mature review; same-day review and one failure cannot fake transitions', () => {
-  const evidence = ['recognition', 'recall', 'spelling'].map((skillType) => ({
-      skillType: skillType as 'recall',
-      ...projectEvidence([100, 100, 100], 2),
-    })),
-    now = new Date('2026-09-15T12:00:00Z');
-  assert.equal(
-    decideProgress(
+test('learning uses active recall evidence, then promotes learned words to established retention', () => {
+  const now = new Date('2026-09-15T12:00:00Z'),
+    evidence = {
+      totalScoredAttempts: 3,
+      activeRecallSuccesses: 2,
+      activeRecallCalendarDays: 2,
+      activeRecallMasteryScore: 100,
+    },
+    learned = decideProgress(
       policy,
       evidence,
-      ['recognition', 'recall', 'spelling'],
-      { status: 'reviewing', stage: 3, masterySource: null },
+      { status: 'reviewing', stage: 1, masterySource: null },
       100,
       now,
-      [100, 100, 100],
-    ).status,
-    'mastered',
+      [100, 100],
+      true,
+    );
+  assert.equal(learned.status, 'mastered');
+  assert.equal(learned.stage, 2);
+  assert.equal(learned.retentionLevel, 'learned');
+  assert.equal(learned.nextReviewAt.getTime() - now.getTime(), 7 * 86400000);
+
+  const sameDay = decideProgress(
+    policy,
+    evidence,
+    { status: 'reviewing', stage: 1, masterySource: null },
+    100,
+    now,
+    [100, 100],
+    true,
+    false,
   );
+  assert.equal(sameDay.stage, 1);
+  assert.equal(sameDay.status, 'reviewing');
+
   assert.equal(
     decideProgress(
       policy,
-      evidence,
-      ['recognition', 'recall', 'spelling', 'pronunciation'],
-      { status: 'reviewing', stage: 3, masterySource: null },
+      { ...evidence, activeRecallCalendarDays: 1 },
+      { status: 'reviewing', stage: 1, masterySource: null },
       100,
       now,
-      [100, 100, 100],
+      [100, 100],
+      true,
     ).status,
     'reviewing',
   );
-  const same = decideProgress(
+
+  const established = decideProgress(
     policy,
     evidence,
-    ['recognition', 'recall', 'spelling'],
-    { status: 'reviewing', stage: 3, masterySource: null },
+    { status: 'mastered', stage: 3, masterySource: 'system' },
     100,
     now,
     [100, 100, 100],
-    false,
+    true,
   );
-  assert.equal(same.stage, 3);
-  assert.equal(same.status, 'reviewing');
-  assert.equal(same.nextReviewAt.getTime() - now.getTime(), 14 * 86400000);
+  assert.equal(established.stage, 4);
+  assert.equal(established.retentionLevel, 'established');
+  assert.equal(established.nextReviewAt.getTime() - now.getTime(), 60 * 86400000);
+
   assert.equal(
     decideProgress(
       policy,
       evidence,
-      ['recall'],
       { status: 'mastered', stage: 4, masterySource: 'system' },
       0,
       now,
       [100, 100, 0],
+      true,
     ).status,
     'mastered',
   );
@@ -71,11 +88,11 @@ test('mastery requires all enabled skills, calendar evidence and mature review; 
     decideProgress(
       policy,
       evidence,
-      ['recall'],
       { status: 'mastered', stage: 4, masterySource: 'system' },
       0,
       now,
       [100, 0, 0],
+      true,
     ).status,
     'reviewing',
   );

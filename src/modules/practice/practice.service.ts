@@ -19,8 +19,10 @@ import {
   levelForXp,
   projectEvidence,
   decideProgress,
+  retentionLevelFor,
   type LearningPolicy,
   type Evidence,
+  type MasteryEvidence,
   type Skill,
 } from '../learning/learning.policy.js';
 import { scoreAnswer, type AnswerSpec } from './practice.scoring.js';
@@ -69,6 +71,7 @@ export class PracticeService {
             translationLanguageCode: r.translation_language_code,
             primaryTranslation: r.primary_translation,
             learningStatus: r.learning_status,
+            retentionLevel: retentionLevelFor(r.learning_status, r.review_stage),
             nextReviewAt: r.next_review_at,
             queueScore: Number(r.queue_score),
           })),
@@ -724,27 +727,67 @@ export class PracticeService {
             ],
           );
       }
-      const recent = (
+      const activeRecall = (
         await tx.query(
-          `SELECT score::float8 score,created_at FROM product_gotit.practice_attempts WHERE application_id=$1 AND application_user_id=$2 AND learning_item_id=$3 AND result<>'skipped' AND id<>$4 AND COALESCE(learning_revision,1)=$5 ORDER BY created_at DESC,id DESC LIMIT 3`,
-          [...scopeValues(scope), item.id, attemptId, item.learning_revision],
+          `WITH history AS(
+          SELECT a.id,a.score::float8 score,(a.created_at AT TIME ZONE $4)::date AS activity_day,a.created_at
+          FROM product_gotit.practice_attempts a
+          WHERE a.application_id=$1 AND a.application_user_id=$2 AND a.learning_item_id=$3
+            AND a.result<>'skipped' AND a.user_answer_text IS NOT NULL AND COALESCE(a.learning_revision,1)=$5
+            AND EXISTS(SELECT 1 FROM product_gotit.attempt_skill_effects e WHERE e.practice_attempt_id=a.id AND e.skill_type='recall'))
+          SELECT count(*)::integer attempts,count(*) FILTER(WHERE score>=85)::integer successes,
+            count(DISTINCT activity_day) FILTER(WHERE score>=85)::integer successful_days,
+            count(*) FILTER(WHERE score<50)::integer failures,
+            max(created_at) FILTER(WHERE id<>$6 AND score>=85) previous_success,
+            ARRAY(SELECT score FROM(SELECT score,created_at,id FROM history ORDER BY created_at DESC,id DESC LIMIT 10) r ORDER BY created_at,id) scores,
+            ARRAY(SELECT score FROM(SELECT score,created_at,id FROM history ORDER BY created_at DESC,id DESC LIMIT 3) r ORDER BY created_at,id) recent_scores
+          FROM history`,
+          [...scopeValues(scope), item.id, profile.timezone, item.learning_revision, attemptId],
         )
-      ).rows;
-      // Repetition on the same calendar day cannot artificially advance review maturity.
-      const canAdvance =
-        recent.length === 0 || calendarDay(recent[0]!.created_at, profile.timezone) !== day;
+      ).rows[0]!;
+      const totalScoredAttempts = Number(
+        (
+          await tx.query(
+            `SELECT count(*)::integer count FROM product_gotit.practice_attempts
+             WHERE application_id=$1 AND application_user_id=$2 AND learning_item_id=$3
+               AND result<>'skipped' AND COALESCE(learning_revision,1)=$4`,
+            [...scopeValues(scope), item.id, item.learning_revision],
+          )
+        ).rows[0]!.count,
+      );
+      const activeRecallProjection = projectEvidence(
+          activeRecall.scores,
+          activeRecall.successful_days,
+          {
+            attemptCount: activeRecall.attempts,
+            successCount: activeRecall.successes,
+            failureCount: activeRecall.failures,
+          },
+        ),
+        masteryEvidence: MasteryEvidence = {
+          totalScoredAttempts,
+          activeRecallSuccesses: activeRecall.successes,
+          activeRecallCalendarDays: activeRecall.successful_days,
+          activeRecallMasteryScore: activeRecallProjection.masteryScore,
+        },
+        activeRecallAttempt =
+          input.answerText !== undefined && spec.skills.some((e) => e.skill === 'recall'),
+        // Repetition on the same profile-calendar day cannot advance review maturity.
+        canAdvance =
+          !activeRecall.previous_success ||
+          calendarDay(activeRecall.previous_success, profile.timezone) !== day;
       const progress = input.skipped
         ? {
             status: item.learning_status,
             stage: item.review_stage,
             masterySource: item.mastery_source,
             masteryScore: Number(item.overall_mastery_score),
+            retentionLevel: retentionLevelFor(item.learning_status, item.review_stage),
             nextReviewAt: item.next_review_at,
           }
         : decideProgress(
             this.policy,
-            evidence,
-            enabled,
+            masteryEvidence,
             {
               status: item.learning_status,
               stage: item.review_stage,
@@ -752,7 +795,8 @@ export class PracticeService {
             },
             scored.score,
             now,
-            [...recent.map((r) => r.score).reverse(), scored.score],
+            activeRecall.recent_scores,
+            activeRecallAttempt,
             canAdvance,
           );
       if (!input.skipped)

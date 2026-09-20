@@ -5,6 +5,7 @@ import { AppError } from '../../shared/errors/app-error.js';
 import type { ProfileScope } from '../profile/profile.types.js';
 import { lookupText } from '../capture/capture.validation.js';
 import { fingerprint } from '../enrichment/selection-proof.js';
+import { ESTABLISHED_REVIEW_STAGE, LEARNED_REVIEW_STAGE } from '../learning/learning.policy.js';
 import type { ListInput, EditInput, BulkInput } from './library.validation.js';
 export const scopeValues = (scope: ProfileScope) => [scope.applicationId, scope.applicationUserId];
 export const itemNotFound = () => new AppError(404, 'NOT_FOUND', 'Learning item not found');
@@ -18,7 +19,9 @@ const cursorSchema = z
 const fields = `li.id,li.source_text AS "sourceText",li.source_language_code AS "sourceLanguageCode",
   li.translation_language_code AS "translationLanguageCode",li.item_type AS "itemType",li.user_status AS "userStatus",
   li.learning_status AS "learningStatus",li.user_priority AS "userPriority",li.manual_hard AS "manualHard",
-  li.overall_mastery_score::float8 AS "overallMasteryScore",li.next_review_at AS "nextReviewAt",li.created_at AS "createdAt",li.updated_at AS "updatedAt",
+  li.overall_mastery_score::float8 AS "overallMasteryScore",li.review_stage AS "reviewStage",
+  CASE WHEN li.learning_status='mastered' AND li.review_stage>=${ESTABLISHED_REVIEW_STAGE} THEN 'established' WHEN li.learning_status='mastered' THEN 'learned' ELSE 'acquiring' END AS "retentionLevel",
+  li.next_review_at AS "nextReviewAt",li.created_at AS "createdAt",li.updated_at AS "updatedAt",
   (SELECT translation_text FROM product_gotit.item_translations t WHERE t.application_id=li.application_id
    AND t.application_user_id=li.application_user_id AND t.learning_item_id=li.id AND t.is_current AND is_primary) AS "primaryTranslation"`;
 export function itemSnapshot(row: Record<string, unknown>, translations: unknown) {
@@ -290,8 +293,7 @@ export class LibraryRepository {
         archive: "user_status='archived'",
         delete: 'deleted_at=now()',
         restore: 'deleted_at=NULL',
-        mark_mastered:
-          "learning_status='mastered',mastery_source='user',review_stage=GREATEST(review_stage,4),next_review_at=now()+interval '60 days',first_mastered_at=COALESCE(first_mastered_at,now()),last_mastered_at=now()",
+        mark_mastered: `learning_status='mastered',mastery_source='user',review_stage=GREATEST(review_stage,${LEARNED_REVIEW_STAGE}),next_review_at=now()+interval '7 days',first_mastered_at=COALESCE(first_mastered_at,now()),last_mastered_at=now()`,
         return_to_learning:
           "learning_status='learning',mastery_source=NULL,review_stage=0,next_review_at=now()",
         high_priority: "user_priority='high'",
@@ -316,7 +318,9 @@ export class LibraryRepository {
               row.learning_status,
               input.action === 'mark_mastered' ? 'mastered' : 'learning',
               row.review_stage,
-              input.action === 'mark_mastered' ? Math.max(4, row.review_stage) : 0,
+              input.action === 'mark_mastered'
+                ? Math.max(LEARNED_REVIEW_STAGE, row.review_stage)
+                : 0,
               input.action,
             ],
           );

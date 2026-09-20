@@ -47,6 +47,7 @@ export const attemptReceiptSchema = z
             stage: count,
             masterySource: z.string().max(100).nullable(),
             masteryScore: z.number().min(0).max(100),
+            retentionLevel: z.enum(['acquiring', 'learned', 'established']).optional(),
             nextReviewAt: timestamp.nullable(),
           })
           .strict(),

@@ -7,6 +7,7 @@ import type { CaptureService } from '../capture/capture.service.js';
 import { parseInput, saveSchema, uuidSchema } from '../capture/capture.validation.js';
 import { pageSchema } from '../library/library.validation.js';
 import { scopeValues } from '../library/library.repository.js';
+import { ESTABLISHED_REVIEW_STAGE } from '../learning/learning.policy.js';
 
 export const importSchema = z
   .object({
@@ -36,7 +37,9 @@ export function createTransferRoutes(pool: Pool, capture: CaptureService) {
           await tx.query(
             `SELECT i.id,i.source_text AS "sourceText",i.source_language_code AS "sourceLanguageCode",i.translation_language_code AS "translationLanguageCode",i.item_type AS "itemType",i.part_of_speech AS "partOfSpeech",i.user_status AS "userStatus",i.learning_status AS "learningStatus",i.mastery_source AS "masterySource",i.user_priority AS "userPriority",i.manual_hard AS "manualHard",
         COALESCE((SELECT jsonb_agg(jsonb_build_object('text',t.translation_text,'isPrimary',t.is_primary,'sourceKind',t.source_kind,'isUserEdited',t.is_user_edited) ORDER BY is_primary DESC,t.id) FROM product_gotit.item_translations t WHERE t.application_id=i.application_id AND t.application_user_id=i.application_user_id AND t.learning_item_id=i.id AND t.is_current),'[]'::jsonb) translations,
-        i.learning_revision AS "learningRevision",i.overall_mastery_score::float8 AS "overallMasteryScore",i.review_stage AS "reviewStage",i.next_review_at AS "nextReviewAt",i.last_practiced_at AS "lastPracticedAt",
+        i.learning_revision AS "learningRevision",i.overall_mastery_score::float8 AS "overallMasteryScore",i.review_stage AS "reviewStage",
+        CASE WHEN i.learning_status='mastered' AND i.review_stage>=${ESTABLISHED_REVIEW_STAGE} THEN 'established' WHEN i.learning_status='mastered' THEN 'learned' ELSE 'acquiring' END AS "retentionLevel",
+        i.next_review_at AS "nextReviewAt",i.last_practiced_at AS "lastPracticedAt",
         (SELECT count(*)::integer FROM product_gotit.item_occurrences o WHERE o.application_id=i.application_id AND o.application_user_id=i.application_user_id AND o.learning_item_id=i.id) AS "occurrenceCount",
         COALESCE((SELECT jsonb_agg(jsonb_build_object('skillType',p.skill_type,'masteryScore',p.mastery_score,'confidence',p.confidence,'attemptCount',p.attempt_count,'successCount',p.success_count,'failureCount',p.failure_count,'lastAttemptAt',p.last_attempt_at,'algorithmVersion',p.algorithm_version) ORDER BY p.skill_type) FROM product_gotit.item_skill_progress p WHERE p.application_id=i.application_id AND p.application_user_id=i.application_user_id AND p.learning_item_id=i.id),'[]'::jsonb) skills,
         COALESCE((SELECT jsonb_agg(jsonb_build_object('id',t.id,'name',t.name) ORDER BY t.id) FROM product_gotit.learning_item_tags a JOIN product_gotit.tags t ON t.id=a.tag_id AND t.application_id=a.application_id AND t.application_user_id=a.application_user_id WHERE a.application_id=i.application_id AND a.application_user_id=i.application_user_id AND a.learning_item_id=i.id),'[]'::jsonb) tags
