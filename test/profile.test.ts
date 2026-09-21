@@ -37,6 +37,7 @@ function makeCoreAuthClient() {
 }
 
 const baseProfile: GotItProfile = {
+  defaultSourceLanguage: null,
   defaultTranslationLanguage: null,
   timezone: 'UTC',
   dailyGoal: { type: 'items', value: 20 },
@@ -109,6 +110,7 @@ test('PATCH /api/v1/profile forwards validated patch with trusted scope', async 
 
   const updated: GotItProfile = {
     ...baseProfile,
+    defaultSourceLanguage: 'en',
     defaultTranslationLanguage: 'he',
     timezone: 'Asia/Jerusalem',
     interests: ['technology'],
@@ -127,6 +129,7 @@ test('PATCH /api/v1/profile forwards validated patch with trusted scope', async 
     .patch('/api/v1/profile')
     .set('authorization', 'Bearer valid-token')
     .send({
+      defaultSourceLanguage: 'EN',
       defaultTranslationLanguage: 'he',
       timezone: 'Asia/Jerusalem',
       interests: ['technology'],
@@ -135,6 +138,7 @@ test('PATCH /api/v1/profile forwards validated patch with trusted scope', async 
 
   assert.deepEqual(seenScope, identity);
   assert.deepEqual(seenPatch, {
+    defaultSourceLanguage: 'EN',
     defaultTranslationLanguage: 'he',
     timezone: 'Asia/Jerusalem',
     interests: ['technology'],

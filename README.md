@@ -90,12 +90,14 @@ explicitly configured fallback is used. Authentication, billing, permission and
 invalid-request failures are not retried. Manual capture works without providers.
 Capture traces persist bounded metadata for every attempt.
 
-Direct Anthropic translation and reading are implemented. Set
-`ANTHROPIC_API_KEY`, optional `ANTHROPIC_WORKSPACE_ID`, `AI_TRANSLATION_MODEL`, optional `AI_READING_MODEL`
-(falls back to the translation model) and independent
-`ENRICHMENT_SIGNING_SECRET` of at least 32 bytes. No model is silently selected.
-The default requests omit model-specific thinking options for translation;
-reading with `claude-sonnet-5` explicitly disables thinking. Structured output is opt-in.
+OpenAI contextual translation uses the Responses API with strict structured output.
+Set `OPENAI_API_KEY`, `OPENAI_TRANSLATION_MODEL` (the deployment default is
+`gpt-5.4-nano`) and an independent `ENRICHMENT_SIGNING_SECRET` of at least 32
+bytes. Responses are not stored by OpenAI. Anthropic remains dedicated to
+reading/story generation: set `ANTHROPIC_API_KEY`, optional
+`ANTHROPIC_WORKSPACE_ID` and `AI_READING_MODEL`. Reading with `claude-sonnet-5`
+explicitly disables thinking; `CLAUDE_STRUCTURED_OUTPUT` controls structured
+reading output.
 Reading receives target expressions with their confirmed meanings; unopened
 content is not saved. Missing vocabulary is repaired with a bounded regeneration;
 if the model still omits it, exact targets are appended and rebound locally so a
@@ -173,8 +175,9 @@ conflicts were found. The verified Core URL is set in ignored local `.env` and
 
 On 2026-09-16, `https://gotit-backend.onrender.com` returned 200 on health,
 readiness and the current 41-route API catalog. A provider-authenticated smoke
-test still requires a valid production session. Claude translation requires
-`ANTHROPIC_API_KEY`, `AI_TRANSLATION_MODEL` and `ENRICHMENT_SIGNING_SECRET`
-together, followed by a new deployment. Web/extension origins, Google Speech API
+test still requires a valid production session. OpenAI translation requires
+`OPENAI_API_KEY`, `OPENAI_TRANSLATION_MODEL` and `ENRICHMENT_SIGNING_SECRET`
+together, followed by a new deployment. Anthropic remains configured only for
+story generation through `AI_READING_MODEL`. Web/extension origins, Google Speech API
 enablement and live verification, production administrator access, calibrated
 level estimation and retention policy still require deployment-specific verification.

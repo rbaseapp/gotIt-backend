@@ -19,7 +19,8 @@ const envSchema = z
       .trim()
       .regex(/^wrkspc_[A-Za-z0-9]+$/u)
       .optional(),
-    AI_TRANSLATION_MODEL: z.string().min(1).max(200).optional(),
+    OPENAI_API_KEY: z.string().min(1).optional(),
+    OPENAI_TRANSLATION_MODEL: z.string().min(1).max(200).optional(),
     AI_READING_MODEL: z.string().min(1).max(200).optional(),
     CLAUDE_STRUCTURED_OUTPUT: z
       .enum(['true', 'false'])
@@ -62,6 +63,12 @@ const envSchema = z
     LEARNING_POLICY_JSON: z.string().max(8000).optional(),
   })
   .superRefine((v, ctx) => {
+    if (Boolean(v.OPENAI_API_KEY) !== Boolean(v.OPENAI_TRANSLATION_MODEL))
+      ctx.addIssue({
+        code: 'custom',
+        path: [v.OPENAI_API_KEY ? 'OPENAI_TRANSLATION_MODEL' : 'OPENAI_API_KEY'],
+        message: 'OpenAI translation requires both an API key and a model',
+      });
     if (v.AI_READING_MODEL && (!v.ANTHROPIC_API_KEY || !v.ENRICHMENT_SIGNING_SECRET))
       ctx.addIssue({
         code: 'custom',

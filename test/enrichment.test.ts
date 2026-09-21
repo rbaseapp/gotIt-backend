@@ -6,6 +6,7 @@ import {
 } from '../src/modules/enrichment/enrichment.registry.js';
 import { createEnrichment } from '../src/modules/enrichment/enrichment.config.js';
 import { AnthropicProvider } from '../src/modules/enrichment/providers/anthropic.js';
+import { OpenAIProvider } from '../src/modules/enrichment/providers/openai.js';
 import type {
   EnrichmentProvider,
   ModelProfile,
@@ -87,7 +88,7 @@ test('providers and model profiles can change without capture-specific vendor br
   );
   assert.throws(() =>
     createEnrichment({
-      AI_TRANSLATION_MODEL: 'configured',
+      OPENAI_TRANSLATION_MODEL: 'configured',
       ENRICHMENT_SIGNING_SECRET: 's'.repeat(32),
     }),
   );
@@ -98,10 +99,10 @@ test('providers and model profiles can change without capture-specific vendor br
     { status: 'not_configured' },
   );
 });
-test('default Claude configuration serves only explicit AI while Google owns automatic translation', async () => {
+test('default OpenAI configuration serves only explicit AI while Google owns automatic translation', async () => {
   const configured = createEnrichment({
-    ANTHROPIC_API_KEY: 'test-key',
-    AI_TRANSLATION_MODEL: 'configured-model',
+    OPENAI_API_KEY: 'test-key',
+    OPENAI_TRANSLATION_MODEL: 'configured-model',
     ENRICHMENT_SIGNING_SECRET: 's'.repeat(32),
   });
   const registryConfig = configured.registry as unknown as {
@@ -109,14 +110,14 @@ test('default Claude configuration serves only explicit AI while Google owns aut
   };
   assert.equal(registryConfig.routes.auto, undefined);
   assert.deepEqual(registryConfig.routes.ai, {
-    profiles: ['claude_default'],
+    profiles: ['openai_default'],
     timeoutMs: 30000,
     maxAttempts: 2,
   });
 
   const withGoogle = createEnrichment({
-    ANTHROPIC_API_KEY: 'test-key',
-    AI_TRANSLATION_MODEL: 'configured-model',
+    OPENAI_API_KEY: 'test-key',
+    OPENAI_TRANSLATION_MODEL: 'configured-model',
     GOOGLE_TRANSLATION_API: 'cloud_basic_v2',
     GOOGLE_TRANSLATE_API_KEY: 'google-test-key',
     ENRICHMENT_SIGNING_SECRET: 's'.repeat(32),
@@ -134,7 +135,7 @@ test('default Claude configuration serves only explicit AI while Google owns aut
     maxAttempts: 2,
   });
   assert.deepEqual(withGoogle.routes.ai, {
-    profiles: ['claude_default'],
+    profiles: ['openai_default'],
     timeoutMs: 30000,
     maxAttempts: 2,
   });
@@ -149,7 +150,86 @@ test('default Claude configuration serves only explicit AI while Google owns aut
     timeoutMs: 10000,
     maxAttempts: 2,
   });
-  assert.throws(() => createEnrichment({ ANTHROPIC_API_KEY: 'test-key' }), /AI_TRANSLATION_MODEL/u);
+  assert.throws(
+    () => createEnrichment({ OPENAI_API_KEY: 'test-key' }),
+    /OPENAI_TRANSLATION_MODEL/u,
+  );
+  const noTranslationProvider = createEnrichment({}).registry as unknown as {
+    routes: Record<string, unknown>;
+  };
+  assert.equal(noTranslationProvider.routes.ai, undefined);
+});
+test('OpenAI Responses API uses Nano structured output without storing translation data', async () => {
+  let calls = 0;
+  const adapter = new OpenAIProvider('openai-test-key', async (url, init) => {
+    calls++;
+    assert.equal(url, 'https://api.openai.com/v1/responses');
+    assert.equal(new Headers(init?.headers).get('authorization'), 'Bearer openai-test-key');
+    const request = JSON.parse(String(init?.body));
+    assert.equal(request.model, 'gpt-5.4-nano');
+    assert.equal(request.store, false);
+    assert.equal(request.max_output_tokens, 1600);
+    assert.equal(request.text.format.type, 'json_schema');
+    assert.equal(request.text.format.name, 'lexical_translation');
+    assert.equal(request.text.format.strict, true);
+    assert.equal(request.text.format.schema.properties.candidates.maxItems, 5);
+    const supplied = JSON.parse(request.input[0].content).untrustedTranslationData;
+    assert.deepEqual(supplied, input);
+    return Response.json({
+      model: 'gpt-5.4-nano-2026-03-17',
+      status: 'completed',
+      output: [
+        {
+          type: 'message',
+          content: [{ type: 'output_text', text: JSON.stringify(output) }],
+        },
+      ],
+    });
+  });
+  const traces: ProviderTrace[] = [];
+  const result = await new EnrichmentRegistry(
+    [adapter],
+    [profile('chosen', 'openai', 'gpt-5.4-nano')],
+    { ai: { profiles: ['chosen'], timeoutMs: 1000 } },
+  ).enrich('ai', input, async (trace) => {
+    traces.push(trace);
+  });
+  assert.equal(result.status, 'succeeded');
+  assert.equal(calls, 1);
+  assert.equal(traces[0]?.provider.id, 'openai');
+  assert.equal(traces[0]?.profile.model, 'gpt-5.4-nano-2026-03-17');
+});
+test('OpenAI incomplete, refusal and authentication failures become safe unavailable results', async () => {
+  const responses = [
+    () =>
+      Response.json({
+        model: 'gpt-5.4-nano',
+        status: 'incomplete',
+        output: [],
+      }),
+    () =>
+      Response.json({
+        model: 'gpt-5.4-nano',
+        status: 'completed',
+        output: [{ type: 'message', content: [{ type: 'refusal', refusal: 'private refusal' }] }],
+      }),
+    () => new Response('private provider error', { status: 401 }),
+  ];
+  for (const [index, response] of responses.entries()) {
+    let calls = 0;
+    const adapter = new OpenAIProvider('openai-test-key', async () => {
+      calls++;
+      return response();
+    });
+    const result = await new EnrichmentRegistry(
+      [adapter],
+      [profile('chosen', 'openai', 'gpt-5.4-nano')],
+      { ai: { profiles: ['chosen'], timeoutMs: 1000 } },
+    ).enrich('ai', input, async () => {});
+    assert.equal(result.status, 'unavailable');
+    if (index === 2) assert.deepEqual(result, { status: 'unavailable', reason: 'authentication' });
+    assert.equal(calls, index === 2 ? 1 : 2);
+  }
 });
 test('Anthropic can detect a missing source language before translating', async () => {
   const adapter = new AnthropicProvider('test-only-key', async (_url, init) => {

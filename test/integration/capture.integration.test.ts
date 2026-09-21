@@ -269,19 +269,23 @@ test(
         },
       );
       await t.test(
-        'manual preview resolves profile/hints without capture writes or automatic AI fallback',
+        'manual preview uses profile languages and ignores document language metadata',
         async () => {
           const before = await counts();
           const unresolved = await preview({ selectedText: 'charge' }).expect(200);
           assert.equal(unresolved.body.preview.requiresLanguageSelection, true);
           assert.equal(unresolved.body.preview.enrichment.status, 'needs_language_selection');
-          await profileService.patchProfile(scopes[0]!, { defaultTranslationLanguage: 'he' });
+          await profileService.patchProfile(scopes[0]!, {
+            defaultSourceLanguage: 'en',
+            defaultTranslationLanguage: 'he',
+          });
           const manual = await preview({
             selectedText: 'charge',
-            documentLanguageHint: 'EN',
+            documentLanguageHint: 'ar',
             context: { paragraphText: 'explicit only' },
           }).expect(200);
-          assert.equal(manual.body.preview.sourceLanguageResolution, 'document_hint');
+          assert.equal(manual.body.preview.sourceLanguageCode, 'en');
+          assert.equal(manual.body.preview.sourceLanguageResolution, 'profile');
           assert.equal(manual.body.preview.translationLanguageResolution, 'profile');
           assert.equal(manual.body.preview.enrichment.status, 'not_configured');
           assert.equal(providerCalls, 0);

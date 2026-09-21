@@ -28,12 +28,14 @@ services:
         sync: false
       - key: ANTHROPIC_WORKSPACE_ID
         sync: false
-      - key: AI_TRANSLATION_MODEL
-        value: claude-haiku-4-5-20251001
       - key: AI_READING_MODEL
         value: claude-sonnet-5
       - key: CLAUDE_STRUCTURED_OUTPUT
         value: 'true'
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: OPENAI_TRANSLATION_MODEL
+        value: gpt-5.4-nano
       - key: GOOGLE_TRANSLATION_API
         value: cloud_basic_v2
       - key: GOOGLE_TRANSLATE_API_KEY

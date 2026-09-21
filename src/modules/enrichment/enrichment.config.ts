@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { EnrichmentRegistry } from './enrichment.registry.js';
-import { AnthropicProvider } from './providers/anthropic.js';
 import { GoogleCloudTranslationProvider } from './providers/google-cloud.js';
+import { OpenAIProvider } from './providers/openai.js';
 import { SelectionProofs } from './selection-proof.js';
 import type { EnrichmentProvider, ModelProfile } from './enrichment.types.js';
 
@@ -37,10 +37,8 @@ function route() {
 }
 export function createEnrichment(
   settings: {
-    ANTHROPIC_API_KEY?: string;
-    ANTHROPIC_WORKSPACE_ID?: string;
-    AI_TRANSLATION_MODEL?: string;
-    CLAUDE_STRUCTURED_OUTPUT?: boolean;
+    OPENAI_API_KEY?: string;
+    OPENAI_TRANSLATION_MODEL?: string;
     ENRICHMENT_SIGNING_SECRET?: string;
     ENRICHMENT_PROFILES_JSON?: string;
     GOOGLE_TRANSLATION_API?: 'cloud_basic_v2';
@@ -50,19 +48,16 @@ export function createEnrichment(
   additionalProviders: EnrichmentProvider[] = [],
 ) {
   if (!settings.ENRICHMENT_PROFILES_JSON) {
-    if (settings.ANTHROPIC_API_KEY && !settings.AI_TRANSLATION_MODEL)
-      throw new Error('ANTHROPIC_API_KEY requires AI_TRANSLATION_MODEL');
-    if (settings.AI_TRANSLATION_MODEL && !settings.ANTHROPIC_API_KEY)
-      throw new Error('AI_TRANSLATION_MODEL requires ANTHROPIC_API_KEY');
+    if (settings.OPENAI_API_KEY && !settings.OPENAI_TRANSLATION_MODEL)
+      throw new Error('OPENAI_API_KEY requires OPENAI_TRANSLATION_MODEL');
+    if (settings.OPENAI_TRANSLATION_MODEL && !settings.OPENAI_API_KEY)
+      throw new Error('OPENAI_TRANSLATION_MODEL requires OPENAI_API_KEY');
   }
   const providers = [...additionalProviders];
   const googleTranslationEnabled = Boolean(
     settings.GOOGLE_TRANSLATION_API || settings.GOOGLE_TRANSLATE_API_KEY,
   );
-  if (settings.ANTHROPIC_API_KEY)
-    providers.push(
-      new AnthropicProvider(settings.ANTHROPIC_API_KEY, fetch, settings.ANTHROPIC_WORKSPACE_ID),
-    );
+  if (settings.OPENAI_API_KEY) providers.push(new OpenAIProvider(settings.OPENAI_API_KEY));
   if (googleTranslationEnabled) {
     if (!settings.GOOGLE_TRANSLATE_API_KEY)
       throw new Error('Configured Google translation requires credentials');
@@ -82,16 +77,16 @@ export function createEnrichment(
     profiles = configuration.profiles;
     routes = configuration.routes;
   } else {
-    if (settings.AI_TRANSLATION_MODEL) {
+    if (settings.OPENAI_TRANSLATION_MODEL) {
       profiles.push({
-        id: 'claude_default',
-        providerId: 'anthropic',
-        model: settings.AI_TRANSLATION_MODEL,
+        id: 'openai_default',
+        providerId: 'openai',
+        model: settings.OPENAI_TRANSLATION_MODEL,
         timeoutMs: 20000,
-        structuredOutput: settings.CLAUDE_STRUCTURED_OUTPUT ?? false,
+        structuredOutput: true,
       });
       routes = {
-        ai: { profiles: ['claude_default'], timeoutMs: 30000, maxAttempts: 2 },
+        ai: { profiles: ['openai_default'], timeoutMs: 30000, maxAttempts: 2 },
       };
     }
     if (googleTranslationEnabled) {

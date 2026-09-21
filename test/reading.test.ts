@@ -214,6 +214,7 @@ test('reading preview repairs omissions and salvages the valid draft if repair c
   const pool = { connect: async () => client } as any;
   const profiles = {
     getProfile: async () => ({
+      defaultSourceLanguage: null,
       defaultTranslationLanguage: 'he',
       timezone: 'UTC',
       dailyGoal: { type: 'items', value: 5 },

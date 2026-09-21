@@ -23,6 +23,14 @@ export class ProfileService implements ProfileServiceContract {
 function normalizePatch(input: ProfilePatchInput): ProfilePatchInput {
   return {
     ...input,
+    ...(input.defaultSourceLanguage !== undefined
+      ? {
+          defaultSourceLanguage:
+            input.defaultSourceLanguage === null
+              ? null
+              : canonicalizeLanguageCode(input.defaultSourceLanguage),
+        }
+      : {}),
     ...(input.defaultTranslationLanguage !== undefined
       ? {
           defaultTranslationLanguage:

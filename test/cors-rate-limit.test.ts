@@ -30,6 +30,7 @@ function fixture(allowed = true, unavailable = false) {
     }),
     profileService: {
       getProfile: async () => ({
+        defaultSourceLanguage: null,
         defaultTranslationLanguage: null,
         timezone: 'UTC',
         dailyGoal: { type: 'items', value: 20 },

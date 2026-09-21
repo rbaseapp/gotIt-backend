@@ -90,12 +90,11 @@ const speechProvider =
       : undefined;
 const speechService: SpeechService = new SpeechService(pool, practiceService, speechProvider);
 const rateLimiter = new PostgresRateLimiter(pool);
-const readingModel = env.AI_READING_MODEL ?? env.AI_TRANSLATION_MODEL;
 const readingGenerator =
-  env.ANTHROPIC_API_KEY && readingModel
+  env.ANTHROPIC_API_KEY && env.AI_READING_MODEL
     ? new AnthropicReadingGenerator(
         env.ANTHROPIC_API_KEY,
-        readingModel,
+        env.AI_READING_MODEL,
         env.CLAUDE_STRUCTURED_OUTPUT,
         fetch,
         env.ANTHROPIC_WORKSPACE_ID,

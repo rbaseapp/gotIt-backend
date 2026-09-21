@@ -11,7 +11,7 @@ export async function verifyRuntimeSchema(client, { strictRole = true } = {}) {
     item_examples: ['learning_revision'],
     learning_items: ['learning_revision'],
     item_translations: ['is_current'],
-    user_profiles: ['learning_preferences'],
+    user_profiles: ['learning_preferences', 'default_source_language'],
     practice_sessions: ['selection', 'client_event_id', 'request_hash', 'response_receipt'],
     practice_attempts: ['request_hash', 'response_receipt', 'learning_revision'],
     generated_contents: ['request_hash', 'publication_receipt'],

@@ -14,6 +14,7 @@ import type {
 
 type ProfileRow = {
   learning_preferences: GotItProfile['learningPreferences'] | null;
+  default_source_language: string | null;
   default_translation_language: string | null;
   timezone: string;
   daily_goal_type: DailyGoalType;
@@ -56,6 +57,7 @@ export class ProfileRepository {
       const currentResult = await client.query<ProfileRow>(
         `
           SELECT
+            default_source_language,
             default_translation_language,
             timezone,
             daily_goal_type,
@@ -81,13 +83,14 @@ export class ProfileRepository {
         `
           UPDATE product_gotit.user_profiles
           SET
-            default_translation_language = $3,
-            timezone = $4,
-            daily_goal_type = $5,
-            daily_goal_value = $6,
-            default_new_items_per_day = $7,
-            translation_method_preference = $8,
-            learning_preferences = $9,
+            default_source_language = $3,
+            default_translation_language = $4,
+            timezone = $5,
+            daily_goal_type = $6,
+            daily_goal_value = $7,
+            default_new_items_per_day = $8,
+            translation_method_preference = $9,
+            learning_preferences = $10,
             updated_at = NOW()
           WHERE application_id = $1
             AND application_user_id = $2
@@ -95,6 +98,9 @@ export class ProfileRepository {
         [
           scope.applicationId,
           scope.applicationUserId,
+          patch.defaultSourceLanguage !== undefined
+            ? patch.defaultSourceLanguage
+            : current.default_source_language,
           patch.defaultTranslationLanguage !== undefined
             ? patch.defaultTranslationLanguage
             : current.default_translation_language,
@@ -136,6 +142,7 @@ export class ProfileRepository {
         INSERT INTO product_gotit.user_profiles (
           application_id,
           application_user_id,
+          default_source_language,
           default_translation_language,
           timezone,
           daily_goal_type,
@@ -146,12 +153,13 @@ export class ProfileRepository {
           created_at,
           updated_at
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW())
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW(), NOW())
         ON CONFLICT (application_id, application_user_id) DO NOTHING
       `,
       [
         scope.applicationId,
         scope.applicationUserId,
+        defaults.defaultSourceLanguage,
         defaults.defaultTranslationLanguage,
         defaults.timezone,
         defaults.dailyGoal.type,
@@ -284,6 +292,7 @@ export class ProfileRepository {
     const profileResult = await client.query<ProfileRow>(
       `
         SELECT
+          default_source_language,
           default_translation_language,
           timezone,
           daily_goal_type,
@@ -332,6 +341,7 @@ export class ProfileRepository {
 
     return {
       learningPreferences: row.learning_preferences ?? PROFILE_DEFAULTS.learningPreferences,
+      defaultSourceLanguage: row.default_source_language,
       defaultTranslationLanguage: row.default_translation_language,
       timezone: row.timezone,
       dailyGoal: {

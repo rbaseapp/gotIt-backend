@@ -22,14 +22,29 @@ export class CaptureService {
       );
     });
     const sourceText = input.sourceText ?? input.selectedText;
-    let sourceLanguageCode = input.sourceLanguageCode ?? input.documentLanguageHint ?? null;
+    // Page metadata is untrusted context, not a translation preference. In particular,
+    // a Hebrew UI may contain English text, so <html lang="he"> must never pin Google
+    // to a Hebrew-to-Hebrew request.
+    let sourceLanguageCode = input.sourceLanguageCode ?? profile.defaultSourceLanguage ?? null;
     let sourceLanguageResolution = input.sourceLanguageCode
       ? 'user'
-      : input.documentLanguageHint
-        ? 'document_hint'
+      : profile.defaultSourceLanguage
+        ? 'profile'
         : 'unresolved';
     const translationLanguageCode =
       input.translationLanguageCode ?? profile.defaultTranslationLanguage;
+    // Equal source/target preferences cannot produce a translation. Fall back to
+    // provider detection instead of sending Google an invalid he -> he pair.
+    if (
+      sourceLanguageCode &&
+      translationLanguageCode &&
+      new Intl.Locale(sourceLanguageCode).language ===
+        new Intl.Locale(translationLanguageCode).language
+    ) {
+      sourceLanguageCode = null;
+      sourceLanguageResolution = 'unresolved';
+    }
+    const providerShouldDetectSource = sourceLanguageCode === null;
     const method = input.translationMethod ?? profile.translationMethodPreference ?? 'auto';
     let runId: string | undefined;
     const enriched = translationLanguageCode
@@ -49,8 +64,7 @@ export class CaptureService {
     const candidates: Array<Record<string, unknown>> = [];
     if (enriched.status === 'succeeded') {
       sourceLanguageCode = enriched.output.sourceLanguageCode;
-      if (!input.sourceLanguageCode && !input.documentLanguageHint)
-        sourceLanguageResolution = 'provider';
+      if (providerShouldDetectSource) sourceLanguageResolution = 'provider';
       for (const candidate of enriched.output.candidates) {
         const facts: ProviderFacts = {
           providerName: enriched.provider.id,

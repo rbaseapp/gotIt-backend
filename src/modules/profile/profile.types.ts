@@ -23,6 +23,8 @@ export type ProfileLanguage = {
 
 export type GotItProfile = {
   learningPreferences?: { enabledSkills: import('../learning/learning.policy.js').Skill[] };
+  /** Null means that the translation provider must detect the source language. */
+  defaultSourceLanguage: string | null;
   defaultTranslationLanguage: string | null;
   timezone: string;
   dailyGoal: {
@@ -37,6 +39,7 @@ export type GotItProfile = {
 
 export type ProfilePatchInput = {
   learningPreferences?: { enabledSkills: import('../learning/learning.policy.js').Skill[] };
+  defaultSourceLanguage?: string | null;
   defaultTranslationLanguage?: string | null;
   timezone?: string;
   dailyGoal?: {
@@ -55,6 +58,7 @@ export type ProfilePatchInput = {
 export type ProfileDefaults = Pick<
   GotItProfile,
   | 'defaultTranslationLanguage'
+  | 'defaultSourceLanguage'
   | 'timezone'
   | 'dailyGoal'
   | 'defaultNewItemsPerDay'

@@ -141,6 +141,7 @@ test(
         'PATCH persists normalized languages and interests and preserves omitted fields',
         async () => {
           const result = await patch('test-user-a', {
+            defaultSourceLanguage: 'EN',
             defaultTranslationLanguage: 'HE',
             timezone: 'Asia/Jerusalem',
             dailyGoal: { type: 'attempts', value: 25 },
@@ -151,6 +152,7 @@ test(
             ],
             interests: ['  Ｔｅｃｈｎｏｌｏｇｙ  ', 'space   science'],
           }).expect(200);
+          assert.equal(result.body.profile.defaultSourceLanguage, 'en');
           assert.equal(result.body.profile.defaultTranslationLanguage, 'he');
           assert.deepEqual(
             result.body.profile.languages.map(
@@ -234,6 +236,7 @@ test(
           const before = await snapshot(userA);
           for (const body of [
             { timezone: 'invalid/timezone' },
+            { defaultSourceLanguage: 'not_a_language' },
             { defaultTranslationLanguage: 'not_a_language' },
             { interests: ['Technology', 'Ｔｅｃｈｎｏｌｏｇｙ'] },
             {
@@ -291,11 +294,13 @@ test(
           [userA.applicationId, userA.applicationUserId],
         );
         const result = await patch('test-user-a', {
+          defaultSourceLanguage: null,
           defaultTranslationLanguage: null,
           translationMethodPreference: null,
           languages: [],
           interests: [],
         }).expect(200);
+        assert.equal(result.body.profile.defaultSourceLanguage, null);
         assert.equal(result.body.profile.defaultTranslationLanguage, null);
         assert.equal(result.body.profile.translationMethodPreference, null);
         assert.deepEqual(result.body.profile.interests, []);

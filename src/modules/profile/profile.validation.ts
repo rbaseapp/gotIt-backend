@@ -51,6 +51,7 @@ export const profilePatchSchema = z
       .strict()
       .optional(),
     defaultTranslationLanguage: languageCodeSchema.nullable().optional(),
+    defaultSourceLanguage: languageCodeSchema.nullable().optional(),
     timezone: timeZoneSchema.optional(),
     dailyGoal: z
       .object({

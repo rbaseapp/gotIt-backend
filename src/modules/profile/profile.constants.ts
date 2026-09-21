@@ -4,6 +4,7 @@ export const PROFILE_DEFAULTS: ProfileDefaults = {
   learningPreferences: {
     enabledSkills: ['recognition', 'recall', 'listening', 'spelling', 'pronunciation'],
   },
+  defaultSourceLanguage: null,
   defaultTranslationLanguage: null,
   timezone: 'UTC',
   dailyGoal: {
