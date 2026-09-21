@@ -100,7 +100,8 @@ export async function migrate(databaseUrl, direction = 'up') {
     throw new Error('Migration direction must be up or down');
   const client = new pg.Client({
     connectionString: databaseUrl,
-    connectionTimeoutMillis: 3000,
+    // Render's external PostgreSQL endpoint can take several seconds to establish TLS.
+    connectionTimeoutMillis: 10000,
     statement_timeout: 5000,
     query_timeout: 6000,
   });
