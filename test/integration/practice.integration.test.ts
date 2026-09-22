@@ -144,6 +144,10 @@ test(
             (await call('get', '/learning-items?search=%25_').expect(200)).body.items.length,
             1,
           );
+          await call('patch', `/learning-items/${ids[0]}`, {
+            sourceLanguageCode: 'he',
+            translation: { text: 'שלום' },
+          }).expect(400);
           assert.equal(
             (await call('get', '/learning-items', undefined, randomUUID(), 1).expect(200)).body
               .items.length,
