@@ -4,6 +4,7 @@ import { SelectionProofs, captureIntentHash } from '../enrichment/selection-proo
 import type { ProviderFacts } from '../enrichment/enrichment.types.js';
 import { CaptureRepository } from './capture.repository.js';
 import type { PreviewInput, SaveInput } from './capture.validation.js';
+import { sameBaseLanguage } from './capture.validation.js';
 import { AppError } from '../../shared/errors/app-error.js';
 
 export class CaptureService {
@@ -38,8 +39,7 @@ export class CaptureService {
     if (
       sourceLanguageCode &&
       translationLanguageCode &&
-      new Intl.Locale(sourceLanguageCode).language ===
-        new Intl.Locale(translationLanguageCode).language
+      sameBaseLanguage(sourceLanguageCode, translationLanguageCode)
     ) {
       sourceLanguageCode = null;
       sourceLanguageResolution = 'unresolved';
@@ -62,10 +62,23 @@ export class CaptureService {
         )
       : { status: 'needs_language_selection' as const };
     const candidates: Array<Record<string, unknown>> = [];
+    let enrichmentStatus: typeof enriched.status | 'needs_language_selection' = enriched.status;
     if (enriched.status === 'succeeded') {
       sourceLanguageCode = enriched.output.sourceLanguageCode;
       if (providerShouldDetectSource) sourceLanguageResolution = 'provider';
-      for (const candidate of enriched.output.candidates) {
+      // A provider may misclassify a short word and report the target language as
+      // its source. Such a pair cannot represent a translation and must never be
+      // persisted or later reused as the pronunciation-recognition language.
+      if (
+        sourceLanguageCode &&
+        translationLanguageCode &&
+        sameBaseLanguage(sourceLanguageCode, translationLanguageCode)
+      ) {
+        sourceLanguageCode = null;
+        sourceLanguageResolution = 'unresolved';
+        enrichmentStatus = 'needs_language_selection';
+      }
+      for (const candidate of sourceLanguageCode ? enriched.output.candidates : []) {
         const facts: ProviderFacts = {
           providerName: enriched.provider.id,
           providerType: enriched.provider.kind,
@@ -115,7 +128,7 @@ export class CaptureService {
           : 'unresolved',
       translationMethod: method,
       enrichment: {
-        status: enriched.status,
+        status: enrichmentStatus,
         candidates,
         ...(enriched.status === 'unavailable'
           ? {

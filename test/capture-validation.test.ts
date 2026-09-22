@@ -36,6 +36,10 @@ test('strict capture input rejects forged provenance, ambiguous duplicates, unsa
   for (const input of [
     { ...body(), applicationUserId: randomUUID() },
     { ...body(), item: { ...body().item, sourceLanguageCode: 'not_a_language' } },
+    {
+      ...body(),
+      item: { ...body().item, sourceLanguageCode: 'he', translationLanguageCode: 'he-IL' },
+    },
     { ...body(), translation: { text: 'fee', variants: [' ＦＥＥ '] } },
     { ...body(), translation: { ...body().translation, providerName: 'anthropic' } },
     { ...body(), senseDecision: { mode: 'auto', learningItemId: randomUUID() } },

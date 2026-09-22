@@ -34,6 +34,9 @@ export const languageSchema = z
       return z.NEVER;
     }
   });
+export function sameBaseLanguage(left: string, right: string) {
+  return new Intl.Locale(left).language === new Intl.Locale(right).language;
+}
 export const uuidSchema = z.uuid().transform((v) => v.toLowerCase());
 const nullableContext = (max: number) => contextTextSchema(max).nullable().default(null);
 const urlSchema = z
@@ -146,6 +149,12 @@ export const saveSchema = z
         code: 'custom',
         message: 'Phonetic text and scheme must be paired',
         path: ['item'],
+      });
+    if (sameBaseLanguage(v.item.sourceLanguageCode, v.item.translationLanguageCode))
+      ctx.addIssue({
+        code: 'custom',
+        message: 'Source and translation languages must differ',
+        path: ['item', 'translationLanguageCode'],
       });
   });
 export type SaveInput = z.output<typeof saveSchema>;

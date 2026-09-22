@@ -65,6 +65,7 @@ test('Google speech recognition produces an explicit transcript-confidence asses
   assert.equal(new Headers(requestInit?.headers).get('X-Goog-Api-Key'), null);
   assert.equal(body.config.languageCode, 'en-US');
   assert.deepEqual(body.config.alternativeLanguageCodes, []);
+  assert.equal(body.config.maxAlternatives, 5);
   assert.equal(body.config.model, 'latest_short');
   assert.deepEqual(body.config.speechContexts, [{ phrases: ['good morning'], boost: 15 }]);
   assert.equal(body.audio.content, audio.toString('base64'));
@@ -94,7 +95,7 @@ test('Google speech recognition uses the V1 Hebrew locale and supported short mo
   assert.equal(body.config.model, 'command_and_search');
 });
 
-test('Google speech ignores a transcript labeled as a different language', async () => {
+test('Google speech ignores a transcript written in a different language even without a result tag', async () => {
   const provider = new GoogleSpeechProvider(
     'server-only-key',
     undefined,
@@ -102,7 +103,6 @@ test('Google speech ignores a transcript labeled as a different language', async
       Response.json({
         results: [
           {
-            languageCode: 'he-IL',
             alternatives: [{ transcript: 'שלום', confidence: 0.99 }],
           },
         ],
@@ -115,6 +115,32 @@ test('Google speech ignores a transcript labeled as a different language', async
   );
   assert.equal(result.score, 0);
   assert.doesNotMatch(result.feedback, /שלום/u);
+});
+
+test('Google speech selects a matching-script alternative instead of a Hebrew transliteration', async () => {
+  const provider = new GoogleSpeechProvider(
+    'server-only-key',
+    undefined,
+    (async () =>
+      Response.json({
+        results: [
+          {
+            alternatives: [
+              { transcript: 'אובסטקס', confidence: 0.99 },
+              { transcript: 'obstacles' },
+            ],
+          },
+        ],
+      })) as typeof fetch,
+    async () => 'token',
+  );
+  const result = await provider.assess(
+    { audio: Buffer.from('wav'), text: 'obstacles', language: 'en', idempotencyKey: 'event' },
+    new AbortController().signal,
+  );
+  assert.equal(result.score, 85);
+  assert.match(result.feedback, /obstacles/u);
+  assert.doesNotMatch(result.feedback, /אובסטקס/u);
 });
 
 test('Google speech rejects a recognition locale from another language', () => {

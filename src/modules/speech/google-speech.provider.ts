@@ -172,6 +172,28 @@ function sameBaseLanguage(left: string, right: string) {
   }
 }
 
+const writingSystems = [
+  /\p{Script=Latin}/u,
+  /\p{Script=Hebrew}/u,
+  /\p{Script=Arabic}/u,
+  /\p{Script=Cyrillic}/u,
+  /\p{Script=Greek}/u,
+  /\p{Script=Han}/u,
+  /\p{Script=Hiragana}/u,
+  /\p{Script=Katakana}/u,
+  /\p{Script=Hangul}/u,
+] as const;
+
+function usesExpectedWritingSystem(transcript: string, expected: string) {
+  const expectedSystems = writingSystems.filter((pattern) => pattern.test(expected));
+  if (!expectedSystems.length) return true;
+  const transcriptSystems = writingSystems.filter((pattern) => pattern.test(transcript));
+  return (
+    !transcriptSystems.length ||
+    transcriptSystems.some((system) => expectedSystems.includes(system))
+  );
+}
+
 export class GoogleSpeechProvider implements SpeechProvider {
   readonly id = 'google_speech';
   private readonly languages: LanguageConfig;
@@ -271,6 +293,7 @@ export class GoogleSpeechProvider implements SpeechProvider {
           // An empty alternative list keeps recognition pinned to the learning item's
           // source language instead of asking Google to auto-select another language.
           alternativeLanguageCodes: [],
+          maxAlternatives: 5,
           model: config.recognitionModel ?? 'command_and_search',
           enableWordConfidence: true,
           // Pronunciation exercises always have a trusted expected expression. Supplying
@@ -284,10 +307,17 @@ export class GoogleSpeechProvider implements SpeechProvider {
     });
     const parsed = recognitionSchema.parse(await boundedJson(response, 262_144, signal));
     const recognitionLanguage = config.recognitionLocale ?? config.locale;
-    const best = parsed.results.find(
+    const alternatives = parsed.results.find(
       (candidate) =>
         !candidate.languageCode || sameBaseLanguage(candidate.languageCode, recognitionLanguage),
-    )?.alternatives[0];
+    )?.alternatives;
+    const best = alternatives
+      ?.filter((candidate) => usesExpectedWritingSystem(candidate.transcript, input.text))
+      .map((candidate) => ({
+        candidate,
+        score: assessment(candidate.transcript, input.text, candidate.confidence).score,
+      }))
+      .sort((left, right) => right.score - left.score)[0]?.candidate;
     const result = assessment(best?.transcript ?? '', input.text, best?.confidence);
     return {
       ...result,

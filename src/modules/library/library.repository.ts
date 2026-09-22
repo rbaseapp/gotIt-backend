@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { withTransaction, type DatabaseTransaction } from '../../shared/database/transaction.js';
 import { AppError } from '../../shared/errors/app-error.js';
 import type { ProfileScope } from '../profile/profile.types.js';
-import { lookupText } from '../capture/capture.validation.js';
+import { lookupText, sameBaseLanguage } from '../capture/capture.validation.js';
 import { fingerprint } from '../enrichment/selection-proof.js';
 import { ESTABLISHED_REVIEW_STAGE, LEARNED_REVIEW_STAGE } from '../learning/learning.policy.js';
 import type { ListInput, EditInput, BulkInput } from './library.validation.js';
@@ -178,6 +178,17 @@ export class LibraryRepository {
           new Date(input.expectedUpdatedAt).getTime() !== row.updated_at.getTime())
       )
         throw new AppError(409, 'ITEM_CHANGED', 'Learning item changed; reload before editing');
+      if (
+        sameBaseLanguage(
+          input.sourceLanguageCode ?? row.source_language_code,
+          input.translationLanguageCode ?? row.translation_language_code,
+        )
+      )
+        throw new AppError(
+          400,
+          'LANGUAGE_PAIR_INVALID',
+          'Source and translation languages must differ',
+        );
       const accepted = (
         await tx.query(
           'SELECT normalized_text FROM product_gotit.item_translations WHERE application_id=$1 AND application_user_id=$2 AND learning_item_id=$3 AND is_current',

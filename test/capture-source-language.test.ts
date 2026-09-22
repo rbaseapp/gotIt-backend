@@ -25,7 +25,7 @@ test('capture ignores page language metadata and auto-detects an equal source/ta
     enrich: async (input) => {
       received = input;
       return {
-        sourceLanguageCode: 'en',
+        sourceLanguageCode: input.sourceText === 'hello' ? 'en' : 'he',
         candidates: [{ text: 'שלום', contextUsed: false }],
       };
     },
@@ -78,4 +78,20 @@ test('capture ignores page language metadata and auto-detects an equal source/ta
   assert.equal(result.sourceLanguageCode, 'en');
   assert.equal(result.sourceLanguageResolution, 'provider');
   assert.equal(result.enrichment.status, 'succeeded');
+
+  const invalidDetection = await service.preview(
+    {
+      applicationId: '22222222-2222-4222-8222-222222222222',
+      applicationUserId: '33333333-3333-4333-8333-333333333333',
+    },
+    {
+      selectedText: 'obstacles',
+      translationMethod: 'dictionary',
+    },
+  );
+  assert.equal(invalidDetection.sourceLanguageCode, null);
+  assert.equal(invalidDetection.sourceLanguageResolution, 'unresolved');
+  assert.equal(invalidDetection.enrichment.status, 'needs_language_selection');
+  assert.deepEqual(invalidDetection.enrichment.candidates, []);
+  assert.equal(invalidDetection.requiresLanguageSelection, true);
 });
