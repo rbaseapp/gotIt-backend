@@ -441,6 +441,12 @@ test(
           ).body.items.find((item: any) => item.id === learningItemId);
           assert.ok(prioritized);
           assert.ok(prioritized.queueScore >= 120);
+          const libraryProgress = (await call('get', '/learning-items?search=progress').expect(200))
+            .body.items[0].masteryRequirements;
+          assert.equal(libraryProgress.activeRecallSuccesses, 1);
+          assert.equal(libraryProgress.activeRecallCalendarDays, 1);
+          assert.equal(libraryProgress.needsTypedRecall, true);
+          assert.ok((await call('get', '/dashboard').expect(200)).body.counts.awaitingRecall >= 1);
 
           const smartSession = (
               await call('post', '/practice/sessions', {

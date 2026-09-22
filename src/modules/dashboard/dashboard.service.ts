@@ -2,12 +2,20 @@ import type { Pool } from 'pg';
 import { withTransaction } from '../../shared/database/transaction.js';
 import type { ProfileScope, ProfileServiceContract } from '../profile/profile.types.js';
 import { scopeValues } from '../library/library.repository.js';
-import { calendarDay, previousDay, levelForXp } from '../learning/learning.policy.js';
+import {
+  DEFAULT_LEARNING_POLICY,
+  LEARNED_REVIEW_STAGE,
+  calendarDay,
+  previousDay,
+  levelForXp,
+  type LearningPolicy,
+} from '../learning/learning.policy.js';
 
 export class DashboardService {
   constructor(
     private readonly pool: Pool,
     private readonly profiles: ProfileServiceContract,
+    private readonly policy: LearningPolicy = DEFAULT_LEARNING_POLICY,
   ) {}
   async gamification(scope: ProfileScope) {
     const profile = await this.profiles.getProfile(scope),
@@ -63,9 +71,35 @@ export class DashboardService {
         const counts = (
           await tx.query(
             `SELECT count(*)::integer total,count(*) FILTER(WHERE learning_status='new')::integer AS new,count(*) FILTER(WHERE learning_status='learning')::integer learning,count(*) FILTER(WHERE learning_status='reviewing')::integer reviewing,count(*) FILTER(WHERE learning_status='mastered')::integer mastered,
-        count(*) FILTER(WHERE user_status='active' AND next_review_at<=now())::integer due,count(*) FILTER(WHERE manual_hard OR system_difficulty>=0.7)::integer difficult,count(*) FILTER(WHERE user_priority='high')::integer AS "highPriority"
+        count(*) FILTER(WHERE user_status='active' AND next_review_at<=now())::integer due,count(*) FILTER(WHERE manual_hard OR system_difficulty>=0.7)::integer difficult,count(*) FILTER(WHERE user_priority='high')::integer AS "highPriority",
+        count(*) FILTER(WHERE user_status='active' AND learning_status<>'mastered'
+          AND (SELECT count(*) FROM product_gotit.practice_attempts scored
+            WHERE scored.application_id=learning_items.application_id AND scored.application_user_id=learning_items.application_user_id
+              AND scored.learning_item_id=learning_items.id AND scored.result<>'skipped'
+              AND COALESCE(scored.learning_revision,1)=learning_items.learning_revision)>=$4
+          AND (review_stage<${LEARNED_REVIEW_STAGE} OR overall_mastery_score<$7
+            OR (SELECT count(*) FROM product_gotit.practice_attempts successful
+              WHERE successful.application_id=learning_items.application_id AND successful.application_user_id=learning_items.application_user_id
+                AND successful.learning_item_id=learning_items.id AND successful.result<>'skipped' AND successful.score>=85
+                AND successful.user_answer_text IS NOT NULL AND COALESCE(successful.learning_revision,1)=learning_items.learning_revision
+                AND EXISTS(SELECT 1 FROM product_gotit.attempt_skill_effects effect
+                  WHERE effect.practice_attempt_id=successful.id AND effect.skill_type='recall'))<$5
+            OR (SELECT count(DISTINCT (successful.created_at AT TIME ZONE $3)::date)
+              FROM product_gotit.practice_attempts successful
+              WHERE successful.application_id=learning_items.application_id AND successful.application_user_id=learning_items.application_user_id
+                AND successful.learning_item_id=learning_items.id AND successful.result<>'skipped' AND successful.score>=85
+                AND successful.user_answer_text IS NOT NULL AND COALESCE(successful.learning_revision,1)=learning_items.learning_revision
+                AND EXISTS(SELECT 1 FROM product_gotit.attempt_skill_effects effect
+                  WHERE effect.practice_attempt_id=successful.id AND effect.skill_type='recall'))<$6))::integer AS "awaitingRecall"
         FROM product_gotit.learning_items WHERE application_id=$1 AND application_user_id=$2 AND deleted_at IS NULL`,
-            scopeValues(scope),
+            [
+              ...scopeValues(scope),
+              profile.timezone,
+              this.policy.minimumScoredAttempts,
+              this.policy.minimumActiveRecallSuccesses,
+              this.policy.minimumActiveRecallCalendarDays,
+              this.policy.masteryThreshold,
+            ],
           )
         ).rows[0];
         const skills = (

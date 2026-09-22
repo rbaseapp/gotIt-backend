@@ -45,6 +45,9 @@ const coreAuthClient = new CoreAuthClient({
 const profileRepository = new ProfileRepository(pool);
 const profileService = new ProfileService(profileRepository);
 const enrichment = createEnrichment(env);
+const learningPolicy = policySchema.parse(
+  env.LEARNING_POLICY_JSON ? JSON.parse(env.LEARNING_POLICY_JSON) : {},
+);
 const captureService = new CaptureService(
   new CaptureRepository(pool),
   profileService,
@@ -54,7 +57,7 @@ const captureService = new CaptureService(
 const practiceService: PracticeService = new PracticeService(
   pool,
   profileService,
-  policySchema.parse(env.LEARNING_POLICY_JSON ? JSON.parse(env.LEARNING_POLICY_JSON) : {}),
+  learningPolicy,
   (...args): boolean => speechService.supports(...args),
 );
 const googleSpeechAccessToken =
@@ -106,9 +109,9 @@ const app = createApp({
   coreAuthClient,
   profileService,
   captureService,
-  libraryService: new LibraryRepository(pool),
+  libraryService: new LibraryRepository(pool, learningPolicy),
   practiceService,
-  dashboardService: new DashboardService(pool, profileService),
+  dashboardService: new DashboardService(pool, profileService, learningPolicy),
   transferPool: pool,
   readingService: new ReadingService(
     pool,

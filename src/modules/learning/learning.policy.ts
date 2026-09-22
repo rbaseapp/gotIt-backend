@@ -67,6 +67,8 @@ export type MasteryRequirements = {
   minimumActiveRecallSuccesses: number;
   activeRecallCalendarDays: number;
   minimumActiveRecallCalendarDays: number;
+  activeRecallMasteryScore: number;
+  masteryThreshold: number;
   reviewStage: number;
   learnedReviewStage: number;
   needsTypedRecall: boolean;
@@ -84,6 +86,8 @@ export function masteryRequirements(
     minimumActiveRecallSuccesses: policy.minimumActiveRecallSuccesses,
     activeRecallCalendarDays: evidence.activeRecallCalendarDays,
     minimumActiveRecallCalendarDays: policy.minimumActiveRecallCalendarDays,
+    activeRecallMasteryScore: Math.round(evidence.activeRecallMasteryScore * 100) / 100,
+    masteryThreshold: policy.masteryThreshold,
     reviewStage: stage,
     learnedReviewStage: LEARNED_REVIEW_STAGE,
     needsTypedRecall:

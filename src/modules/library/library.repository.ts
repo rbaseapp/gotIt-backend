@@ -5,7 +5,14 @@ import { AppError } from '../../shared/errors/app-error.js';
 import type { ProfileScope } from '../profile/profile.types.js';
 import { lookupText, sameBaseLanguage } from '../capture/capture.validation.js';
 import { fingerprint } from '../enrichment/selection-proof.js';
-import { ESTABLISHED_REVIEW_STAGE, LEARNED_REVIEW_STAGE } from '../learning/learning.policy.js';
+import {
+  DEFAULT_LEARNING_POLICY,
+  ESTABLISHED_REVIEW_STAGE,
+  LEARNED_REVIEW_STAGE,
+  masteryRequirements,
+  projectEvidence,
+  type LearningPolicy,
+} from '../learning/learning.policy.js';
 import type { ListInput, EditInput, BulkInput } from './library.validation.js';
 export const scopeValues = (scope: ProfileScope) => [scope.applicationId, scope.applicationUserId];
 export const itemNotFound = () => new AppError(404, 'NOT_FOUND', 'Learning item not found');
@@ -36,7 +43,71 @@ export function itemSnapshot(row: Record<string, unknown>, translations: unknown
   });
 }
 export class LibraryRepository {
-  constructor(readonly pool: Pool) {}
+  constructor(
+    readonly pool: Pool,
+    readonly policy: LearningPolicy = DEFAULT_LEARNING_POLICY,
+  ) {}
+  private async requirements(tx: DatabaseTransaction, scope: ProfileScope, ids: string[]) {
+    if (!ids.length) return new Map<string, ReturnType<typeof masteryRequirements>>();
+    const timezone = (
+        await tx.query(
+          'SELECT timezone FROM product_gotit.user_profiles WHERE application_id=$1 AND application_user_id=$2',
+          scopeValues(scope),
+        )
+      ).rows[0]?.timezone as string | undefined,
+      rows = (
+        await tx.query(
+          `WITH active_history AS(
+             SELECT a.learning_item_id,a.id,a.score::float8 score,a.created_at,
+               (a.created_at AT TIME ZONE $4)::date activity_day
+             FROM product_gotit.practice_attempts a
+             JOIN product_gotit.learning_items current ON current.application_id=a.application_id
+               AND current.application_user_id=a.application_user_id AND current.id=a.learning_item_id
+             WHERE a.application_id=$1 AND a.application_user_id=$2 AND a.learning_item_id=ANY($3::uuid[])
+               AND a.result<>'skipped' AND a.user_answer_text IS NOT NULL
+               AND COALESCE(a.learning_revision,1)=current.learning_revision
+               AND EXISTS(SELECT 1 FROM product_gotit.attempt_skill_effects effect
+                 WHERE effect.practice_attempt_id=a.id AND effect.skill_type='recall'))
+           SELECT li.id,li.learning_status,li.review_stage,
+             (SELECT count(*)::integer FROM product_gotit.practice_attempts total
+               WHERE total.application_id=li.application_id AND total.application_user_id=li.application_user_id
+                 AND total.learning_item_id=li.id AND total.result<>'skipped'
+                 AND COALESCE(total.learning_revision,1)=li.learning_revision) total_attempts,
+             count(history.id) FILTER(WHERE history.score>=85)::integer successes,
+             count(DISTINCT history.activity_day) FILTER(WHERE history.score>=85)::integer successful_days,
+             ARRAY(SELECT score FROM(SELECT score,created_at,id FROM active_history recent
+               WHERE recent.learning_item_id=li.id ORDER BY created_at DESC,id DESC LIMIT 10) recent
+               ORDER BY created_at,id) scores
+           FROM product_gotit.learning_items li
+           LEFT JOIN active_history history ON history.learning_item_id=li.id
+           WHERE li.application_id=$1 AND li.application_user_id=$2 AND li.id=ANY($3::uuid[])
+           GROUP BY li.id`,
+          [...scopeValues(scope), ids, timezone ?? 'UTC'],
+        )
+      ).rows;
+    return new Map(
+      rows.map((row) => {
+        const activeRecallMasteryScore = projectEvidence(
+          row.scores,
+          row.successful_days,
+        ).masteryScore;
+        return [
+          row.id,
+          masteryRequirements(
+            this.policy,
+            {
+              totalScoredAttempts: row.total_attempts,
+              activeRecallSuccesses: row.successes,
+              activeRecallCalendarDays: row.successful_days,
+              activeRecallMasteryScore,
+            },
+            row.review_stage,
+            row.learning_status,
+          ),
+        ];
+      }),
+    );
+  }
   async list(scope: ProfileScope, input: ListInput) {
     return withTransaction(
       this.pool,
@@ -121,9 +192,17 @@ export class LibraryRepository {
         ).rows;
         const hasMore = rows.length > input.limit,
           selected = rows.slice(0, input.limit),
-          last = selected.at(-1);
+          last = selected.at(-1),
+          requirements = await this.requirements(
+            tx,
+            scope,
+            selected.map((row) => row.id),
+          );
         return {
-          items: selected.map(({ cursor_value, ...row }) => row),
+          items: selected.map(({ cursor_value, ...row }) => ({
+            ...row,
+            masteryRequirements: requirements.get(row.id),
+          })),
           nextCursor:
             hasMore && last
               ? Buffer.from(

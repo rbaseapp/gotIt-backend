@@ -56,6 +56,8 @@ export const attemptReceiptSchema = z
                 minimumActiveRecallSuccesses: count,
                 activeRecallCalendarDays: count,
                 minimumActiveRecallCalendarDays: count,
+                activeRecallMasteryScore: z.number().min(0).max(100),
+                masteryThreshold: z.number().min(0).max(100),
                 reviewStage: count,
                 learnedReviewStage: count,
                 needsTypedRecall: z.boolean(),
