@@ -1,10 +1,12 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { parseInput, uuidSchema } from '../capture/capture.validation.js';
+import { languageSchema, parseInput, uuidSchema } from '../capture/capture.validation.js';
 import type { SpeechService } from './speech.service.js';
 const assessmentSchema = z
   .object({
     exerciseId: uuidSchema,
+    // Optional during the backend-first rollout; current clients always send it.
+    languageCode: languageSchema.optional(),
     audioBase64: z
       .string()
       .min(1)
@@ -28,6 +30,7 @@ export function createPronunciationRoutes(service: SpeechService) {
       req.gotitAuth!,
       parseInput(uuidSchema, req.get('Idempotency-Key')),
       input.exerciseId,
+      input.languageCode,
       Buffer.from(input.audioBase64, 'base64'),
     );
     res.status(result.replayed ? 200 : 201).json({ ...result, requestId: req.id });

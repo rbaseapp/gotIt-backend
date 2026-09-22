@@ -131,10 +131,17 @@ export class SpeechService {
       throw new AppError(503, 'SPEECH_UNAVAILABLE', 'Invalid speech provider response');
     return result;
   }
-  async assess(scope: ProfileScope, key: string, exerciseId: string, audio: Buffer) {
+  async assess(
+    scope: ProfileScope,
+    key: string,
+    exerciseId: string,
+    languageCode: string | undefined,
+    audio: Buffer,
+  ) {
     validateWav(audio);
     const hash = fingerprint({
       exerciseId,
+      languageCode,
       audioHash: createHash('sha256').update(audio).digest('hex'),
     });
     const snapshot = await withTransaction(
@@ -188,6 +195,12 @@ export class SpeechService {
           itemSnapshot(item, translations) !== exercise.item_snapshot_hash
         )
           throw new AppError(409, 'EXERCISE_STALE', 'Learning item changed');
+        if (languageCode && Intl.getCanonicalLocales(item.source_language_code)[0] !== languageCode)
+          throw new AppError(
+            409,
+            'EXERCISE_LANGUAGE_MISMATCH',
+            'Pronunciation language does not match the exercise source language',
+          );
         return {
           replay: false,
           text: item.source_text as string,

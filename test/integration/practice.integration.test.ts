@@ -798,9 +798,10 @@ test(
               audio: Buffer.from('fake reference'),
               contentType: 'audio/mpeg' as const,
             }),
-            assess: async (input: { audio: Buffer }) => {
+            assess: async (input: { audio: Buffer; language: string }) => {
               calls++;
               assert.equal(input.audio.length, 3244);
+              assert.equal(input.language, 'en');
               return { score: 90, feedback: 'Good pronunciation', model: 'test_voice' };
             },
           };
@@ -843,8 +844,8 @@ test(
           audio.write('data', 36);
           audio.writeUInt32LE(3200, 40);
           const key = randomUUID(),
-            result = await speech.assess(scope, key, exercise.id, audio),
-            again = await speech.assess(scope, key, exercise.id, audio);
+            result = await speech.assess(scope, key, exercise.id, 'en', audio),
+            again = await speech.assess(scope, key, exercise.id, 'en', audio);
           assert.deepEqual(again.attempt, result.attempt);
           assert.equal(calls, 1);
           assert.equal(result.attempt.score, 90);
@@ -859,7 +860,7 @@ test(
           const changed = Buffer.from(audio);
           changed[changed.length - 1] = 1;
           await assert.rejects(
-            () => speech.assess(scope, key, exercise.id, changed),
+            () => speech.assess(scope, key, exercise.id, 'en', changed),
             (error: any) => error.code === 'IDEMPOTENCY_CONFLICT',
           );
         },

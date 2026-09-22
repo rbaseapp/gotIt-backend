@@ -37,6 +37,7 @@ test('Google speech recognition produces an explicit transcript-confidence asses
       return Response.json({
         results: [
           {
+            languageCode: 'en-US',
             alternatives: [
               {
                 transcript: 'Good morning.',
@@ -63,7 +64,9 @@ test('Google speech recognition produces an explicit transcript-confidence asses
   );
   assert.equal(new Headers(requestInit?.headers).get('X-Goog-Api-Key'), null);
   assert.equal(body.config.languageCode, 'en-US');
+  assert.deepEqual(body.config.alternativeLanguageCodes, []);
   assert.equal(body.config.model, 'latest_short');
+  assert.deepEqual(body.config.speechContexts, [{ phrases: ['good morning'], boost: 15 }]);
   assert.equal(body.audio.content, audio.toString('base64'));
   assert.equal(result.score, 99);
   assert.match(result.feedback, /התאמה 100/u);
@@ -89,6 +92,45 @@ test('Google speech recognition uses the V1 Hebrew locale and supported short mo
   const body = JSON.parse(String(requestInit?.body));
   assert.equal(body.config.languageCode, 'iw-IL');
   assert.equal(body.config.model, 'command_and_search');
+});
+
+test('Google speech ignores a transcript labeled as a different language', async () => {
+  const provider = new GoogleSpeechProvider(
+    'server-only-key',
+    undefined,
+    (async () =>
+      Response.json({
+        results: [
+          {
+            languageCode: 'he-IL',
+            alternatives: [{ transcript: 'שלום', confidence: 0.99 }],
+          },
+        ],
+      })) as typeof fetch,
+    async () => 'token',
+  );
+  const result = await provider.assess(
+    { audio: Buffer.from('wav'), text: 'hello', language: 'en', idempotencyKey: 'event' },
+    new AbortController().signal,
+  );
+  assert.equal(result.score, 0);
+  assert.doesNotMatch(result.feedback, /שלום/u);
+});
+
+test('Google speech rejects a recognition locale from another language', () => {
+  assert.throws(
+    () =>
+      new GoogleSpeechProvider(
+        'server-only-key',
+        JSON.stringify({
+          en: {
+            locale: 'en-US',
+            recognitionLocale: 'he-IL',
+          },
+        }),
+      ),
+    /Recognition locale must match the configured source language/u,
+  );
 });
 
 test('Google speech exposes safe actionable authentication failures', async () => {

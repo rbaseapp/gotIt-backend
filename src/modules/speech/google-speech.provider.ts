@@ -17,7 +17,27 @@ const languageConfigSchema = z
       })
       .strict(),
   )
-  .refine((value) => Object.keys(value).length > 0, 'At least one speech language is required');
+  .refine((value) => Object.keys(value).length > 0, 'At least one speech language is required')
+  .superRefine((value, ctx) => {
+    for (const [sourceLanguage, config] of Object.entries(value)) {
+      try {
+        const sourceBase = new Intl.Locale(sourceLanguage).language;
+        const recognitionBase = new Intl.Locale(config.recognitionLocale ?? config.locale).language;
+        if (sourceBase !== recognitionBase)
+          ctx.addIssue({
+            code: 'custom',
+            path: [sourceLanguage, 'recognitionLocale'],
+            message: 'Recognition locale must match the configured source language',
+          });
+      } catch {
+        ctx.addIssue({
+          code: 'custom',
+          path: [sourceLanguage],
+          message: 'Speech language key must be a valid BCP-47 language code',
+        });
+      }
+    }
+  });
 
 const synthesisSchema = z
   .object({
@@ -52,6 +72,7 @@ const recognitionSchema = z
                   .passthrough(),
               )
               .max(30),
+            languageCode: z.string().max(64).optional(),
           })
           .passthrough(),
       )
@@ -141,6 +162,14 @@ function assessment(transcript: string, expected: string, confidence: number | u
   const score = Math.round(Math.min(100, Math.max(0, similarity * 85 + (confidence ?? 0) * 15)));
   const feedback = `זוהה: “${transcript}” · התאמה ${Math.round(similarity * 100)} · ${confidence === undefined ? 'ביטחון זיהוי לא סופק' : `ביטחון זיהוי ${Math.round(confidence * 100)}`}.`;
   return { score, feedback };
+}
+
+function sameBaseLanguage(left: string, right: string) {
+  try {
+    return new Intl.Locale(left).language === new Intl.Locale(right).language;
+  } catch {
+    return false;
+  }
 }
 
 export class GoogleSpeechProvider implements SpeechProvider {
@@ -239,15 +268,26 @@ export class GoogleSpeechProvider implements SpeechProvider {
           sampleRateHertz: 16000,
           audioChannelCount: 1,
           languageCode: config.recognitionLocale ?? config.locale,
+          // An empty alternative list keeps recognition pinned to the learning item's
+          // source language instead of asking Google to auto-select another language.
+          alternativeLanguageCodes: [],
           model: config.recognitionModel ?? 'command_and_search',
           enableWordConfidence: true,
+          // Pronunciation exercises always have a trusted expected expression. Supplying
+          // it as context improves recognition of short isolated words without changing
+          // the language selected above.
+          speechContexts: [{ phrases: [input.text], boost: 15 }],
         },
         audio: { content: input.audio.toString('base64') },
       }),
       signal,
     });
     const parsed = recognitionSchema.parse(await boundedJson(response, 262_144, signal));
-    const best = parsed.results[0]?.alternatives[0];
+    const recognitionLanguage = config.recognitionLocale ?? config.locale;
+    const best = parsed.results.find(
+      (candidate) =>
+        !candidate.languageCode || sameBaseLanguage(candidate.languageCode, recognitionLanguage),
+    )?.alternatives[0];
     const result = assessment(best?.transcript ?? '', input.text, best?.confidence);
     return {
       ...result,
