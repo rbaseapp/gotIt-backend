@@ -29,7 +29,7 @@ export const policySchema = z
 export type LearningPolicy = z.output<typeof policySchema>;
 export const DEFAULT_LEARNING_POLICY = policySchema.parse({});
 export const policyVersion = (policy: LearningPolicy) =>
-  `gotit-v1-${fingerprint(policy).slice(0, 12)}`;
+  `gotit-v1.1-${fingerprint(policy).slice(0, 12)}`;
 export function calendarDay(timestamp: Date, timezone: string) {
   const parts = new Intl.DateTimeFormat('en-CA', {
     timeZone: timezone,
@@ -60,6 +60,41 @@ export type MasteryEvidence = {
   activeRecallCalendarDays: number;
   activeRecallMasteryScore: number;
 };
+export type MasteryRequirements = {
+  totalScoredAttempts: number;
+  minimumScoredAttempts: number;
+  activeRecallSuccesses: number;
+  minimumActiveRecallSuccesses: number;
+  activeRecallCalendarDays: number;
+  minimumActiveRecallCalendarDays: number;
+  reviewStage: number;
+  learnedReviewStage: number;
+  needsTypedRecall: boolean;
+};
+export function masteryRequirements(
+  policy: LearningPolicy,
+  evidence: MasteryEvidence,
+  stage: number,
+  status: string,
+): MasteryRequirements {
+  return {
+    totalScoredAttempts: evidence.totalScoredAttempts,
+    minimumScoredAttempts: policy.minimumScoredAttempts,
+    activeRecallSuccesses: evidence.activeRecallSuccesses,
+    minimumActiveRecallSuccesses: policy.minimumActiveRecallSuccesses,
+    activeRecallCalendarDays: evidence.activeRecallCalendarDays,
+    minimumActiveRecallCalendarDays: policy.minimumActiveRecallCalendarDays,
+    reviewStage: stage,
+    learnedReviewStage: LEARNED_REVIEW_STAGE,
+    needsTypedRecall:
+      status !== 'mastered' &&
+      (evidence.totalScoredAttempts < policy.minimumScoredAttempts ||
+        evidence.activeRecallSuccesses < policy.minimumActiveRecallSuccesses ||
+        evidence.activeRecallCalendarDays < policy.minimumActiveRecallCalendarDays ||
+        evidence.activeRecallMasteryScore < policy.masteryThreshold ||
+        stage < LEARNED_REVIEW_STAGE),
+  };
+}
 export function projectEvidence(
   scores: number[],
   days: number,
@@ -132,6 +167,7 @@ export function decideProgress(
     masterySource,
     masteryScore: Math.round(evidence.activeRecallMasteryScore * 100) / 100,
     retentionLevel,
+    masteryRequirements: masteryRequirements(policy, evidence, stage, status),
     nextReviewAt: new Date(now.getTime() + days * 86400000),
   };
 }

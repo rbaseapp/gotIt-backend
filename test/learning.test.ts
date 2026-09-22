@@ -31,6 +31,7 @@ test('learning uses active recall evidence, then promotes learned words to estab
   assert.equal(learned.status, 'mastered');
   assert.equal(learned.stage, 2);
   assert.equal(learned.retentionLevel, 'learned');
+  assert.equal(learned.masteryRequirements.needsTypedRecall, false);
   assert.equal(learned.nextReviewAt.getTime() - now.getTime(), 7 * 86400000);
 
   const sameDay = decideProgress(
@@ -45,6 +46,7 @@ test('learning uses active recall evidence, then promotes learned words to estab
   );
   assert.equal(sameDay.stage, 1);
   assert.equal(sameDay.status, 'reviewing');
+  assert.equal(sameDay.masteryRequirements.needsTypedRecall, true);
 
   assert.equal(
     decideProgress(

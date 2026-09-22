@@ -75,6 +75,9 @@ The default policy separates `learned` from `established` retention. A word beco
 learned after three scored attempts overall, including two successful active-recall
 answers on two profile-calendar days, recall mastery of at least 80 and a passing
 latest answer. Optional skill scores remain visible but do not block learning.
+Smart review prioritizes a typed active-recall answer when it can satisfy a missing
+learning requirement; after a successful recall that day it resumes the weakest
+skill. Optional-skill attempts do not postpone the pending recall review.
 Delayed active-recall reviews promote the word to established retention at review
 stage four. Unique reward ledger keys and a 200-XP daily cap limit repeated rewards;
 skips do not change progress, streak or XP. `GET /api/v1/learning/config` exposes

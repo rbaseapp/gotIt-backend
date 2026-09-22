@@ -354,6 +354,121 @@ test(
         await call('delete', `/learning-items/${learningItemId}`).expect(200);
       });
       await t.test(
+        'smart review prioritizes a useful typed recall and optional skills do not postpone it',
+        async () => {
+          const captured = await call('post', '/captures', {
+              item: {
+                sourceText: 'progress',
+                sourceLanguageCode: 'en',
+                translationLanguageCode: 'he',
+                itemType: 'word',
+              },
+              translation: { text: 'progress meaning' },
+              context: { selectedText: 'progress' },
+              senseDecision: { mode: 'auto' },
+            }).expect(201),
+            learningItemId = captured.body.capture.learningItemId,
+            recallSession = (
+              await call('post', '/practice/sessions', {
+                sessionType: 'recall',
+                learningItemIds: [learningItemId],
+              }).expect(201)
+            ).body.session,
+            firstRecallExercise = (
+              await call('post', `/practice/sessions/${recallSession.id}/exercises`, {
+                count: 1,
+              }).expect(201)
+            ).body.exercises[0],
+            firstRecall = await call('post', '/practice/attempts', {
+              exerciseId: firstRecallExercise.id,
+              answerText: 'progress',
+            }).expect(201);
+          assert.equal(firstRecall.body.progress.masteryRequirements.activeRecallCalendarDays, 1);
+          assert.equal(firstRecall.body.progress.masteryRequirements.needsTypedRecall, true);
+
+          const flashcardSession = (
+              await call('post', '/practice/sessions', {
+                sessionType: 'flashcards',
+                learningItemIds: [learningItemId],
+              }).expect(201)
+            ).body.session,
+            flashcardExercise = (
+              await call('post', `/practice/sessions/${flashcardSession.id}/exercises`, {
+                count: 1,
+                direction: 'source_to_translation',
+              }).expect(201)
+            ).body.exercises[0],
+            flashcard = await call('post', '/practice/attempts', {
+              exerciseId: flashcardExercise.id,
+              selfRating: 'easy',
+            }).expect(201),
+            secondFlashcardExercise = (
+              await call('post', `/practice/sessions/${flashcardSession.id}/exercises`, {
+                count: 1,
+                direction: 'source_to_translation',
+              }).expect(201)
+            ).body.exercises[0],
+            secondFlashcard = await call('post', '/practice/attempts', {
+              exerciseId: secondFlashcardExercise.id,
+              selfRating: 'easy',
+            }).expect(201);
+          assert.equal(
+            flashcard.body.progress.nextReviewAt,
+            firstRecall.body.progress.nextReviewAt,
+          );
+          assert.equal(
+            secondFlashcard.body.progress.nextReviewAt,
+            firstRecall.body.progress.nextReviewAt,
+          );
+
+          await db.adminPool.query(
+            "UPDATE product_gotit.practice_attempts SET created_at=now()-interval '2 days' WHERE id=ANY($1::uuid[])",
+            [
+              [
+                firstRecall.body.attempt.id,
+                flashcard.body.attempt.id,
+                secondFlashcard.body.attempt.id,
+              ],
+            ],
+          );
+          await db.adminPool.query(
+            `UPDATE product_gotit.item_skill_progress SET mastery_score=10
+             WHERE learning_item_id=$1 AND skill_type='recognition'`,
+            [learningItemId],
+          );
+          const prioritized = (
+            await call('get', '/learning/queue?limit=20').expect(200)
+          ).body.items.find((item: any) => item.id === learningItemId);
+          assert.ok(prioritized);
+          assert.ok(prioritized.queueScore >= 120);
+
+          const smartSession = (
+              await call('post', '/practice/sessions', {
+                sessionType: 'smart_review',
+                learningItemIds: [learningItemId],
+              }).expect(201)
+            ).body.session,
+            smartExercise = (
+              await call('post', `/practice/sessions/${smartSession.id}/exercises`, {
+                count: 1,
+                kind: 'multiple_choice',
+                direction: 'source_to_translation',
+              }).expect(201)
+            ).body.exercises[0];
+          assert.equal(smartExercise.exerciseType, 'recall');
+          assert.equal(smartExercise.kind, 'typed');
+          assert.equal(smartExercise.direction, 'translation_to_source');
+
+          const learned = await call('post', '/practice/attempts', {
+            exerciseId: smartExercise.id,
+            answerText: 'progress',
+          }).expect(201);
+          assert.equal(learned.body.progress.status, 'mastered');
+          assert.equal(learned.body.progress.masteryRequirements.needsTypedRecall, false);
+          await call('delete', `/learning-items/${learningItemId}`).expect(200);
+        },
+      );
+      await t.test(
         'new semantic revision excludes historical evidence while same-sense variants and manual mastery preserve attempts without rewards',
         async () => {
           const session = (

@@ -48,6 +48,20 @@ export const attemptReceiptSchema = z
             masterySource: z.string().max(100).nullable(),
             masteryScore: z.number().min(0).max(100),
             retentionLevel: z.enum(['acquiring', 'learned', 'established']).optional(),
+            masteryRequirements: z
+              .object({
+                totalScoredAttempts: count,
+                minimumScoredAttempts: count,
+                activeRecallSuccesses: count,
+                minimumActiveRecallSuccesses: count,
+                activeRecallCalendarDays: count,
+                minimumActiveRecallCalendarDays: count,
+                reviewStage: count,
+                learnedReviewStage: count,
+                needsTypedRecall: z.boolean(),
+              })
+              .strict()
+              .optional(),
             nextReviewAt: timestamp.nullable(),
           })
           .strict(),

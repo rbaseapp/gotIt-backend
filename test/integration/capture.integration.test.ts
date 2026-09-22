@@ -173,7 +173,7 @@ test(
           const metadata = await database.adminPool.query(
             'SELECT count(*)::integer AS count FROM gotit_migrations.pgmigrations',
           );
-          assert.equal(metadata.rows[0].count, 2);
+          assert.equal(metadata.rows[0].count, 3);
           const originalCore = await database.adminPool.query(
             'SELECT count(*)::integer AS count FROM public.pgmigrations',
           );
@@ -197,6 +197,7 @@ test(
               randomUUID(),
             ],
           );
+          await database.migrate('down');
           await database.migrate('down');
           await database.migrate('down');
           const absent = await database.adminPool

@@ -20,6 +20,8 @@ import {
   projectEvidence,
   decideProgress,
   retentionLevelFor,
+  masteryRequirements,
+  LEARNED_REVIEW_STAGE,
   type LearningPolicy,
   type Evidence,
   type MasteryEvidence,
@@ -95,15 +97,52 @@ export class PracticeService {
        +(100-li.overall_mastery_score)/2+CASE WHEN li.user_priority='high' THEN 30 ELSE 0 END
        +CASE WHEN li.manual_hard THEN 20 ELSE 0 END+COALESCE(li.system_difficulty,0)*20
        +CASE WHEN li.overall_mastery_score BETWEEN 70 AND 84 THEN 10 ELSE 0 END
-       +CASE WHEN li.learning_status='new' THEN 15 ELSE 0 END) queue_score,
+       +CASE WHEN li.learning_status='new' THEN 15 ELSE 0 END
+       +CASE WHEN li.learning_status<>'mastered'
+         AND (SELECT count(*) FROM product_gotit.practice_attempts scored
+           WHERE scored.application_id=li.application_id AND scored.application_user_id=li.application_user_id
+             AND scored.learning_item_id=li.id AND scored.result<>'skipped'
+             AND COALESCE(scored.learning_revision,1)=li.learning_revision)>=$5
+         AND NOT EXISTS(SELECT 1 FROM product_gotit.practice_attempts today
+           WHERE today.application_id=li.application_id AND today.application_user_id=li.application_user_id
+             AND today.learning_item_id=li.id AND today.result<>'skipped' AND today.score>=85
+             AND today.user_answer_text IS NOT NULL AND COALESCE(today.learning_revision,1)=li.learning_revision
+             AND (today.created_at AT TIME ZONE $4)::date=(now() AT TIME ZONE $4)::date
+             AND EXISTS(SELECT 1 FROM product_gotit.attempt_skill_effects effect
+               WHERE effect.practice_attempt_id=today.id AND effect.skill_type='recall'))
+         AND (li.review_stage<${LEARNED_REVIEW_STAGE}
+           OR li.overall_mastery_score<$8
+           OR (SELECT count(*) FROM product_gotit.practice_attempts successful
+             WHERE successful.application_id=li.application_id AND successful.application_user_id=li.application_user_id
+               AND successful.learning_item_id=li.id AND successful.result<>'skipped' AND successful.score>=85
+               AND successful.user_answer_text IS NOT NULL AND COALESCE(successful.learning_revision,1)=li.learning_revision
+               AND EXISTS(SELECT 1 FROM product_gotit.attempt_skill_effects effect
+                 WHERE effect.practice_attempt_id=successful.id AND effect.skill_type='recall'))<$6
+           OR (SELECT count(DISTINCT (successful.created_at AT TIME ZONE $4)::date)
+             FROM product_gotit.practice_attempts successful
+             WHERE successful.application_id=li.application_id AND successful.application_user_id=li.application_user_id
+               AND successful.learning_item_id=li.id AND successful.result<>'skipped' AND successful.score>=85
+               AND successful.user_answer_text IS NOT NULL AND COALESCE(successful.learning_revision,1)=li.learning_revision
+               AND EXISTS(SELECT 1 FROM product_gotit.attempt_skill_effects effect
+                 WHERE effect.practice_attempt_id=successful.id AND effect.skill_type='recall'))<$7)
+         THEN 120 ELSE 0 END) queue_score,
       row_number() OVER(PARTITION BY learning_status ORDER BY created_at,id) new_rank
       FROM product_gotit.learning_items li WHERE application_id=$1 AND application_user_id=$2 AND user_status='active' AND deleted_at IS NULL)
       SELECT * FROM candidates WHERE primary_translation IS NOT NULL AND
       (learning_status<>'new' OR new_rank<=GREATEST(0,$3-(SELECT count(DISTINCT a.learning_item_id) FROM product_gotit.practice_attempts a
        JOIN product_gotit.learning_items i ON i.application_id=a.application_id AND i.application_user_id=a.application_user_id AND i.id=a.learning_item_id
        WHERE a.application_id=$1 AND a.application_user_id=$2 AND (a.created_at AT TIME ZONE $4)::date=(now() AT TIME ZONE $4)::date AND a.result<>'skipped' AND NOT EXISTS(SELECT 1 FROM product_gotit.practice_attempts older WHERE older.application_id=a.application_id AND older.application_user_id=a.application_user_id AND older.learning_item_id=a.learning_item_id AND older.result<>'skipped' AND (older.created_at AT TIME ZONE $4)::date<(now() AT TIME ZONE $4)::date))))
-      AND (learning_status<>'mastered' OR next_review_at<=now()) ORDER BY queue_score DESC,created_at,id LIMIT $5`,
-        [...scopeValues(scope), profile.defaultNewItemsPerDay, profile.timezone, count],
+       AND (learning_status<>'mastered' OR next_review_at<=now()) ORDER BY queue_score DESC,created_at,id LIMIT $9`,
+        [
+          ...scopeValues(scope),
+          profile.defaultNewItemsPerDay,
+          profile.timezone,
+          this.policy.minimumScoredAttempts,
+          this.policy.minimumActiveRecallSuccesses,
+          this.policy.minimumActiveRecallCalendarDays,
+          this.policy.masteryThreshold,
+          count,
+        ],
       )
     ).rows;
   }
@@ -383,10 +422,49 @@ export class PracticeService {
           translations = row.translations as string[];
         if (!translations.length)
           throw new AppError(409, 'ITEM_INCOMPLETE', 'Learning item has no accepted translation');
-        let type = input.exerciseType ?? session.session_type;
+        let type = input.exerciseType ?? session.session_type,
+          masteryGateRecall = false;
         if (type === 'manual' && !input.exerciseType)
           throw new AppError(400, 'VALIDATION_ERROR', 'Manual session requires an exercise type');
         if (type === 'smart_review') {
+          const activeRecall = (
+              await tx.query(
+                `WITH history AS(
+                   SELECT a.score::float8 score,(a.created_at AT TIME ZONE $4)::date AS activity_day,a.created_at,a.id
+                   FROM product_gotit.practice_attempts a
+                   WHERE a.application_id=$1 AND a.application_user_id=$2 AND a.learning_item_id=$3
+                     AND a.result<>'skipped' AND a.user_answer_text IS NOT NULL
+                     AND COALESCE(a.learning_revision,1)=$5
+                     AND EXISTS(SELECT 1 FROM product_gotit.attempt_skill_effects e
+                       WHERE e.practice_attempt_id=a.id AND e.skill_type='recall'))
+                 SELECT count(*) FILTER(WHERE score>=85)::integer successes,
+                   count(DISTINCT activity_day) FILTER(WHERE score>=85)::integer successful_days,
+                   COALESCE(bool_or(activity_day=(now() AT TIME ZONE $4)::date AND score>=85),false) successful_today,
+                   (SELECT count(*)::integer FROM product_gotit.practice_attempts total
+                     WHERE total.application_id=$1 AND total.application_user_id=$2
+                       AND total.learning_item_id=$3 AND total.result<>'skipped'
+                       AND COALESCE(total.learning_revision,1)=$5) total_scored_attempts,
+                   ARRAY(SELECT score FROM(SELECT score,created_at,id FROM history
+                     ORDER BY created_at DESC,id DESC LIMIT 10) recent ORDER BY created_at,id) scores
+                 FROM history`,
+                [...scopeValues(scope), row.id, profile.timezone, row.learning_revision],
+              )
+            ).rows[0]!,
+            totalScoredAttempts = Number(activeRecall.total_scored_attempts),
+            recallMastery = projectEvidence(
+              activeRecall.scores,
+              activeRecall.successful_days,
+            ).masteryScore,
+            hasMasteryGap =
+              row.learning_status !== 'mastered' &&
+              (totalScoredAttempts < this.policy.minimumScoredAttempts ||
+                activeRecall.successes < this.policy.minimumActiveRecallSuccesses ||
+                activeRecall.successful_days < this.policy.minimumActiveRecallCalendarDays ||
+                recallMastery < this.policy.masteryThreshold ||
+                row.review_stage < LEARNED_REVIEW_STAGE);
+          // A qualifying recall can advance maturity at most once per profile-calendar day.
+          // Prefer it over optional weak skills only when it can make progress now.
+          masteryGateRecall = hasMasteryGap && !activeRecall.successful_today;
           const weakest = (
             await tx.query(
               'SELECT skill_type FROM product_gotit.item_skill_progress WHERE application_id=$1 AND application_user_id=$2 AND learning_item_id=$3 AND skill_type=ANY($4::text[]) ORDER BY mastery_score,attempt_count,skill_type LIMIT 1',
@@ -397,8 +475,9 @@ export class PracticeService {
               ],
             )
           ).rows[0]?.skill_type;
-          type =
-            weakest === 'recognition'
+          type = masteryGateRecall
+            ? 'recall'
+            : weakest === 'recognition'
               ? 'flashcards'
               : weakest === 'listening'
                 ? 'listening_spelling'
@@ -412,8 +491,9 @@ export class PracticeService {
           type !== session.session_type
         )
           throw new AppError(400, 'VALIDATION_ERROR', 'Exercise type does not match session');
-        const reverse =
-          type === 'pronunciation'
+        const reverse = masteryGateRecall
+          ? true
+          : type === 'pronunciation'
             ? false
             : type === 'listening_spelling'
               ? true
@@ -422,8 +502,9 @@ export class PracticeService {
         const direction = reverse ? 'translation_to_source' : 'source_to_translation';
         const accepted =
           type === 'pronunciation' ? [row.source_text] : reverse ? [row.source_text] : translations;
-        let kind: AnswerSpec['kind'] =
-          type === 'flashcards'
+        let kind: AnswerSpec['kind'] = masteryGateRecall
+          ? 'typed'
+          : type === 'flashcards'
             ? 'self_rating'
             : type === 'pronunciation'
               ? 'provider'
@@ -783,6 +864,12 @@ export class PracticeService {
             masterySource: item.mastery_source,
             masteryScore: Number(item.overall_mastery_score),
             retentionLevel: retentionLevelFor(item.learning_status, item.review_stage),
+            masteryRequirements: masteryRequirements(
+              this.policy,
+              masteryEvidence,
+              item.review_stage,
+              item.learning_status,
+            ),
             nextReviewAt: item.next_review_at,
           }
         : decideProgress(
@@ -799,6 +886,10 @@ export class PracticeService {
             activeRecallAttempt,
             canAdvance,
           );
+      // Optional skills remain useful evidence, but they must not postpone the
+      // active-recall review that is required to finish learning the item.
+      if (!input.skipped && !activeRecallAttempt && item.learning_status !== 'mastered')
+        progress.nextReviewAt = item.next_review_at ?? now;
       if (!input.skipped)
         await tx.query(
           `UPDATE product_gotit.learning_items SET overall_mastery_score=$4,learning_status=$5,review_stage=$6,next_review_at=$7,mastery_source=$8,last_practiced_at=$9,system_difficulty=$10,
