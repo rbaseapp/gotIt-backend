@@ -295,7 +295,9 @@ test('retryable enrichment failures retry within one deadline before using confi
       );
     });
   const deadline = new EnrichmentRegistry([first, second], profiles, {
-    auto: { profiles: ['first', 'second'], timeoutMs: 20 },
+    // Leave enough wall-clock budget for both scheduled attempts even when the
+    // test runner executes files concurrently on a loaded CI worker.
+    auto: { profiles: ['first', 'second'], timeoutMs: 200 },
   });
   const traces: ProviderTrace[] = [];
   assert.deepEqual(

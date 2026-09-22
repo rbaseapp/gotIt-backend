@@ -22,6 +22,7 @@ export function createAuthenticateMiddleware(coreAuthClient: CoreAuthClient) {
       const identity = await coreAuthClient.validateAccessToken(accessToken, String(request.id));
 
       request.gotitAuth = identity;
+      request.gotitCoreAccessToken = accessToken;
       next();
     } catch (error) {
       next(error);

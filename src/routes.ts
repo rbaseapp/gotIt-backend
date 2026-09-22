@@ -18,6 +18,7 @@ import { API_ROUTES } from './shared/http/api-catalog.js';
 import { AppError } from './shared/errors/app-error.js';
 import type { AppDependencies } from './shared/http/dependencies.js';
 import { createAuthenticateMiddleware } from './shared/middleware/authenticate.js';
+import { createRequireEntitlementMiddleware } from './shared/middleware/require-entitlement.js';
 
 export function createRoutes(dependencies: AppDependencies) {
   const router = Router();
@@ -102,10 +103,19 @@ export function createRoutes(dependencies: AppDependencies) {
     router.use('/api/v1/gamification', createGamificationRoutes(dependencies.dashboardService));
   }
   if (dependencies.readingService)
-    router.use('/api/v1/reading', createReadingRoutes(dependencies.readingService));
+    router.use('/api/v1/reading', createReadingRoutes(
+      dependencies.readingService,
+      createRequireEntitlementMiddleware(dependencies.coreAuthClient, 'reading.ai'),
+    ));
   if (dependencies.speechService) {
-    router.use('/api/v1/learning-items', createSpeechItemRoutes(dependencies.speechService));
-    router.use('/api/v1/pronunciation', createPronunciationRoutes(dependencies.speechService));
+    router.use('/api/v1/learning-items', createSpeechItemRoutes(
+      dependencies.speechService,
+      createRequireEntitlementMiddleware(dependencies.coreAuthClient, 'speech.audio'),
+    ));
+    router.use('/api/v1/pronunciation', createPronunciationRoutes(
+      dependencies.speechService,
+      createRequireEntitlementMiddleware(dependencies.coreAuthClient, 'speech.pronunciation'),
+    ));
   }
   if (dependencies.transferPool && dependencies.captureService)
     router.use(

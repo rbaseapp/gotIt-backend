@@ -978,7 +978,7 @@ export class PracticeService {
       );
       const activity = (
         await tx.query(
-          `SELECT practice_seconds,(SELECT count(*)::integer FROM product_gotit.practice_attempts WHERE application_id=$1 AND application_user_id=$2 AND (created_at AT TIME ZONE $4)::date=$3::date AND result<>'skipped') attempts,(SELECT count(DISTINCT learning_item_id)::integer FROM product_gotit.practice_attempts WHERE application_id=$1 AND application_user_id=$2 AND (created_at AT TIME ZONE $4)::date=$3::date AND result<>'skipped') items FROM product_gotit.user_daily_activity WHERE application_id=$1 AND application_user_id=$2 AND activity_date=$3`,
+          `SELECT practice_seconds,xp_earned,(SELECT count(*)::integer FROM product_gotit.practice_attempts WHERE application_id=$1 AND application_user_id=$2 AND (created_at AT TIME ZONE $4)::date=$3::date AND result<>'skipped') attempts,(SELECT count(DISTINCT learning_item_id)::integer FROM product_gotit.practice_attempts WHERE application_id=$1 AND application_user_id=$2 AND (created_at AT TIME ZONE $4)::date=$3::date AND result<>'skipped') items FROM product_gotit.user_daily_activity WHERE application_id=$1 AND application_user_id=$2 AND activity_date=$3`,
           [...scopeValues(scope), day, profile.timezone],
         )
       ).rows[0]!;
@@ -993,6 +993,7 @@ export class PracticeService {
           : profile.dailyGoal.type === 'items'
             ? activity.items
             : activity.attempts;
+      let todayXp = Number(activity.xp_earned);
       if (!input.skipped && goalValue >= profile.dailyGoal.value) {
         const goalXp = await this.award(
           tx,
@@ -1006,12 +1007,14 @@ export class PracticeService {
           now,
         );
         reward += goalXp;
+        todayXp += goalXp;
         if (goalXp)
           await tx.query(
             'UPDATE product_gotit.user_daily_activity SET xp_earned=xp_earned+$4 WHERE application_id=$1 AND application_user_id=$2 AND activity_date=$3',
             [...scopeValues(scope), day, goalXp],
           );
       }
+      const dailyXpRemaining = Math.max(0, this.policy.dailyXpCap - todayXp);
       await tx.query(
         'UPDATE product_gotit.practice_sessions SET attempt_count=$4,correct_count=correct_count+$5,xp_earned=xp_earned+$6,updated_at=now() WHERE application_id=$1 AND application_user_id=$2 AND id=$3',
         [
@@ -1036,6 +1039,12 @@ export class PracticeService {
           score: scored.score,
           expectedAnswer: scored.expectedAnswer,
           xpEarned: reward,
+          xpStatus: {
+            todayXp,
+            dailyXpCap: this.policy.dailyXpCap,
+            dailyXpRemaining,
+            dailyXpCapReached: dailyXpRemaining === 0,
+          },
           ...(verifiedAssessment?.feedback
             ? { pronunciationFeedback: verifiedAssessment.feedback }
             : {}),

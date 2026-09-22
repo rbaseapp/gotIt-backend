@@ -44,6 +44,26 @@ test('CoreAuthClient maps Core /auth/me user to trusted GotIt identity', async (
   assert.equal(seenHeaders?.get('x-request-id'), 'request-123');
 });
 
+test('CoreAuthClient loads billing entitlements from the application-scoped Core endpoint', async () => {
+  let seenUrl = '';
+  const client = new CoreAuthClient({
+    baseUrl: 'https://core.example.test', applicationKey: 'gotit', timeoutMs: 1000,
+    fetchImpl: async (input) => {
+      seenUrl = String(input);
+      return Response.json({
+        tier: 'paid', access: true,
+        plan: { key: 'pro-monthly', name: 'Pro', kind: 'paid' },
+        entitlements: ['reading.ai', 'speech.audio'],
+        subscription: { status: 'active', cancelAtPeriodEnd: false, currentPeriodEndsAt: '2030-01-01T00:00:00.000Z' },
+      });
+    },
+  });
+  const status = await client.getBillingStatus('access-token');
+  assert.equal(seenUrl, 'https://core.example.test/api/v1/billing/status');
+  assert.equal(status.tier, 'paid');
+  assert.deepEqual(status.entitlements, ['reading.ai', 'speech.audio']);
+});
+
 test('CoreAuthClient maps invalid Core token to 401', async () => {
   const client = new CoreAuthClient({
     baseUrl: 'https://core.example.test',

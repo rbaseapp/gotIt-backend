@@ -1,17 +1,17 @@
-import { Router } from 'express';
+import { Router, type RequestHandler } from 'express';
 import { parseInput, uuidSchema } from '../capture/capture.validation.js';
 import { pageSchema } from '../library/library.validation.js';
 import { publicationSchema, readingInputSchema } from './reading.validation.js';
 import type { ReadingService } from './reading.service.js';
-export function createReadingRoutes(service: ReadingService) {
+export function createReadingRoutes(service: ReadingService, requireGeneration: RequestHandler) {
   const router = Router();
-  router.post('/preview', async (req, res) =>
+  router.post('/preview', requireGeneration, async (req, res) =>
     res.json({
       ...(await service.preview(req.gotitAuth!, parseInput(readingInputSchema, req.body))),
       requestId: req.id,
     }),
   );
-  router.post('/', async (req, res) => {
+  router.post('/', requireGeneration, async (req, res) => {
     const result = await service.open(
       req.gotitAuth!,
       parseInput(uuidSchema, req.get('Idempotency-Key')),

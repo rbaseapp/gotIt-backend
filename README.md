@@ -129,6 +129,10 @@ Azure remains an optional adapter for native pronunciation assessment. Without a
 configured provider the endpoints return safe unavailable errors and never
 fabricate audio or scores.
 
+## Paid feature enforcement
+
+GotIt delegates billing state to Core and enforces entitlements on the server. `reading.ai`, `speech.audio`, and `speech.pronunciation` are checked for every costly operation; a free user receives `402 SUBSCRIPTION_REQUIRED`. Read-only reading history stays available after cancellation. GotIt never accepts or stores card data.
+
 ## HTTP, deployment and verification
 
 Browser clients require exact `CORS_ORIGINS` for the Web site and Chrome extension.

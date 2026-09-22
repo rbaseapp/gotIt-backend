@@ -29,12 +29,25 @@ export class DashboardService {
             scopeValues(scope),
           )
         ).rows[0];
+        const todayXp = Number(
+          (
+            await tx.query(
+              'SELECT COALESCE(xp_earned,0)::integer AS xp FROM product_gotit.user_daily_activity WHERE application_id=$1 AND application_user_id=$2 AND activity_date=$3',
+              [...scopeValues(scope), today],
+            )
+          ).rows[0]?.xp ?? 0,
+        );
         const xp = Number(row?.total_xp ?? 0),
-          level = levelForXp(xp);
+          level = levelForXp(xp),
+          dailyXpRemaining = Math.max(0, this.policy.dailyXpCap - todayXp);
         return {
           totalXp: xp,
           level,
           nextLevelXp: 100 * level ** 2,
+          todayXp,
+          dailyXpCap: this.policy.dailyXpCap,
+          dailyXpRemaining,
+          dailyXpCapReached: dailyXpRemaining === 0,
           currentStreakDays: [today, previousDay(today)].includes(row?.activity_day)
             ? (row?.current_streak_days ?? 0)
             : 0,

@@ -708,6 +708,13 @@ test(
           const dashboard = await call('get', '/dashboard').expect(200);
           assert.equal(dashboard.body.counts.total, 4);
           assert.ok(dashboard.body.gamification.totalXp >= 10);
+          assert.ok(dashboard.body.gamification.todayXp >= 10);
+          assert.equal(dashboard.body.gamification.dailyXpCap, 200);
+          assert.equal(
+            dashboard.body.gamification.dailyXpRemaining,
+            200 - dashboard.body.gamification.todayXp,
+          );
+          assert.equal(dashboard.body.gamification.dailyXpCapReached, false);
           assert.equal(
             (await call('get', '/dashboard', undefined, randomUUID(), 1).expect(200)).body.counts
               .total,
@@ -1089,6 +1096,18 @@ test(
           assert.equal(
             results.reduce((total, result) => total + result.attempt.xpEarned, 0),
             7,
+          );
+          assert.ok(
+            results.every((result) => {
+              const status = result.attempt.xpStatus;
+              return (
+                status !== undefined &&
+                status.todayXp === 7 &&
+                status.dailyXpCap === 7 &&
+                status.dailyXpRemaining === 0 &&
+                status.dailyXpCapReached
+              );
+            }),
           );
           const totals = (
             await db.adminPool.query(

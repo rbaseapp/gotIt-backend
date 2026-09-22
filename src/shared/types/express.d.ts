@@ -11,6 +11,7 @@ declare global {
         applicationId: string;
         applicationUserId: string;
       };
+      gotitCoreAccessToken?: string;
     }
   }
 }

@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, type RequestHandler } from 'express';
 import { z } from 'zod';
 import { languageSchema, parseInput, uuidSchema } from '../capture/capture.validation.js';
 import type { SpeechService } from './speech.service.js';
@@ -14,17 +14,17 @@ const assessmentSchema = z
       .regex(/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/u),
   })
   .strict();
-export function createSpeechItemRoutes(service: SpeechService) {
+export function createSpeechItemRoutes(service: SpeechService, requireAudio: RequestHandler) {
   const router = Router();
-  router.get('/:id/audio', async (req, res) => {
+  router.get('/:id/audio', requireAudio, async (req, res) => {
     const result = await service.audio(req.gotitAuth!, parseInput(uuidSchema, req.params.id));
     res.type(result.contentType).send(result.audio);
   });
   return router;
 }
-export function createPronunciationRoutes(service: SpeechService) {
+export function createPronunciationRoutes(service: SpeechService, requirePronunciation: RequestHandler) {
   const router = Router();
-  router.post('/assessments', async (req, res) => {
+  router.post('/assessments', requirePronunciation, async (req, res) => {
     const input = parseInput(assessmentSchema, req.body);
     const result = await service.assess(
       req.gotitAuth!,
