@@ -13,6 +13,10 @@ const envSchema = z
     CORE_API_BASE_URL: z.string().url(),
     CORE_APPLICATION_KEY: z.string().min(1).default('gotit'),
     CORE_AUTH_TIMEOUT_MS: z.coerce.number().int().positive().max(30_000).default(3000),
+    ENFORCE_PAID_ENTITLEMENTS: z
+      .enum(['true', 'false'])
+      .default('false')
+      .transform((value) => value === 'true'),
     ANTHROPIC_API_KEY: z.string().min(1).optional(),
     ANTHROPIC_WORKSPACE_ID: z
       .string()

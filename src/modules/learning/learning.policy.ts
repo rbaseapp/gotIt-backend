@@ -18,6 +18,7 @@ export const policySchema = z
       .max(10)
       .default([1, 3, 7, 14, 30, 60]),
     dailyXpCap: z.number().int().min(0).max(1000).default(200),
+    postDailyCapPercent: z.number().int().min(0).max(100).default(25),
     correctXp: z.number().int().min(0).max(50).default(10),
     partialXp: z.number().int().min(0).max(20).default(3),
     selfRatedXp: z.number().int().min(0).max(20).default(5),
@@ -44,6 +45,20 @@ export function previousDay(day: string) {
 }
 export function levelForXp(xp: number) {
   return Math.floor(Math.sqrt(Math.max(0, xp) / 100)) + 1;
+}
+export function xpAwardForDailyTotal(
+  requestedXp: number,
+  dailyXp: number,
+  dailyXpCap: number,
+  postDailyCapPercent: number,
+) {
+  const fullRateXp = Math.min(requestedXp, Math.max(0, dailyXpCap - dailyXp)),
+    reducedRateBase = requestedXp - fullRateXp,
+    reducedRateXp =
+      reducedRateBase > 0 && postDailyCapPercent > 0
+        ? Math.max(1, Math.round((reducedRateBase * postDailyCapPercent) / 100))
+        : 0;
+  return fullRateXp + reducedRateXp;
 }
 export type Evidence = {
   skillType: Skill;

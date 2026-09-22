@@ -121,6 +121,7 @@ const app = createApp({
     env.ENRICHMENT_SIGNING_SECRET,
   ),
   speechService,
+  enforcePaidEntitlements: env.ENFORCE_PAID_ENTITLEMENTS,
   rateLimiter,
   corsOrigins: env.CORS_ORIGINS,
   trustProxyHops: env.TRUST_PROXY_HOPS,

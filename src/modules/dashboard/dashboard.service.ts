@@ -48,6 +48,7 @@ export class DashboardService {
           dailyXpCap: this.policy.dailyXpCap,
           dailyXpRemaining,
           dailyXpCapReached: dailyXpRemaining === 0,
+          postDailyCapPercent: this.policy.postDailyCapPercent,
           currentStreakDays: [today, previousDay(today)].includes(row?.activity_day)
             ? (row?.current_streak_days ?? 0)
             : 0,

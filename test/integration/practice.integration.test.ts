@@ -1044,7 +1044,7 @@ test(
         },
       );
       await t.test(
-        'concurrent correct answers obey the daily XP cap while retaining evidence and meaningful activity',
+        'concurrent correct answers apply the soft XP threshold while deduplicating rewards and retaining evidence',
         async () => {
           const scope = { applicationId, applicationUserId: users[1]! },
             capture = new CaptureService(
@@ -1095,19 +1095,23 @@ test(
           );
           assert.equal(
             results.reduce((total, result) => total + result.attempt.xpEarned, 0),
-            7,
+            8,
           );
           assert.ok(
             results.every((result) => {
               const status = result.attempt.xpStatus;
               return (
                 status !== undefined &&
-                status.todayXp === 7 &&
                 status.dailyXpCap === 7 &&
                 status.dailyXpRemaining === 0 &&
-                status.dailyXpCapReached
+                status.dailyXpCapReached &&
+                status.postDailyCapPercent === 25
               );
             }),
+          );
+          assert.deepEqual(
+            results.map((result) => result.attempt.xpStatus?.todayXp).sort((a, b) => a! - b!),
+            [8, 8],
           );
           const totals = (
             await db.adminPool.query(
@@ -1115,7 +1119,7 @@ test(
               [applicationId, users[1]],
             )
           ).rows[0];
-          assert.equal(Number(totals.total_xp), 7);
+          assert.equal(Number(totals.total_xp), 8);
           assert.equal(totals.current_streak_days, 1);
           const daily = (
             await db.adminPool.query(
@@ -1124,7 +1128,7 @@ test(
             )
           ).rows[0];
           assert.equal(daily.attempts, 2);
-          assert.equal(daily.xp_earned, 7);
+          assert.equal(daily.xp_earned, 8);
         },
       );
       await t.test(

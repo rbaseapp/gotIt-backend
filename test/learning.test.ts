@@ -6,6 +6,7 @@ import {
   calendarDay,
   previousDay,
   levelForXp,
+  xpAwardForDailyTotal,
 } from '../src/modules/learning/learning.policy.js';
 import { scoreAnswer, type AnswerSpec } from '../src/modules/practice/practice.scoring.js';
 import { attemptSchema } from '../src/modules/practice/practice.validation.js';
@@ -102,6 +103,11 @@ test('learning uses active recall evidence, then promotes learned words to estab
   assert.equal(previousDay('2024-03-01'), '2024-02-29');
   assert.equal(levelForXp(99), 1);
   assert.equal(levelForXp(100), 2);
+  assert.equal(xpAwardForDailyTotal(10, 0, 200, 25), 10);
+  assert.equal(xpAwardForDailyTotal(10, 195, 200, 25), 6);
+  assert.equal(xpAwardForDailyTotal(10, 200, 200, 25), 3);
+  assert.equal(xpAwardForDailyTotal(3, 200, 200, 25), 1);
+  assert.equal(xpAwardForDailyTotal(10, 200, 200, 0), 0);
 });
 test('typed scoring normalizes Unicode, recognizes accepted variants, treats typos and hints as partial, and validates answer mode', () => {
   const spec: AnswerSpec = {

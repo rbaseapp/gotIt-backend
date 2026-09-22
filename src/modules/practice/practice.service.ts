@@ -17,6 +17,7 @@ import {
   calendarDay,
   previousDay,
   levelForXp,
+  xpAwardForDailyTotal,
   projectEvidence,
   decideProgress,
   retentionLevelFor,
@@ -1044,6 +1045,7 @@ export class PracticeService {
             dailyXpCap: this.policy.dailyXpCap,
             dailyXpRemaining,
             dailyXpCapReached: dailyXpRemaining === 0,
+            postDailyCapPercent: this.policy.postDailyCapPercent,
           },
           ...(verifiedAssessment?.feedback
             ? { pronunciationFeedback: verifiedAssessment.feedback }
@@ -1097,7 +1099,12 @@ export class PracticeService {
         [...scopeValues(scope), day, timezone],
       )
     ).rows[0]!.xp;
-    amount = Math.min(amount, Math.max(0, this.policy.dailyXpCap - daily));
+    amount = xpAwardForDailyTotal(
+      amount,
+      Number(daily),
+      this.policy.dailyXpCap,
+      this.policy.postDailyCapPercent,
+    );
     if (!amount) return 0;
     const inserted = await tx.query(
       `INSERT INTO product_gotit.xp_events(application_id,application_user_id,source_type,source_id,xp_amount,reason_code,idempotency_key,created_at) VALUES($1,$2,$3,$4,$5,$3,$6,$7)

@@ -79,7 +79,9 @@ Smart review prioritizes a typed active-recall answer when it can satisfy a miss
 learning requirement; after a successful recall that day it resumes the weakest
 skill. Optional-skill attempts do not postpone the pending recall review.
 Delayed active-recall reviews promote the word to established retention at review
-stage four. Unique reward ledger keys and a 200-XP daily cap limit repeated rewards;
+stage four. Unique reward ledger keys limit repeated rewards. XP is awarded at the
+full rate through the 200-XP daily threshold and at 25% (rounded to whole XP)
+afterward;
 skips do not change progress, streak or XP. `GET /api/v1/learning/config` exposes
 the versioned policy; `LEARNING_POLICY_JSON` supplies validated server overrides.
 This initial policy does not implement calibrated automatic CEFR estimation.
@@ -131,7 +133,7 @@ fabricate audio or scores.
 
 ## Paid feature enforcement
 
-GotIt delegates billing state to Core and enforces entitlements on the server. `reading.ai`, `speech.audio`, and `speech.pronunciation` are checked for every costly operation; a free user receives `402 SUBSCRIPTION_REQUIRED`. Read-only reading history stays available after cancellation. GotIt never accepts or stores card data.
+Paid entitlement enforcement is temporarily disabled, so every authenticated user can use reading generation, speech audio, and pronunciation assessment while subscriptions are not yet available. Keep `ENFORCE_PAID_ENTITLEMENTS=false` until the paid-subscription launch is complete. The existing Core billing integration remains in place; setting the flag to `true` restores server-side checks for `reading.ai`, `speech.audio`, and `speech.pronunciation`, returning `402 SUBSCRIPTION_REQUIRED` when access is missing. GotIt never accepts or stores card data.
 
 ## HTTP, deployment and verification
 

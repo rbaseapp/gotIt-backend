@@ -22,6 +22,7 @@ export type AppDependencies = {
   transferPool?: Pool;
   readingService?: ReadingService;
   speechService?: SpeechService;
+  enforcePaidEntitlements?: boolean;
   corsOrigins?: string[];
   trustProxyHops?: number;
   rateLimiter?: RateLimitContract;

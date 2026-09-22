@@ -9,16 +9,51 @@ import { errorHandler } from '../src/shared/middleware/error-handler.js';
 function appWith(entitlements: string[]) {
   const core = {
     async getBillingStatus() {
-      return { tier: entitlements.length ? 'paid' : 'free', access: true,
-        plan: { key: entitlements.length ? 'pro' : 'free', name: 'Plan', kind: entitlements.length ? 'paid' : 'free' },
-        entitlements, subscription: null };
+      return {
+        tier: entitlements.length ? 'paid' : 'free',
+        access: true,
+        plan: {
+          key: entitlements.length ? 'pro' : 'free',
+          name: 'Plan',
+          kind: entitlements.length ? 'paid' : 'free',
+        },
+        entitlements,
+        subscription: null,
+      };
     },
   } as unknown as CoreAuthClient;
   const app = express();
-  app.use((req, _res, next) => { req.id = 'request-id'; req.gotitCoreAccessToken = 'token'; next(); });
-  app.get('/premium', createRequireEntitlementMiddleware(core, 'reading.ai'), (_req, res) => res.json({ ok: true }));
+  app.use((req, _res, next) => {
+    req.id = 'request-id';
+    req.gotitCoreAccessToken = 'token';
+    next();
+  });
+  app.get('/premium', createRequireEntitlementMiddleware(core, 'reading.ai'), (_req, res) =>
+    res.json({ ok: true }),
+  );
   app.use(errorHandler);
   return app;
+}
+
+function appWithEnforcementDisabled() {
+  let billingRequests = 0;
+  const core = {
+    async getBillingStatus() {
+      billingRequests++;
+      throw new Error('Billing should not be queried while enforcement is disabled');
+    },
+  } as unknown as CoreAuthClient;
+  const app = express();
+  app.use((req, _res, next) => {
+    req.id = 'request-id';
+    req.gotitCoreAccessToken = 'token';
+    next();
+  });
+  app.get('/premium', createRequireEntitlementMiddleware(core, 'reading.ai', false), (_req, res) =>
+    res.json({ ok: true }),
+  );
+  app.use(errorHandler);
+  return { app, billingRequests: () => billingRequests };
 }
 
 test('premium middleware allows an entitled subscriber', async () => {
@@ -31,4 +66,12 @@ test('premium middleware fails closed for a free account', async () => {
   const response = await request(appWith([])).get('/premium');
   assert.equal(response.status, 402);
   assert.equal(response.body.error.code, 'SUBSCRIPTION_REQUIRED');
+});
+
+test('disabled paid enforcement allows every authenticated account without a billing lookup', async () => {
+  const fixture = appWithEnforcementDisabled();
+  const response = await request(fixture.app).get('/premium');
+  assert.equal(response.status, 200);
+  assert.deepEqual(response.body, { ok: true });
+  assert.equal(fixture.billingRequests(), 0);
 });

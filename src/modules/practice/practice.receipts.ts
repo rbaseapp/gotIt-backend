@@ -44,6 +44,7 @@ export const attemptReceiptSchema = z
                 dailyXpCap: count,
                 dailyXpRemaining: count,
                 dailyXpCapReached: z.boolean(),
+                postDailyCapPercent: count.max(100).optional(),
               })
               .strict()
               .optional(),

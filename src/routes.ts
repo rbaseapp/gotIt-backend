@@ -103,19 +103,40 @@ export function createRoutes(dependencies: AppDependencies) {
     router.use('/api/v1/gamification', createGamificationRoutes(dependencies.dashboardService));
   }
   if (dependencies.readingService)
-    router.use('/api/v1/reading', createReadingRoutes(
-      dependencies.readingService,
-      createRequireEntitlementMiddleware(dependencies.coreAuthClient, 'reading.ai'),
-    ));
+    router.use(
+      '/api/v1/reading',
+      createReadingRoutes(
+        dependencies.readingService,
+        createRequireEntitlementMiddleware(
+          dependencies.coreAuthClient,
+          'reading.ai',
+          dependencies.enforcePaidEntitlements === true,
+        ),
+      ),
+    );
   if (dependencies.speechService) {
-    router.use('/api/v1/learning-items', createSpeechItemRoutes(
-      dependencies.speechService,
-      createRequireEntitlementMiddleware(dependencies.coreAuthClient, 'speech.audio'),
-    ));
-    router.use('/api/v1/pronunciation', createPronunciationRoutes(
-      dependencies.speechService,
-      createRequireEntitlementMiddleware(dependencies.coreAuthClient, 'speech.pronunciation'),
-    ));
+    router.use(
+      '/api/v1/learning-items',
+      createSpeechItemRoutes(
+        dependencies.speechService,
+        createRequireEntitlementMiddleware(
+          dependencies.coreAuthClient,
+          'speech.audio',
+          dependencies.enforcePaidEntitlements === true,
+        ),
+      ),
+    );
+    router.use(
+      '/api/v1/pronunciation',
+      createPronunciationRoutes(
+        dependencies.speechService,
+        createRequireEntitlementMiddleware(
+          dependencies.coreAuthClient,
+          'speech.pronunciation',
+          dependencies.enforcePaidEntitlements === true,
+        ),
+      ),
+    );
   }
   if (dependencies.transferPool && dependencies.captureService)
     router.use(
