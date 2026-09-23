@@ -22,6 +22,7 @@ import { createLogger } from './shared/logger/logger.js';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { GoogleAuth } from 'google-auth-library';
+import { OpenverseImageProvider } from './modules/practice/openverse-image.provider.js';
 
 const logger = createLogger(env.LOG_LEVEL);
 const pool = createPool(env.DATABASE_URL);
@@ -60,6 +61,7 @@ const practiceService: PracticeService = new PracticeService(
   profileService,
   learningPolicy,
   (...args): boolean => speechService.supports(...args),
+  new OpenverseImageProvider(fetch),
 );
 const googleSpeechAccessToken =
   env.GOOGLE_SERVICE_ACCOUNT_JSON || env.GOOGLE_APPLICATION_CREDENTIALS

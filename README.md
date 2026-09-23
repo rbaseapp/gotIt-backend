@@ -86,6 +86,12 @@ skips do not change progress, streak or XP. `GET /api/v1/learning/config` expose
 the versioned policy; `LEARNING_POLICY_JSON` supplies validated server overrides.
 This initial policy does not implement calibrated automatic CEFR estimation.
 
+Before a smart-review client issues scored exercises it may request the session's
+owned study cards from `GET /api/v1/practice/sessions/:id/study`. This introductory
+view exposes the source expression and current primary translation but creates no
+attempt, evidence or XP. The separate per-card image route performs a bounded,
+cached Openverse lookup and returns `null` when no safe result is available.
+
 ## Providers
 
 Vendor adapters and server model profiles are independent of capture. Clients
@@ -94,6 +100,11 @@ validation failures receive bounded retries inside one route deadline, then any
 explicitly configured fallback is used. Authentication, billing, permission and
 invalid-request failures are not retried. Manual capture works without providers.
 Capture traces persist bounded metadata for every attempt.
+
+Memorization images use anonymous Openverse search for commercially reusable,
+non-mature results. Only the expression being studied is sent. Returned thumbnail
+URLs are restricted to `https://api.openverse.org`; creator, license and source
+links are returned so the client can display attribution.
 
 OpenAI contextual translation uses the Responses API with strict structured output.
 Set `OPENAI_API_KEY`, `OPENAI_TRANSLATION_MODEL` (the deployment default is

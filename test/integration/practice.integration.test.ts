@@ -196,6 +196,31 @@ test(
           await call('get', `/practice/sessions/${sessionId}`, undefined, randomUUID(), 1).expect(
             404,
           );
+          const study = await call('get', `/practice/sessions/${sessionId}/study`).expect(200);
+          assert.deepEqual(
+            study.body.cards.map((card: { sourceText: string; translationText: string }) => [
+              card.sourceText,
+              card.translationText,
+            ]),
+            [
+              ['hello', 'שלום'],
+              ['world', 'עולם'],
+              ['percent%_', 'אחוז'],
+            ],
+          );
+          assert.equal(study.body.cards[0].audioUrl, null);
+          assert.equal(
+            (await call('get', `/practice/sessions/${sessionId}/study/${ids[0]}/image`).expect(200))
+              .body.image,
+            null,
+          );
+          await call(
+            'get',
+            `/practice/sessions/${sessionId}/study`,
+            undefined,
+            randomUUID(),
+            1,
+          ).expect(404);
           const issued = await call('post', `/practice/sessions/${sessionId}/exercises`, {
             count: 1,
           }).expect(201);

@@ -32,6 +32,22 @@ export function createPracticeRoutes(service: PracticeService, requirePlay: Requ
       requestId: req.id,
     }),
   );
+  router.get('/sessions/:id/study', requirePlay, async (req, res) =>
+    res.json({
+      ...(await service.studyCards(req.gotitAuth!, parseInput(uuidSchema, req.params.id))),
+      requestId: req.id,
+    }),
+  );
+  router.get('/sessions/:id/study/:itemId/image', requirePlay, async (req, res) =>
+    res.set('Cache-Control', 'private, max-age=86400').json({
+      ...(await service.studyImage(
+        req.gotitAuth!,
+        parseInput(uuidSchema, req.params.id),
+        parseInput(uuidSchema, req.params.itemId),
+      )),
+      requestId: req.id,
+    }),
+  );
   router.patch('/sessions/:id', requirePlay, async (req, res) =>
     res.json({
       session: await service.closeSession(

@@ -31,6 +31,7 @@ import {
 } from '../learning/learning.policy.js';
 import { scoreAnswer, type AnswerSpec } from './practice.scoring.js';
 import type { SessionInput, ExercisesInput, AttemptInput } from './practice.validation.js';
+import type { StudyImageProvider } from './openverse-image.provider.js';
 const missingSession = () => new AppError(404, 'NOT_FOUND', 'Practice session not found');
 type DbItem = Record<string, any>;
 type ExerciseType = 'flashcards' | 'recall' | 'listening_spelling' | 'matching' | 'pronunciation';
@@ -57,6 +58,7 @@ export class PracticeService {
       language: string,
       kind: 'listening' | 'pronunciation',
     ) => boolean = () => false,
+    private readonly imageProvider?: StudyImageProvider,
   ) {
     this.version = policyVersion(policy);
   }
@@ -284,6 +286,66 @@ export class PracticeService {
         attempts,
       };
     });
+  }
+  async studyCards(scope: ProfileScope, id: string) {
+    return withTransaction(this.pool, async (tx) => {
+      const session = await this.session(tx, scope, id);
+      if (session.status !== 'active')
+        throw new AppError(409, 'SESSION_CLOSED', 'Session is closed');
+      const ids = session.selection.itemIds as string[];
+      const rows = (
+        await tx.query(
+          `SELECT li.id,li.source_text,li.source_language_code,li.translation_language_code,
+              (SELECT translation_text FROM product_gotit.item_translations t
+                WHERE t.application_id=li.application_id AND t.application_user_id=li.application_user_id
+                  AND t.learning_item_id=li.id AND t.is_current
+                ORDER BY t.is_primary DESC,t.id LIMIT 1) translation_text,
+              (SELECT sentence_text FROM product_gotit.item_occurrences o
+                WHERE o.application_id=li.application_id AND o.application_user_id=li.application_user_id
+                  AND o.learning_item_id=li.id AND o.learning_revision=li.learning_revision
+                  AND o.sentence_text IS NOT NULL ORDER BY o.captured_at DESC,o.id LIMIT 1) context
+            FROM product_gotit.learning_items li
+            WHERE li.application_id=$1 AND li.application_user_id=$2 AND li.id=ANY($3::uuid[])
+              AND li.user_status='active' AND li.deleted_at IS NULL
+            ORDER BY array_position($3::uuid[],li.id)`,
+          [...scopeValues(scope), ids],
+        )
+      ).rows;
+      if (rows.length !== ids.length || rows.some((row) => !row.translation_text))
+        throw new AppError(409, 'ITEM_INCOMPLETE', 'A study item is unavailable or incomplete');
+      return {
+        cards: rows.map((row) => ({
+          learningItemId: row.id,
+          sourceText: row.source_text,
+          translationText: row.translation_text,
+          sourceLanguageCode: row.source_language_code,
+          translationLanguageCode: row.translation_language_code,
+          context: row.context,
+          audioUrl: this.speechAvailable(row.source_language_code, 'listening')
+            ? `/api/v1/learning-items/${row.id}/audio`
+            : null,
+        })),
+      };
+    });
+  }
+  async studyImage(scope: ProfileScope, sessionId: string, itemId: string) {
+    const query = await withTransaction(this.pool, async (tx) => {
+      const session = await this.session(tx, scope, sessionId);
+      if (session.status !== 'active')
+        throw new AppError(409, 'SESSION_CLOSED', 'Session is closed');
+      if (!(session.selection.itemIds as string[]).includes(itemId)) throw itemNotFound();
+      const row = (
+        await tx.query(
+          `SELECT source_text FROM product_gotit.learning_items
+             WHERE application_id=$1 AND application_user_id=$2 AND id=$3
+               AND user_status='active' AND deleted_at IS NULL`,
+          [...scopeValues(scope), itemId],
+        )
+      ).rows[0];
+      if (!row) throw itemNotFound();
+      return row.source_text as string;
+    });
+    return { image: (await this.imageProvider?.find(query)) ?? null };
   }
   async sessions(scope: ProfileScope, limit: number, cursor?: string) {
     return withTransaction(

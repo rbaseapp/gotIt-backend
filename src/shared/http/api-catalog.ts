@@ -24,6 +24,8 @@ export const API_ROUTES = [
   ['GET', '/practice/sessions'],
   ['POST', '/practice/sessions'],
   ['GET', '/practice/sessions/:id'],
+  ['GET', '/practice/sessions/:id/study'],
+  ['GET', '/practice/sessions/:id/study/:itemId/image'],
   ['PATCH', '/practice/sessions/:id'],
   ['POST', '/practice/sessions/:id/exercises'],
   ['POST', '/practice/attempts'],
