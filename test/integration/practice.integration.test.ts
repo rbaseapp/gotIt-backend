@@ -57,6 +57,10 @@ test(
           return {
             data: studyImageData,
             contentType: 'image/webp',
+            kind: 'generated',
+            provider: 'Integration AI',
+            sourceUrl: null,
+            creator: null,
           };
         },
       });
@@ -229,6 +233,8 @@ test(
           const firstImage = await call('get', imagePath).expect(200);
           const cachedImage = await call('get', imagePath).expect(200);
           assert.match(firstImage.body.image.url, /^data:image\/webp;base64,/u);
+          assert.equal(firstImage.body.image.generated, true);
+          assert.equal(firstImage.body.image.provider, 'Integration AI');
           assert.deepEqual(cachedImage.body.image, firstImage.body.image);
           assert.equal(studyImageGenerations, 1);
           await call(

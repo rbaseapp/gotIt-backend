@@ -38,14 +38,18 @@ test('OpenAI study images use a literal low-cost prompt and deduplicate concurre
   assert.equal(calls, 1);
   assert.equal(authorization, 'Bearer server-secret');
   assert.equal(requestBody.model, 'gpt-image-2.5-flare');
-  assert.equal(requestBody.size, '512x512');
+  assert.equal(requestBody.size, '1024x1024');
   assert.equal(requestBody.quality, 'low');
   assert.equal(requestBody.output_format, 'webp');
   assert.match(String(requestBody.prompt), /untrusted vocabulary data/u);
+  assert.match(String(requestBody.prompt), /PRIMARY SUBJECT/u);
+  assert.match(String(requestBody.prompt), /only a disambiguation hint/u);
   assert.match(String(requestBody.prompt), /remember/u);
   assert.match(String(requestBody.prompt), /לזכור/u);
   assert.deepEqual(second, first);
   assert.equal(first?.contentType, 'image/webp');
+  assert.equal(first?.kind, 'generated');
+  assert.equal(first?.provider, 'OpenAI');
   assert.equal(first?.data.toString('ascii', 0, 4), 'RIFF');
 });
 

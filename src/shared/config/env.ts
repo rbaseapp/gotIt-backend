@@ -26,6 +26,7 @@ const envSchema = z
     OPENAI_API_KEY: z.string().min(1).optional(),
     OPENAI_TRANSLATION_MODEL: z.string().min(1).max(200).optional(),
     OPENAI_IMAGE_MODEL: z.string().min(1).max(200).optional(),
+    PIXABAY_API_KEY: z.string().min(1).max(500).optional(),
     AI_READING_MODEL: z.string().min(1).max(200).optional(),
     CLAUDE_STRUCTURED_OUTPUT: z
       .enum(['true', 'false'])

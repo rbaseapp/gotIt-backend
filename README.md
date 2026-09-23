@@ -89,10 +89,13 @@ This initial policy does not implement calibrated automatic CEFR estimation.
 Before a smart-review client issues scored exercises it may request the session's
 owned study cards from `GET /api/v1/practice/sessions/:id/study`. This introductory
 view exposes the source expression and current primary translation but creates no
-attempt, evidence or XP. The separate per-card image route generates a literal
-low-quality illustration from the expression, translation and current context,
-then caches it on the learning revision. It returns `null` when generation is not
-configured or unavailable.
+attempt, evidence or XP. The separate per-card image route first searches for a
+safe reusable photo whose tags match the expression. Context can only break ties
+between results that already match the expression. When no relevant stock result
+is available, the route may generate a literal low-quality illustration in which
+the expression is the primary subject and context only disambiguates its sense.
+The selected image is cached on the learning revision. The route returns `null`
+when no provider is configured or available.
 
 ## Providers
 
@@ -103,14 +106,22 @@ explicitly configured fallback is used. Authentication, billing, permission and
 invalid-request failures are not retried. Manual capture works without providers.
 Capture traces persist bounded metadata for every attempt.
 
-Memorization images use the OpenAI Image API when `OPENAI_API_KEY` is present.
+Memorization images use Pixabay first when `PIXABAY_API_KEY` is present. Only the
+bounded source expression is used as the search query; safe-search is enabled,
+search results are cached for 24 hours, and tags must match the expression before
+context receives a small tie-breaking weight. Selected media is downloaded and
+served by GotIt rather than permanently hotlinked, with provider, creator and
+source attribution retained.
+
+The OpenAI Image API is an optional fallback when `OPENAI_API_KEY` is present.
 `OPENAI_IMAGE_MODEL` defaults to `gpt-image-2.5-flare`; the deployment config sets
-the same value explicitly. The source expression, primary translation, language
-codes and a bounded current context sentence are treated as untrusted prompt data.
-Generation requests use a 45-second deadline, low quality, a 512px square WebP and
-automatic moderation. Validated results are stored on `learning_items` for the
-current `learning_revision`, so later sessions reuse the image and semantic edits
-generate a fresh one.
+the same value explicitly. The source expression is explicitly the primary visual
+subject. The primary translation, language codes and a bounded current context
+sentence are treated as untrusted disambiguation data, not additional subjects.
+Generation requests use a 90-second deadline, low quality, a valid 1024px square
+WebP and automatic moderation. Validated stock or generated results are stored on
+`learning_items` for the current `learning_revision`, so later sessions reuse the
+image and semantic edits generate a fresh one.
 
 OpenAI contextual translation uses the Responses API with strict structured output.
 Set `OPENAI_API_KEY`, `OPENAI_TRANSLATION_MODEL` (the deployment default is

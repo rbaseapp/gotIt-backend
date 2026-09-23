@@ -31,28 +31,44 @@ import {
 } from '../learning/learning.policy.js';
 import { scoreAnswer, type AnswerSpec } from './practice.scoring.js';
 import type { SessionInput, ExercisesInput, AttemptInput } from './practice.validation.js';
-import type { StudyImageProvider } from './openai-study-image.provider.js';
+import type { GeneratedStudyImage, StudyImageProvider } from './study-image.provider.js';
 const missingSession = () => new AppError(404, 'NOT_FOUND', 'Practice session not found');
 type DbItem = Record<string, any>;
 type ExerciseType = 'flashcards' | 'recall' | 'listening_spelling' | 'matching' | 'pronunciation';
+
+function isHttpsUrl(value: unknown) {
+  try {
+    return typeof value === 'string' && new URL(value).protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
 
 function studyImageDto(
   data: Buffer,
   contentType: string,
   sourceText: string,
   translationText: string,
+  metadata: Pick<GeneratedStudyImage, 'kind' | 'provider' | 'sourceUrl' | 'creator'>,
 ) {
   if (
     !Buffer.isBuffer(data) ||
     !data.length ||
     data.length > 3_000_000 ||
-    contentType !== 'image/webp'
+    !['image/jpeg', 'image/png', 'image/webp'].includes(contentType) ||
+    !['generated', 'stock'].includes(metadata.kind) ||
+    typeof metadata.provider !== 'string' ||
+    !metadata.provider.length ||
+    (metadata.kind === 'stock' && !isHttpsUrl(metadata.sourceUrl))
   )
     return null;
   return {
     url: `data:${contentType};base64,${data.toString('base64')}`,
-    alt: `איור עבור ${sourceText} — ${translationText}`,
-    generated: true as const,
+    alt: `תמונה עבור ${sourceText} — ${translationText}`,
+    generated: metadata.kind === 'generated',
+    provider: metadata.provider,
+    sourceUrl: metadata.sourceUrl,
+    creator: metadata.creator,
   };
 }
 
@@ -359,6 +375,8 @@ export class PracticeService {
           `SELECT li.source_text,li.source_language_code,li.translation_language_code,
              li.learning_revision,li.study_image_data,li.study_image_content_type,
              li.study_image_model,li.study_image_revision,
+             li.study_image_kind,li.study_image_provider,li.study_image_source_url,
+             li.study_image_creator,
              (SELECT translation_text FROM product_gotit.item_translations t
                WHERE t.application_id=li.application_id AND t.application_user_id=li.application_user_id
                  AND t.learning_item_id=li.id AND t.is_current
@@ -377,20 +395,26 @@ export class PracticeService {
         throw new AppError(409, 'ITEM_INCOMPLETE', 'Study item is unavailable or incomplete');
       return row;
     });
-    if (
-      this.imageProvider &&
-      item.study_image_model === this.imageProvider.id &&
+    const cachedImage =
       item.study_image_revision === item.learning_revision
-    )
+        ? studyImageDto(
+            item.study_image_data,
+            item.study_image_content_type,
+            item.source_text,
+            item.translation_text,
+            {
+              kind: item.study_image_kind,
+              provider: item.study_image_provider,
+              sourceUrl: item.study_image_source_url,
+              creator: item.study_image_creator,
+            },
+          )
+        : null;
+    if (cachedImage && item.study_image_model === this.imageProvider?.id)
       return {
-        image: studyImageDto(
-          item.study_image_data,
-          item.study_image_content_type,
-          item.source_text,
-          item.translation_text,
-        ),
+        image: cachedImage,
       };
-    if (!this.imageProvider) return { image: null };
+    if (!this.imageProvider) return { image: cachedImage };
     const generated = await this.imageProvider.generate({
       sourceText: item.source_text,
       translationText: item.translation_text,
@@ -398,12 +422,13 @@ export class PracticeService {
       translationLanguageCode: item.translation_language_code,
       context: item.context,
     });
-    if (!generated) return { image: null };
+    if (!generated) return { image: cachedImage };
     const stored = await withTransaction(this.pool, async (tx) => {
       const result = await tx.query(
         `UPDATE product_gotit.learning_items
          SET study_image_data=$4,study_image_content_type=$5,study_image_model=$6,
-             study_image_revision=learning_revision
+             study_image_revision=learning_revision,study_image_kind=$8,
+             study_image_provider=$9,study_image_source_url=$10,study_image_creator=$11
          WHERE application_id=$1 AND application_user_id=$2 AND id=$3
            AND learning_revision=$7 AND user_status='active' AND deleted_at IS NULL`,
         [
@@ -413,6 +438,10 @@ export class PracticeService {
           generated.contentType,
           this.imageProvider!.id,
           item.learning_revision,
+          generated.kind,
+          generated.provider,
+          generated.sourceUrl,
+          generated.creator,
         ],
       );
       return result.rowCount === 1;
@@ -424,6 +453,7 @@ export class PracticeService {
             generated.contentType,
             item.source_text,
             item.translation_text,
+            generated,
           )
         : null,
     };

@@ -23,6 +23,8 @@ import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { GoogleAuth } from 'google-auth-library';
 import { OpenAiStudyImageProvider } from './modules/practice/openai-study-image.provider.js';
+import { PixabayStudyImageProvider } from './modules/practice/pixabay-study-image.provider.js';
+import { FallbackStudyImageProvider } from './modules/practice/study-image.provider.js';
 
 const logger = createLogger(env.LOG_LEVEL);
 const pool = createPool(env.DATABASE_URL);
@@ -56,18 +58,24 @@ const captureService = new CaptureService(
   enrichment.registry,
   enrichment.proofs,
 );
+const studyImageProviders = [
+  ...(env.PIXABAY_API_KEY ? [new PixabayStudyImageProvider(env.PIXABAY_API_KEY, fetch)] : []),
+  ...(env.OPENAI_API_KEY
+    ? [
+        new OpenAiStudyImageProvider(
+          env.OPENAI_API_KEY,
+          env.OPENAI_IMAGE_MODEL ?? 'gpt-image-2.5-flare',
+          fetch,
+        ),
+      ]
+    : []),
+];
 const practiceService: PracticeService = new PracticeService(
   pool,
   profileService,
   learningPolicy,
   (...args): boolean => speechService.supports(...args),
-  env.OPENAI_API_KEY
-    ? new OpenAiStudyImageProvider(
-        env.OPENAI_API_KEY,
-        env.OPENAI_IMAGE_MODEL ?? 'gpt-image-2.5-flare',
-        fetch,
-      )
-    : undefined,
+  studyImageProviders.length ? new FallbackStudyImageProvider(studyImageProviders) : undefined,
 );
 const googleSpeechAccessToken =
   env.GOOGLE_SERVICE_ACCOUNT_JSON || env.GOOGLE_APPLICATION_CREDENTIALS
