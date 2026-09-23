@@ -26,7 +26,7 @@ export const sessionSchema = z
     learningItemIds: itemIds.optional(),
     readingId: uuidSchema.optional(),
     scope: sessionScopeSchema.optional(),
-    count: z.number().int().min(1).max(20).default(10),
+    count: z.number().int().min(1).max(100).default(10),
   })
   .strict()
   .superRefine((v, ctx) => {
@@ -41,7 +41,7 @@ export const sessionSchema = z
 export const closeSessionSchema = z.object({ status: z.enum(['completed', 'abandoned']) }).strict();
 export const exercisesSchema = z
   .object({
-    count: z.number().int().min(1).max(20).default(5),
+    count: z.number().int().min(1).max(100).default(5),
     exerciseType: z
       .enum([
         'flashcards',

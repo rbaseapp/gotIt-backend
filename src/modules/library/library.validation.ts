@@ -18,6 +18,18 @@ export const listSchema = z
     highPriority: z.enum(['true', 'false']).optional(),
     due: z.enum(['true', 'false']).optional(),
     tagId: uuidSchema.optional(),
+    packIds: z
+      .string()
+      .max(3700)
+      .transform((value) => value.split(',').filter(Boolean))
+      .pipe(
+        z
+          .array(uuidSchema)
+          .min(1)
+          .max(100)
+          .refine((ids) => new Set(ids).size === ids.length, 'Duplicate packs'),
+      )
+      .optional(),
     sort: z
       .enum(['recent', 'alphabetical', 'weakest', 'strongest', 'due_next', 'most_practiced'])
       .default('recent'),

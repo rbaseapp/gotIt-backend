@@ -3,7 +3,7 @@ import { withTransaction, type DatabaseTransaction } from '../../shared/database
 import { AppError } from '../../shared/errors/app-error.js';
 import { scopeValues } from '../library/library.repository.js';
 import type { ProfileScope } from '../profile/profile.types.js';
-import type { RemovalInput } from './word-packs.validation.js';
+import type { AddInput, RemovalInput } from './word-packs.validation.js';
 
 type Row = Record<string, any>;
 
@@ -113,7 +113,7 @@ export class WordPackRepository {
     );
   }
 
-  async add(scope: ProfileScope, id: string) {
+  async add(scope: ProfileScope, id: string, input: AddInput) {
     return withTransaction(this.pool, async (tx) => {
       await tx.lock(['word-pack', ...scopeValues(scope), id]);
       const pack = (
@@ -147,11 +147,21 @@ export class WordPackRepository {
           [id],
         )
       ).rows;
+      const selected = new Set(input.entryIds);
+      if (entries.filter((entry) => selected.has(entry.id)).length !== selected.size)
+        throw new AppError(400, 'VALIDATION_ERROR', 'A selected word is not part of this pack');
+      await tx.query(
+        `UPDATE product_gotit.learning_item_pack_entries
+        SET excluded_at=CASE WHEN entry_id=ANY($4::uuid[]) THEN NULL ELSE COALESCE(excluded_at,now()) END,
+            updated_at=now()
+        WHERE application_id=$1 AND application_user_id=$2 AND pack_id=$3`,
+        [...scopeValues(scope), id, input.entryIds],
+      );
       let added = 0,
         linkedExisting = 0,
         restored = 0,
-        excluded = 0;
-      for (const entry of entries) {
+        excluded = entries.length - selected.size;
+      for (const entry of entries.filter((candidate) => selected.has(candidate.id))) {
         const prior = (
           await tx.query(
             `SELECT link.learning_item_id,link.excluded_at,li.user_status,li.deleted_at
@@ -163,14 +173,18 @@ export class WordPackRepository {
             [...scopeValues(scope), id, entry.id],
           )
         ).rows[0];
-        if (prior?.excluded_at || prior?.deleted_at) {
-          excluded++;
-          continue;
-        }
         if (prior) {
-          if (prior.user_status !== 'active') {
+          if (prior.excluded_at)
             await tx.query(
-              `UPDATE product_gotit.learning_items SET user_status='active',updated_at=now()
+              `UPDATE product_gotit.learning_item_pack_entries
+              SET excluded_at=NULL,updated_at=now()
+              WHERE application_id=$1 AND application_user_id=$2 AND pack_id=$3 AND entry_id=$4`,
+              [...scopeValues(scope), id, entry.id],
+            );
+          if (prior.user_status !== 'active' || prior.deleted_at) {
+            await tx.query(
+              `UPDATE product_gotit.learning_items
+              SET user_status='active',deleted_at=NULL,updated_at=now()
               WHERE application_id=$1 AND application_user_id=$2 AND id=$3`,
               [...scopeValues(scope), prior.learning_item_id],
             );

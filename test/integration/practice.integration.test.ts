@@ -147,9 +147,11 @@ test(
         ids.push(captured.body.capture.learningItemId);
       }
       await t.test(
-        'word packs add once, scope a smart session, and archive only pack words',
+        'word packs preview selective additions, filter the library, and scope every selected word',
         async () => {
-          const catalog = await call('get', '/word-packs').expect(200);
+          const packCall = (method: Parameters<typeof call>[0], url: string, body?: object) =>
+            call(method, url, body, randomUUID(), 1);
+          const catalog = await packCall('get', '/word-packs').expect(200);
           assert.equal(catalog.body.packs.length, 3);
           const pack = catalog.body.packs.find(
             (candidate: { slug: string }) => candidate.slug === 'business-beginner-1-en-he',
@@ -158,43 +160,58 @@ test(
           assert.equal(pack.wordCount, 12);
           assert.equal(pack.installed, false);
 
-          const added = await call('post', `/word-packs/${pack.id}/add`).expect(201);
-          assert.equal(added.body.added, 12);
+          const detail = await packCall('get', `/word-packs/${pack.id}`).expect(200);
+          assert.equal(detail.body.entries.length, 12);
+          const selectedEntries = detail.body.entries.slice(0, 11);
+          const added = await packCall('post', `/word-packs/${pack.id}/add`, {
+            entryIds: selectedEntries.map((entry: { id: string }) => entry.id),
+          }).expect(201);
+          assert.equal(added.body.added, 11);
+          assert.equal(added.body.excluded, 1);
           assert.equal(added.body.total, 12);
-          const listed = await call('get', '/word-packs').expect(200);
+          const listed = await packCall('get', '/word-packs').expect(200);
           const installed = listed.body.packs.find(
             (candidate: { id: string }) => candidate.id === pack.id,
           );
           assert.equal(installed.installed, true);
-          assert.equal(installed.progress.linked, 12);
+          assert.equal(installed.progress.linked, 11);
+          const packLibrary = await packCall(
+            'get',
+            `/learning-items?packIds=${pack.id}&limit=100`,
+          ).expect(200);
+          assert.equal(packLibrary.body.items.length, 11);
 
-          const scoped = await call('post', '/practice/sessions', {
+          const scoped = await packCall('post', '/practice/sessions', {
             sessionType: 'smart_review',
             count: 5,
             scope: { type: 'pack', id: pack.id },
           }).expect(201);
-          assert.equal(scoped.body.session.itemCount, 5);
+          assert.equal(scoped.body.session.itemCount, 11);
           assert.deepEqual(scoped.body.session.scope, {
             type: 'pack',
             id: pack.id,
             title: pack.title,
           });
 
-          const removed = await call(
+          const removed = await packCall(
             'delete',
             `/word-packs/${pack.id}?mode=archive_exclusive`,
           ).expect(200);
-          assert.equal(removed.body.archived, 12);
-          const activeSnapshot = await call(
+          assert.equal(removed.body.archived, 11);
+          const activeSnapshot = await packCall(
             'get',
             `/practice/sessions/${scoped.body.session.id}/study`,
           ).expect(200);
-          assert.equal(activeSnapshot.body.cards.length, 5);
-          await call('post', '/practice/sessions', {
+          assert.equal(activeSnapshot.body.cards.length, 11);
+          await packCall('post', '/practice/sessions', {
             sessionType: 'smart_review',
             count: 5,
             scope: { type: 'pack', id: pack.id },
           }).expect(409);
+          await packCall('post', '/learning-items/bulk', {
+            ids: packLibrary.body.items.map((item: { id: string }) => item.id),
+            action: 'delete',
+          }).expect(200);
         },
       );
       let sessionId: string, exerciseId: string;

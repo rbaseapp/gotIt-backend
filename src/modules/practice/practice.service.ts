@@ -353,9 +353,7 @@ export class PracticeService {
       if (input.scope) {
         const resolved = await this.resolveSessionScope(tx, scope, input.scope);
         scopeSnapshot = resolved.snapshot;
-        ids = (await this.queueRows(tx, scope, profile, input.count, resolved.ids)).map(
-          (row) => row.id,
-        );
+        ids = resolved.ids;
       }
       if (!ids) ids = (await this.queueRows(tx, scope, profile, input.count)).map((r) => r.id);
       if (!ids.length) throw new AppError(409, 'NO_ELIGIBLE_ITEMS', 'No eligible learning items');

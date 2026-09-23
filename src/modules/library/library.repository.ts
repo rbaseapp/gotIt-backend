@@ -153,6 +153,19 @@ export class LibraryRepository {
             `EXISTS(SELECT 1 FROM product_gotit.learning_item_tags it WHERE it.application_id=li.application_id AND it.application_user_id=li.application_user_id AND it.learning_item_id=li.id AND it.tag_id=?)`,
             input.tagId,
           );
+        if (input.packIds)
+          add(
+            `EXISTS(SELECT 1 FROM product_gotit.learning_item_pack_entries pack_link
+              JOIN product_gotit.user_word_packs membership
+                ON membership.application_id=pack_link.application_id
+                AND membership.application_user_id=pack_link.application_user_id
+                AND membership.pack_id=pack_link.pack_id AND membership.status='active'
+              WHERE pack_link.application_id=li.application_id
+                AND pack_link.application_user_id=li.application_user_id
+                AND pack_link.learning_item_id=li.id AND pack_link.excluded_at IS NULL
+                AND pack_link.pack_id=ANY(?::uuid[]))`,
+            input.packIds,
+          );
         const sorts = {
           recent: ['li.created_at', 'DESC', 'timestamptz'],
           alphabetical: ['li.normalized_source_text', 'ASC', 'text'],
