@@ -32,6 +32,20 @@ import { scoreAnswer, type AnswerSpec } from './practice.scoring.js';
 import type { SessionInput, ExercisesInput, AttemptInput } from './practice.validation.js';
 const missingSession = () => new AppError(404, 'NOT_FOUND', 'Practice session not found');
 type DbItem = Record<string, any>;
+type ExerciseType = 'flashcards' | 'recall' | 'listening_spelling' | 'matching' | 'pronunciation';
+
+export function smartLearningSequence(skills: Skill[], matchingAvailable = true): ExerciseType[] {
+  return [
+    ...(matchingAvailable && skills.includes('recognition') ? (['matching'] as const) : []),
+    ...(skills.includes('recognition') ? (['flashcards'] as const) : []),
+    ...(skills.includes('pronunciation') ? (['pronunciation'] as const) : []),
+    ...(skills.includes('listening') && skills.includes('spelling')
+      ? (['listening_spelling'] as const)
+      : []),
+    ...(skills.includes('recall') ? (['recall'] as const) : []),
+  ];
+}
+
 export class PracticeService {
   readonly version: string;
   constructor(
@@ -456,6 +470,15 @@ export class PracticeService {
               activeRecall.scores,
               activeRecall.successful_days,
             ).masteryScore,
+            available = this.availableSkills(profile, row.source_language_code),
+            distinctMeanings = new Set(
+              rows
+                .map((candidate) => candidate.translations[0] as string | undefined)
+                .filter((translation): translation is string => Boolean(translation))
+                .map(lookupText),
+            ).size,
+            learningSequence = smartLearningSequence(available, distinctMeanings >= 2),
+            introductoryType = learningSequence[totalScoredAttempts],
             hasMasteryGap =
               row.learning_status !== 'mastered' &&
               (totalScoredAttempts < this.policy.minimumScoredAttempts ||
@@ -464,27 +487,28 @@ export class PracticeService {
                 recallMastery < this.policy.masteryThreshold ||
                 row.review_stage < LEARNED_REVIEW_STAGE);
           // A qualifying recall can advance maturity at most once per profile-calendar day.
-          // Prefer it over optional weak skills only when it can make progress now.
-          masteryGateRecall = hasMasteryGap && !activeRecall.successful_today;
-          const weakest = (
-            await tx.query(
-              'SELECT skill_type FROM product_gotit.item_skill_progress WHERE application_id=$1 AND application_user_id=$2 AND learning_item_id=$3 AND skill_type=ANY($4::text[]) ORDER BY mastery_score,attempt_count,skill_type LIMIT 1',
-              [
-                ...scopeValues(scope),
-                row.id,
-                this.availableSkills(profile, row.source_language_code),
-              ],
-            )
-          ).rows[0]?.skill_type;
-          type = masteryGateRecall
-            ? 'recall'
-            : weakest === 'recognition'
-              ? 'flashcards'
-              : weakest === 'listening'
-                ? 'listening_spelling'
-                : weakest === 'pronunciation'
-                  ? 'pronunciation'
-                  : 'recall';
+          // Introduce a word gradually before asking for active recall. Once the
+          // introduction is complete, prefer a qualifying recall over optional
+          // weak skills only when it can make progress now.
+          if (introductoryType) type = introductoryType;
+          else {
+            masteryGateRecall = hasMasteryGap && !activeRecall.successful_today;
+            const weakest = (
+              await tx.query(
+                'SELECT skill_type FROM product_gotit.item_skill_progress WHERE application_id=$1 AND application_user_id=$2 AND learning_item_id=$3 AND skill_type=ANY($4::text[]) ORDER BY mastery_score,attempt_count,skill_type LIMIT 1',
+                [...scopeValues(scope), row.id, available],
+              )
+            ).rows[0]?.skill_type;
+            type = masteryGateRecall
+              ? 'recall'
+              : weakest === 'recognition'
+                ? 'flashcards'
+                : weakest === 'listening'
+                  ? 'listening_spelling'
+                  : weakest === 'pronunciation'
+                    ? 'pronunciation'
+                    : 'recall';
+          }
         }
         if (
           session.session_type !== 'smart_review' &&
@@ -492,14 +516,17 @@ export class PracticeService {
           type !== session.session_type
         )
           throw new AppError(400, 'VALIDATION_ERROR', 'Exercise type does not match session');
-        const reverse = masteryGateRecall
-          ? true
-          : type === 'pronunciation'
-            ? false
-            : type === 'listening_spelling'
+        const reverse =
+          session.session_type === 'smart_review'
+            ? type === 'recall' || type === 'listening_spelling'
+            : masteryGateRecall
               ? true
-              : input.direction === 'translation_to_source' ||
-                (input.direction === undefined && type !== 'flashcards' && type !== 'matching');
+              : type === 'pronunciation'
+                ? false
+                : type === 'listening_spelling'
+                  ? true
+                  : input.direction === 'translation_to_source' ||
+                    (input.direction === undefined && type !== 'flashcards' && type !== 'matching');
         const direction = reverse ? 'translation_to_source' : 'source_to_translation';
         const accepted =
           type === 'pronunciation' ? [row.source_text] : reverse ? [row.source_text] : translations;

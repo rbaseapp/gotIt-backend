@@ -1,7 +1,29 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { PracticeService } from '../src/modules/practice/practice.service.js';
+import {
+  PracticeService,
+  smartLearningSequence,
+} from '../src/modules/practice/practice.service.js';
+
+test('smart learning introduces words from recognition to active recall', () => {
+  assert.deepEqual(
+    smartLearningSequence(['recognition', 'recall', 'listening', 'spelling', 'pronunciation']),
+    ['matching', 'flashcards', 'pronunciation', 'listening_spelling', 'recall'],
+  );
+});
+
+test('smart learning skips unavailable activities without starting with recall', () => {
+  assert.deepEqual(smartLearningSequence(['recognition', 'recall', 'spelling']), [
+    'matching',
+    'flashcards',
+    'recall',
+  ]);
+  assert.deepEqual(smartLearningSequence(['recognition', 'recall'], false), [
+    'flashcards',
+    'recall',
+  ]);
+});
 
 test('speech skills are enabled by default and remain gated by provider support', () => {
   const profiles = { async getProfile() {} };
