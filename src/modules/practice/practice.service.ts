@@ -30,7 +30,12 @@ import {
   type Skill,
 } from '../learning/learning.policy.js';
 import { scoreAnswer, type AnswerSpec } from './practice.scoring.js';
-import type { SessionInput, ExercisesInput, AttemptInput } from './practice.validation.js';
+import type {
+  SessionInput,
+  SessionScope,
+  ExercisesInput,
+  AttemptInput,
+} from './practice.validation.js';
 import type { GeneratedStudyImage, StudyImageProvider } from './study-image.provider.js';
 const missingSession = () => new AppError(404, 'NOT_FOUND', 'Practice session not found');
 type DbItem = Record<string, any>;
@@ -142,6 +147,7 @@ export class PracticeService {
     scope: ProfileScope,
     profile: GotItProfile,
     count: number,
+    eligibleIds?: string[],
   ) {
     return (
       await tx.query(
@@ -181,7 +187,9 @@ export class PracticeService {
                  WHERE effect.practice_attempt_id=successful.id AND effect.skill_type='recall'))<$7)
          THEN 120 ELSE 0 END) queue_score,
       row_number() OVER(PARTITION BY learning_status ORDER BY created_at,id) new_rank
-      FROM product_gotit.learning_items li WHERE application_id=$1 AND application_user_id=$2 AND user_status='active' AND deleted_at IS NULL)
+      FROM product_gotit.learning_items li WHERE application_id=$1 AND application_user_id=$2
+        AND user_status='active' AND deleted_at IS NULL
+        AND ($10::uuid[] IS NULL OR li.id=ANY($10::uuid[])))
       SELECT * FROM candidates WHERE primary_translation IS NOT NULL AND
       (learning_status<>'new' OR new_rank<=GREATEST(0,$3-(SELECT count(DISTINCT a.learning_item_id) FROM product_gotit.practice_attempts a
        JOIN product_gotit.learning_items i ON i.application_id=a.application_id AND i.application_user_id=a.application_user_id AND i.id=a.learning_item_id
@@ -196,11 +204,71 @@ export class PracticeService {
           this.policy.minimumActiveRecallCalendarDays,
           this.policy.masteryThreshold,
           count,
+          eligibleIds ?? null,
         ],
       )
     ).rows;
   }
+  private async resolveSessionScope(
+    tx: DatabaseTransaction,
+    scope: ProfileScope,
+    selection: SessionScope,
+  ) {
+    const definitions = {
+      pack: {
+        sql: `SELECT p.id,p.title FROM product_gotit.word_packs p
+          JOIN product_gotit.user_word_packs up ON up.pack_id=p.id
+            AND up.application_id=$1 AND up.application_user_id=$2 AND up.status='active'
+          WHERE p.id=$3 AND p.is_active`,
+        predicate: 'p.id=$3',
+      },
+      track: {
+        sql: `SELECT tr.id,tr.title FROM product_gotit.word_tracks tr
+          WHERE tr.id=$3 AND tr.is_active AND EXISTS(SELECT 1 FROM product_gotit.word_packs installed
+            JOIN product_gotit.user_word_packs up ON up.pack_id=installed.id
+              AND up.application_id=$1 AND up.application_user_id=$2 AND up.status='active'
+            WHERE installed.track_id=tr.id)`,
+        predicate: 'p.track_id=$3',
+      },
+      topic: {
+        sql: `SELECT tp.id,tp.title FROM product_gotit.word_topics tp
+          WHERE tp.id=$3 AND tp.is_active AND EXISTS(SELECT 1 FROM product_gotit.word_tracks tr
+            JOIN product_gotit.word_packs installed ON installed.track_id=tr.id
+            JOIN product_gotit.user_word_packs up ON up.pack_id=installed.id
+              AND up.application_id=$1 AND up.application_user_id=$2 AND up.status='active'
+            WHERE tr.topic_id=tp.id)`,
+        predicate: 'tr.topic_id=$3',
+      },
+    } as const;
+    const definition = definitions[selection.type];
+    const descriptor = (await tx.query(definition.sql, [...scopeValues(scope), selection.id]))
+      .rows[0];
+    if (!descriptor)
+      throw new AppError(
+        409,
+        'WORD_PACK_NOT_ADDED',
+        'Add this word pack before starting a session',
+      );
+    const ids = (
+      await tx.query(
+        `SELECT DISTINCT link.learning_item_id
+        FROM product_gotit.learning_item_pack_entries link
+        JOIN product_gotit.user_word_packs up ON up.application_id=link.application_id
+          AND up.application_user_id=link.application_user_id AND up.pack_id=link.pack_id AND up.status='active'
+        JOIN product_gotit.word_packs p ON p.id=link.pack_id AND p.is_active
+        JOIN product_gotit.word_tracks tr ON tr.id=p.track_id AND tr.is_active
+        WHERE link.application_id=$1 AND link.application_user_id=$2 AND link.excluded_at IS NULL
+          AND ${definition.predicate}`,
+        [...scopeValues(scope), selection.id],
+      )
+    ).rows.map((row) => row.learning_item_id as string);
+    return {
+      ids,
+      snapshot: { type: selection.type, id: selection.id, title: descriptor.title as string },
+    };
+  }
   private sessionDto(row: DbItem) {
+    const selection = row.selection ?? {};
     return {
       id: row.id,
       sessionType: row.session_type,
@@ -213,6 +281,7 @@ export class PracticeService {
       correctCount: row.correct_count,
       xpEarned: row.xp_earned,
       algorithmVersion: row.algorithm_version,
+      scope: selection.scope ?? null,
     };
   }
   private async session(tx: DatabaseTransaction, scope: ProfileScope, id: string) {
@@ -245,6 +314,7 @@ export class PracticeService {
         return { session: parsed.data.data, replayed: true };
       }
       let ids = input.learningItemIds;
+      let scopeSnapshot: { type: string; id: string; title: string } | null = null;
       if (input.readingId) {
         const content = await tx.query(
           'SELECT id FROM product_gotit.generated_contents WHERE application_id=$1 AND application_user_id=$2 AND id=$3 AND deleted_at IS NULL AND opened_at IS NOT NULL',
@@ -259,6 +329,13 @@ export class PracticeService {
         ).rows.map((r) => r.learning_item_id as string);
         if (ids && ids.some((id) => !targets.includes(id))) throw itemNotFound();
         ids = ids ?? targets;
+      }
+      if (input.scope) {
+        const resolved = await this.resolveSessionScope(tx, scope, input.scope);
+        scopeSnapshot = resolved.snapshot;
+        ids = (await this.queueRows(tx, scope, profile, input.count, resolved.ids)).map(
+          (row) => row.id,
+        );
       }
       if (!ids) ids = (await this.queueRows(tx, scope, profile, input.count)).map((r) => r.id);
       if (!ids.length) throw new AppError(409, 'NO_ELIGIBLE_ITEMS', 'No eligible learning items');
@@ -295,7 +372,11 @@ export class PracticeService {
             this.version,
             key,
             hash,
-            JSON.stringify({ itemIds: ids, readingId: input.readingId ?? null }),
+            JSON.stringify({
+              itemIds: ids,
+              readingId: input.readingId ?? null,
+              scope: scopeSnapshot,
+            }),
           ],
         )
       ).rows[0]!;
@@ -336,13 +417,17 @@ export class PracticeService {
                 WHERE t.application_id=li.application_id AND t.application_user_id=li.application_user_id
                   AND t.learning_item_id=li.id AND t.is_current
                 ORDER BY t.is_primary DESC,t.id LIMIT 1) translation_text,
-              (SELECT sentence_text FROM product_gotit.item_occurrences o
+              COALESCE((SELECT sentence_text FROM product_gotit.item_occurrences o
                 WHERE o.application_id=li.application_id AND o.application_user_id=li.application_user_id
                   AND o.learning_item_id=li.id AND o.learning_revision=li.learning_revision
-                  AND o.sentence_text IS NOT NULL ORDER BY o.captured_at DESC,o.id LIMIT 1) context
+                  AND o.sentence_text IS NOT NULL ORDER BY o.captured_at DESC,o.id LIMIT 1),
+                (SELECT example_text FROM product_gotit.item_examples ex
+                  WHERE ex.application_id=li.application_id AND ex.application_user_id=li.application_user_id
+                    AND ex.learning_item_id=li.id AND ex.learning_revision=li.learning_revision
+                  ORDER BY (ex.source_kind='user') DESC,ex.created_at,ex.id LIMIT 1)) context
             FROM product_gotit.learning_items li
             WHERE li.application_id=$1 AND li.application_user_id=$2 AND li.id=ANY($3::uuid[])
-              AND li.user_status='active' AND li.deleted_at IS NULL
+              AND li.deleted_at IS NULL
             ORDER BY array_position($3::uuid[],li.id)`,
           [...scopeValues(scope), ids],
         )
@@ -381,13 +466,17 @@ export class PracticeService {
                WHERE t.application_id=li.application_id AND t.application_user_id=li.application_user_id
                  AND t.learning_item_id=li.id AND t.is_current
                ORDER BY t.is_primary DESC,t.id LIMIT 1) translation_text,
-             (SELECT sentence_text FROM product_gotit.item_occurrences o
+             COALESCE((SELECT sentence_text FROM product_gotit.item_occurrences o
                WHERE o.application_id=li.application_id AND o.application_user_id=li.application_user_id
                  AND o.learning_item_id=li.id AND o.learning_revision=li.learning_revision
-                 AND o.sentence_text IS NOT NULL ORDER BY o.captured_at DESC,o.id LIMIT 1) context
+                 AND o.sentence_text IS NOT NULL ORDER BY o.captured_at DESC,o.id LIMIT 1),
+               (SELECT example_text FROM product_gotit.item_examples ex
+                 WHERE ex.application_id=li.application_id AND ex.application_user_id=li.application_user_id
+                   AND ex.learning_item_id=li.id AND ex.learning_revision=li.learning_revision
+                 ORDER BY (ex.source_kind='user') DESC,ex.created_at,ex.id LIMIT 1)) context
            FROM product_gotit.learning_items li
            WHERE li.application_id=$1 AND li.application_user_id=$2 AND li.id=$3
-             AND li.user_status='active' AND li.deleted_at IS NULL`,
+             AND li.deleted_at IS NULL`,
           [...scopeValues(scope), itemId],
         )
       ).rows[0];
@@ -430,7 +519,7 @@ export class PracticeService {
              study_image_revision=learning_revision,study_image_kind=$8,
              study_image_provider=$9,study_image_source_url=$10,study_image_creator=$11
          WHERE application_id=$1 AND application_user_id=$2 AND id=$3
-           AND learning_revision=$7 AND user_status='active' AND deleted_at IS NULL`,
+           AND learning_revision=$7 AND deleted_at IS NULL`,
         [
           ...scopeValues(scope),
           itemId,
@@ -564,8 +653,9 @@ export class PracticeService {
       const rows = (
         await tx.query(
           `SELECT li.*,ARRAY(SELECT translation_text FROM product_gotit.item_translations t WHERE t.application_id=li.application_id AND t.application_user_id=li.application_user_id AND t.learning_item_id=li.id AND t.is_current ORDER BY is_primary DESC,id) translations,
-      (SELECT sentence_text FROM product_gotit.item_occurrences o WHERE o.application_id=li.application_id AND o.application_user_id=li.application_user_id AND o.learning_item_id=li.id AND o.learning_revision=li.learning_revision AND sentence_text IS NOT NULL ORDER BY captured_at DESC,id LIMIT 1) context
-      FROM product_gotit.learning_items li WHERE application_id=$1 AND application_user_id=$2 AND id=ANY($3::uuid[]) AND user_status='active' AND deleted_at IS NULL ORDER BY next_review_at NULLS LAST,created_at,id`,
+      COALESCE((SELECT sentence_text FROM product_gotit.item_occurrences o WHERE o.application_id=li.application_id AND o.application_user_id=li.application_user_id AND o.learning_item_id=li.id AND o.learning_revision=li.learning_revision AND sentence_text IS NOT NULL ORDER BY captured_at DESC,id LIMIT 1),
+        (SELECT example_text FROM product_gotit.item_examples ex WHERE ex.application_id=li.application_id AND ex.application_user_id=li.application_user_id AND ex.learning_item_id=li.id AND ex.learning_revision=li.learning_revision ORDER BY (ex.source_kind='user') DESC,ex.created_at,ex.id LIMIT 1)) context
+      FROM product_gotit.learning_items li WHERE application_id=$1 AND application_user_id=$2 AND id=ANY($3::uuid[]) AND deleted_at IS NULL ORDER BY next_review_at NULLS LAST,created_at,id`,
           [...scopeValues(scope), ids],
         )
       ).rows;

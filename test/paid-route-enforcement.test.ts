@@ -13,6 +13,7 @@ const identity = {
 test('expired free accounts cannot save words or start practice sessions', async () => {
   let captureCalls = 0;
   let practiceCalls = 0;
+  let wordPackCalls = 0;
   const coreAuthClient = {
     async validateAccessToken() {
       return identity;
@@ -54,6 +55,12 @@ test('expired free accounts cannot save words or start practice sessions', async
         throw new Error('must not run');
       },
     } as never,
+    wordPackService: {
+      add: async () => {
+        wordPackCalls++;
+        throw new Error('must not run');
+      },
+    } as never,
     enforcePaidEntitlements: true,
   });
 
@@ -65,11 +72,18 @@ test('expired free accounts cannot save words or start practice sessions', async
     .post('/api/v1/practice/sessions')
     .set('authorization', 'Bearer token')
     .send({});
+  const wordPack = await request(app)
+    .post('/api/v1/word-packs/30000000-0000-4000-8000-000000000001/add')
+    .set('authorization', 'Bearer token')
+    .send({});
 
   assert.equal(capture.status, 402);
   assert.equal(capture.body.error.code, 'SUBSCRIPTION_REQUIRED');
   assert.equal(practice.status, 402);
   assert.equal(practice.body.error.code, 'SUBSCRIPTION_REQUIRED');
+  assert.equal(wordPack.status, 402);
+  assert.equal(wordPack.body.error.code, 'SUBSCRIPTION_REQUIRED');
   assert.equal(captureCalls, 0);
   assert.equal(practiceCalls, 0);
+  assert.equal(wordPackCalls, 0);
 });

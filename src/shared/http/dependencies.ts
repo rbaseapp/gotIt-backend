@@ -9,6 +9,7 @@ import type { SpeechService } from '../../modules/speech/speech.service.js';
 import type { RateLimitContract } from '../middleware/rate-limit.js';
 import type { ProfileServiceContract } from '../../modules/profile/profile.types.js';
 import type { CoreAuthClient } from '../core/core-auth.client.js';
+import type { WordPackRepository } from '../../modules/word-packs/word-packs.repository.js';
 
 export type AppDependencies = {
   logger: Logger;
@@ -22,6 +23,7 @@ export type AppDependencies = {
   transferPool?: Pool;
   readingService?: ReadingService;
   speechService?: SpeechService;
+  wordPackService?: WordPackRepository;
   enforcePaidEntitlements?: boolean;
   corsOrigins?: string[];
   trustProxyHops?: number;

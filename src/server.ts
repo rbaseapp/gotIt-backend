@@ -25,6 +25,7 @@ import { GoogleAuth } from 'google-auth-library';
 import { OpenAiStudyImageProvider } from './modules/practice/openai-study-image.provider.js';
 import { PixabayStudyImageProvider } from './modules/practice/pixabay-study-image.provider.js';
 import { FallbackStudyImageProvider } from './modules/practice/study-image.provider.js';
+import { WordPackRepository } from './modules/word-packs/word-packs.repository.js';
 
 const logger = createLogger(env.LOG_LEVEL);
 const pool = createPool(env.DATABASE_URL);
@@ -140,6 +141,7 @@ const app = createApp({
     new AiMonthlyQuota(pool),
   ),
   speechService,
+  wordPackService: new WordPackRepository(pool),
   enforcePaidEntitlements: env.ENFORCE_PAID_ENTITLEMENTS,
   rateLimiter,
   corsOrigins: env.CORS_ORIGINS,

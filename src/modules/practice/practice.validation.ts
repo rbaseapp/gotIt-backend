@@ -15,18 +15,29 @@ const itemIds = z
   .min(1)
   .max(100)
   .refine((v) => new Set(v).size === v.length, 'Duplicate items');
+export const sessionScopeSchema = z.discriminatedUnion('type', [
+  z.object({ type: z.literal('pack'), id: uuidSchema }).strict(),
+  z.object({ type: z.literal('track'), id: uuidSchema }).strict(),
+  z.object({ type: z.literal('topic'), id: uuidSchema }).strict(),
+]);
 export const sessionSchema = z
   .object({
     sessionType: z.enum(sessionTypes),
     learningItemIds: itemIds.optional(),
     readingId: uuidSchema.optional(),
+    scope: sessionScopeSchema.optional(),
     count: z.number().int().min(1).max(20).default(10),
   })
   .strict()
-  .refine(
-    (v) => (v.sessionType === 'article_quiz' ? !!v.readingId : !v.readingId),
-    'Article quiz requires readingId',
-  );
+  .superRefine((v, ctx) => {
+    if ((v.sessionType === 'article_quiz') !== Boolean(v.readingId))
+      ctx.addIssue({ code: 'custom', message: 'Article quiz requires readingId' });
+    if (v.scope && (v.learningItemIds || v.readingId))
+      ctx.addIssue({
+        code: 'custom',
+        message: 'Session scope cannot be combined with explicit items',
+      });
+  });
 export const closeSessionSchema = z.object({ status: z.enum(['completed', 'abandoned']) }).strict();
 export const exercisesSchema = z
   .object({
@@ -69,5 +80,6 @@ export const attemptSchema = z
       });
   });
 export type SessionInput = z.output<typeof sessionSchema>;
+export type SessionScope = z.output<typeof sessionScopeSchema>;
 export type ExercisesInput = z.output<typeof exercisesSchema>;
 export type AttemptInput = z.output<typeof attemptSchema>;

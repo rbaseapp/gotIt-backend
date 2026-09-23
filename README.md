@@ -9,7 +9,7 @@ remain unchanged.
 
 `src/server.ts` constructs the services, `src/app.ts` creates Express and
 [src/routes.ts](src/routes.ts) mounts all module routers. The old root-level
-`app.ts` is excluded from the build. Public `GET /api/v1` lists **41 product
+`app.ts` is excluded from the build. Public `GET /api/v1` lists **48 product
 routes** from [api-catalog.ts](src/shared/http/api-catalog.ts).
 
 | Prefix under /api/v1                      | Behavior                                                                                           |
@@ -17,6 +17,7 @@ routes** from [api-catalog.ts](src/shared/http/api-catalog.ts).
 | /profile, /capabilities                   | Languages, interests, learning preferences and configured capabilities                             |
 | /captures                                 | Manual/provider preview, sense decisions, atomic save and original replay                          |
 | /learning-items, /tags                    | Filtered library, edits, bulk actions, restore, mastery, translations, contexts, examples and tags |
+| /word-packs                               | Leveled topic catalog, safe library installation/removal and pack-scoped learning                  |
 | /practice                                 | Sessions, private single-use exercises, matching and authoritative scored attempts                 |
 | /learning                                 | Smart queue and versioned learning/reward configuration                                            |
 | /dashboard, /gamification                 | Progress, daily activity, XP, levels and streaks                                                   |
@@ -40,11 +41,12 @@ The database must already contain the established 20-table product baseline and
 Core foreign-key dependencies. `npm run dev` defaults to port 3001 and refuses
 an incomplete V1 schema. Startup never runs migrations implicitly.
 
-Two GotIt-owned increments in `migrations/` use
+GotIt-owned increments in `migrations/` use
 `gotit_migrations.pgmigrations` and the shared migration advisory lock. They add
 capture/practice/reading receipts, semantic evidence revisions, learning
-preferences, `practice_exercises` and `api_rate_limits`. The resulting product
-schema has **22 tables**. The eight historical GotIt migrations in Core remain immutable.
+preferences, `practice_exercises`, `api_rate_limits`, and a versioned topic/level
+word-pack catalog. The resulting product schema has **29 tables**. The eight historical
+GotIt migrations in Core remain immutable.
 
 For existing databases, first take a backup and review baseline/normalization
 and provisioning. `scripts/provision-runtime.sql` and
@@ -211,7 +213,7 @@ conflicts were found. The verified Core URL is set in ignored local `.env` and
 `render.yaml`. Local baseline data and Core source were not changed.
 
 On 2026-09-16, `https://gotit-backend.onrender.com` returned 200 on health,
-readiness and the current 41-route API catalog. A provider-authenticated smoke
+readiness and the then-current 41-route API catalog. A provider-authenticated smoke
 test still requires a valid production session. OpenAI translation requires
 `OPENAI_API_KEY`, `OPENAI_TRANSLATION_MODEL` and `ENRICHMENT_SIGNING_SECRET`
 together, followed by a new deployment. Anthropic remains configured only for

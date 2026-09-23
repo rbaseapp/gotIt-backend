@@ -24,6 +24,7 @@ import { ProfileService } from '../../src/modules/profile/profile.service.js';
 import { CoreAuthClient } from '../../src/shared/core/core-auth.client.js';
 import { createLogger } from '../../src/shared/logger/logger.js';
 import { createTestDatabase } from '../helpers/postgres.js';
+import { WordPackRepository } from '../../src/modules/word-packs/word-packs.repository.js';
 
 test(
   'library and issued practice exercise lifecycle on product-only PostgreSQL',
@@ -111,6 +112,7 @@ test(
         transferPool: db.runtimePool,
         readingService: readings,
         speechService: new SpeechService(db.runtimePool, practices),
+        wordPackService: new WordPackRepository(db.runtimePool),
       });
       const auth = (user = 0) => `Bearer user-${user}`;
       const call = (
@@ -144,6 +146,57 @@ test(
         }).expect(201);
         ids.push(captured.body.capture.learningItemId);
       }
+      await t.test(
+        'word packs add once, scope a smart session, and archive only pack words',
+        async () => {
+          const catalog = await call('get', '/word-packs').expect(200);
+          assert.equal(catalog.body.packs.length, 3);
+          const pack = catalog.body.packs.find(
+            (candidate: { slug: string }) => candidate.slug === 'business-beginner-1-en-he',
+          );
+          assert.ok(pack);
+          assert.equal(pack.wordCount, 12);
+          assert.equal(pack.installed, false);
+
+          const added = await call('post', `/word-packs/${pack.id}/add`).expect(201);
+          assert.equal(added.body.added, 12);
+          assert.equal(added.body.total, 12);
+          const listed = await call('get', '/word-packs').expect(200);
+          const installed = listed.body.packs.find(
+            (candidate: { id: string }) => candidate.id === pack.id,
+          );
+          assert.equal(installed.installed, true);
+          assert.equal(installed.progress.linked, 12);
+
+          const scoped = await call('post', '/practice/sessions', {
+            sessionType: 'smart_review',
+            count: 5,
+            scope: { type: 'pack', id: pack.id },
+          }).expect(201);
+          assert.equal(scoped.body.session.itemCount, 5);
+          assert.deepEqual(scoped.body.session.scope, {
+            type: 'pack',
+            id: pack.id,
+            title: pack.title,
+          });
+
+          const removed = await call(
+            'delete',
+            `/word-packs/${pack.id}?mode=archive_exclusive`,
+          ).expect(200);
+          assert.equal(removed.body.archived, 12);
+          const activeSnapshot = await call(
+            'get',
+            `/practice/sessions/${scoped.body.session.id}/study`,
+          ).expect(200);
+          assert.equal(activeSnapshot.body.cards.length, 5);
+          await call('post', '/practice/sessions', {
+            sessionType: 'smart_review',
+            count: 5,
+            scope: { type: 'pack', id: pack.id },
+          }).expect(409);
+        },
+      );
       let sessionId: string, exerciseId: string;
       await t.test(
         'library search and pagination preserve filters and scope; bulk operations roll back foreign IDs',

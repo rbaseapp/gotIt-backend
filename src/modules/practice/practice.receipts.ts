@@ -19,6 +19,15 @@ export const sessionReceiptSchema = z
         correctCount: count,
         xpEarned: count,
         algorithmVersion: z.string().min(1).max(100),
+        scope: z
+          .object({
+            type: z.enum(['pack', 'track', 'topic']),
+            id: z.uuid(),
+            title: z.string().min(1).max(500),
+          })
+          .strict()
+          .nullable()
+          .optional(),
       })
       .strict(),
   })

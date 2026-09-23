@@ -44,6 +44,25 @@ export async function verifyRuntimeSchema(client, { strictRole = true } = {}) {
       'generation_count',
       'updated_at',
     ],
+    word_topics: ['id', 'slug', 'title', 'is_active'],
+    word_tracks: ['id', 'topic_id', 'level_code', 'cefr_from', 'cefr_to'],
+    word_packs: ['id', 'track_id', 'module_number', 'version', 'is_active'],
+    word_pack_entries: ['id', 'pack_id', 'source_text', 'translation_text'],
+    user_word_packs: [
+      'application_id',
+      'application_user_id',
+      'pack_id',
+      'status',
+      'installed_version',
+    ],
+    learning_item_pack_entries: [
+      'application_id',
+      'application_user_id',
+      'pack_id',
+      'entry_id',
+      'learning_item_id',
+      'excluded_at',
+    ],
   };
   const columns = (
     await client.query(
@@ -86,6 +105,25 @@ export async function verifyRuntimeSchema(client, { strictRole = true } = {}) {
     )
       throw new Error('GOTIT_EXERCISE_SCOPE_CONSTRAINT_MISSING');
   }
+  const packUserConstraint = constraints.find(
+    (constraint) => constraint.conname === 'user_word_packs_application_user_fkey',
+  );
+  if (
+    !packUserConstraint?.convalidated ||
+    !packUserConstraint.definition.includes('FOREIGN KEY (application_id, application_user_id)') ||
+    !packUserConstraint.definition.includes('REFERENCES core.application_users(application_id, id)')
+  )
+    throw new Error('GOTIT_WORD_PACK_USER_SCOPE_CONSTRAINT_MISSING');
+  const packItemConstraint = constraints.find(
+    (constraint) => constraint.conname === 'learning_item_pack_entries_learning_item_fkey',
+  );
+  if (
+    !packItemConstraint?.convalidated ||
+    !packItemConstraint.definition.includes(
+      'FOREIGN KEY (application_id, application_user_id, learning_item_id)',
+    )
+  )
+    throw new Error('GOTIT_WORD_PACK_ITEM_SCOPE_CONSTRAINT_MISSING');
   const grants = (
     await client.query(
       `SELECT c.relname,has_table_privilege(current_user,c.oid,'SELECT') AS read,has_table_privilege(current_user,c.oid,'INSERT') AS insert,has_table_privilege(current_user,c.oid,'UPDATE') AS update,has_table_privilege(current_user,c.oid,'DELETE') AS delete FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='product_gotit' AND c.relkind='r'`,
@@ -118,7 +156,7 @@ export async function verifyRuntimeSchema(client, { strictRole = true } = {}) {
     schema: 'ok',
     privileges: 'ok',
     role: strictRole ? 'product-only' : 'not-enforced',
-    operationalTables: 3,
+    operationalTables: 9,
   };
 }
 

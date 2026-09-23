@@ -19,6 +19,7 @@ import { AppError } from './shared/errors/app-error.js';
 import type { AppDependencies } from './shared/http/dependencies.js';
 import { createAuthenticateMiddleware } from './shared/middleware/authenticate.js';
 import { createRequireEntitlementMiddleware } from './shared/middleware/require-entitlement.js';
+import { createWordPackRoutes } from './modules/word-packs/word-packs.routes.js';
 
 export function createRoutes(dependencies: AppDependencies) {
   const router = Router();
@@ -110,6 +111,11 @@ export function createRoutes(dependencies: AppDependencies) {
       createTagRoutes(dependencies.libraryService, requireVocabularyWrite),
     );
   }
+  if (dependencies.wordPackService)
+    router.use(
+      '/api/v1/word-packs',
+      createWordPackRoutes(dependencies.wordPackService, requireVocabularyWrite),
+    );
   if (dependencies.practiceService) {
     router.use(
       '/api/v1/practice',
