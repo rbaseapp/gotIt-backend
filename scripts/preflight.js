@@ -9,7 +9,13 @@ export async function verifyRuntimeSchema(client, { strictRole = true } = {}) {
   const requirements = {
     item_occurrences: ['capture_request_hash', 'capture_receipt', 'learning_revision'],
     item_examples: ['learning_revision'],
-    learning_items: ['learning_revision'],
+    learning_items: [
+      'learning_revision',
+      'study_image_data',
+      'study_image_content_type',
+      'study_image_model',
+      'study_image_revision',
+    ],
     item_translations: ['is_current'],
     user_profiles: ['learning_preferences', 'default_source_language'],
     practice_sessions: ['selection', 'client_event_id', 'request_hash', 'response_receipt'],

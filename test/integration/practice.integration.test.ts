@@ -43,7 +43,23 @@ test(
           [id, applicationId, `practice-${i}@example.test`],
         );
       const profiles = new ProfileService(new ProfileRepository(db.runtimePool));
-      const practices = new PracticeService(db.runtimePool, profiles);
+      let studyImageGenerations = 0;
+      const studyImageData = Buffer.concat([
+        Buffer.from('RIFF', 'ascii'),
+        Buffer.alloc(4),
+        Buffer.from('WEBP', 'ascii'),
+        Buffer.from('integration-image'),
+      ]);
+      const practices = new PracticeService(db.runtimePool, profiles, undefined, undefined, {
+        id: 'test:study-image',
+        generate: async () => {
+          studyImageGenerations++;
+          return {
+            data: studyImageData,
+            contentType: 'image/webp',
+          };
+        },
+      });
       let generationCalls = 0,
         readingClock = Date.now();
       const readings = new ReadingService(
@@ -209,11 +225,12 @@ test(
             ],
           );
           assert.equal(study.body.cards[0].audioUrl, null);
-          assert.equal(
-            (await call('get', `/practice/sessions/${sessionId}/study/${ids[0]}/image`).expect(200))
-              .body.image,
-            null,
-          );
+          const imagePath = `/practice/sessions/${sessionId}/study/${ids[0]}/image`;
+          const firstImage = await call('get', imagePath).expect(200);
+          const cachedImage = await call('get', imagePath).expect(200);
+          assert.match(firstImage.body.image.url, /^data:image\/webp;base64,/u);
+          assert.deepEqual(cachedImage.body.image, firstImage.body.image);
+          assert.equal(studyImageGenerations, 1);
           await call(
             'get',
             `/practice/sessions/${sessionId}/study`,

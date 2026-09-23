@@ -39,7 +39,7 @@ export function createPracticeRoutes(service: PracticeService, requirePlay: Requ
     }),
   );
   router.get('/sessions/:id/study/:itemId/image', requirePlay, async (req, res) =>
-    res.set('Cache-Control', 'private, max-age=86400').json({
+    res.set('Cache-Control', 'private, no-store').json({
       ...(await service.studyImage(
         req.gotitAuth!,
         parseInput(uuidSchema, req.params.id),

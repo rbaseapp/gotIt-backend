@@ -89,8 +89,10 @@ This initial policy does not implement calibrated automatic CEFR estimation.
 Before a smart-review client issues scored exercises it may request the session's
 owned study cards from `GET /api/v1/practice/sessions/:id/study`. This introductory
 view exposes the source expression and current primary translation but creates no
-attempt, evidence or XP. The separate per-card image route performs a bounded,
-cached Openverse lookup and returns `null` when no safe result is available.
+attempt, evidence or XP. The separate per-card image route generates a literal
+low-quality illustration from the expression, translation and current context,
+then caches it on the learning revision. It returns `null` when generation is not
+configured or unavailable.
 
 ## Providers
 
@@ -101,10 +103,14 @@ explicitly configured fallback is used. Authentication, billing, permission and
 invalid-request failures are not retried. Manual capture works without providers.
 Capture traces persist bounded metadata for every attempt.
 
-Memorization images use anonymous Openverse search for commercially reusable,
-non-mature results. Only the expression being studied is sent. Returned thumbnail
-URLs are restricted to `https://api.openverse.org`; creator, license and source
-links are returned so the client can display attribution.
+Memorization images use the OpenAI Image API when `OPENAI_API_KEY` is present.
+`OPENAI_IMAGE_MODEL` defaults to `gpt-image-2.5-flare`; the deployment config sets
+the same value explicitly. The source expression, primary translation, language
+codes and a bounded current context sentence are treated as untrusted prompt data.
+Generation requests use a 45-second deadline, low quality, a 512px square WebP and
+automatic moderation. Validated results are stored on `learning_items` for the
+current `learning_revision`, so later sessions reuse the image and semantic edits
+generate a fresh one.
 
 OpenAI contextual translation uses the Responses API with strict structured output.
 Set `OPENAI_API_KEY`, `OPENAI_TRANSLATION_MODEL` (the deployment default is

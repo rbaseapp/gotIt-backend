@@ -31,10 +31,30 @@ import {
 } from '../learning/learning.policy.js';
 import { scoreAnswer, type AnswerSpec } from './practice.scoring.js';
 import type { SessionInput, ExercisesInput, AttemptInput } from './practice.validation.js';
-import type { StudyImageProvider } from './openverse-image.provider.js';
+import type { StudyImageProvider } from './openai-study-image.provider.js';
 const missingSession = () => new AppError(404, 'NOT_FOUND', 'Practice session not found');
 type DbItem = Record<string, any>;
 type ExerciseType = 'flashcards' | 'recall' | 'listening_spelling' | 'matching' | 'pronunciation';
+
+function studyImageDto(
+  data: Buffer,
+  contentType: string,
+  sourceText: string,
+  translationText: string,
+) {
+  if (
+    !Buffer.isBuffer(data) ||
+    !data.length ||
+    data.length > 3_000_000 ||
+    contentType !== 'image/webp'
+  )
+    return null;
+  return {
+    url: `data:${contentType};base64,${data.toString('base64')}`,
+    alt: `איור עבור ${sourceText} — ${translationText}`,
+    generated: true as const,
+  };
+}
 
 export function smartLearningSequence(skills: Skill[], matchingAvailable = true): ExerciseType[] {
   return [
@@ -329,23 +349,84 @@ export class PracticeService {
     });
   }
   async studyImage(scope: ProfileScope, sessionId: string, itemId: string) {
-    const query = await withTransaction(this.pool, async (tx) => {
+    const item = await withTransaction(this.pool, async (tx) => {
       const session = await this.session(tx, scope, sessionId);
       if (session.status !== 'active')
         throw new AppError(409, 'SESSION_CLOSED', 'Session is closed');
       if (!(session.selection.itemIds as string[]).includes(itemId)) throw itemNotFound();
       const row = (
         await tx.query(
-          `SELECT source_text FROM product_gotit.learning_items
-             WHERE application_id=$1 AND application_user_id=$2 AND id=$3
-               AND user_status='active' AND deleted_at IS NULL`,
+          `SELECT li.source_text,li.source_language_code,li.translation_language_code,
+             li.learning_revision,li.study_image_data,li.study_image_content_type,
+             li.study_image_model,li.study_image_revision,
+             (SELECT translation_text FROM product_gotit.item_translations t
+               WHERE t.application_id=li.application_id AND t.application_user_id=li.application_user_id
+                 AND t.learning_item_id=li.id AND t.is_current
+               ORDER BY t.is_primary DESC,t.id LIMIT 1) translation_text,
+             (SELECT sentence_text FROM product_gotit.item_occurrences o
+               WHERE o.application_id=li.application_id AND o.application_user_id=li.application_user_id
+                 AND o.learning_item_id=li.id AND o.learning_revision=li.learning_revision
+                 AND o.sentence_text IS NOT NULL ORDER BY o.captured_at DESC,o.id LIMIT 1) context
+           FROM product_gotit.learning_items li
+           WHERE li.application_id=$1 AND li.application_user_id=$2 AND li.id=$3
+             AND li.user_status='active' AND li.deleted_at IS NULL`,
           [...scopeValues(scope), itemId],
         )
       ).rows[0];
-      if (!row) throw itemNotFound();
-      return row.source_text as string;
+      if (!row || !row.translation_text)
+        throw new AppError(409, 'ITEM_INCOMPLETE', 'Study item is unavailable or incomplete');
+      return row;
     });
-    return { image: (await this.imageProvider?.find(query)) ?? null };
+    if (
+      this.imageProvider &&
+      item.study_image_model === this.imageProvider.id &&
+      item.study_image_revision === item.learning_revision
+    )
+      return {
+        image: studyImageDto(
+          item.study_image_data,
+          item.study_image_content_type,
+          item.source_text,
+          item.translation_text,
+        ),
+      };
+    if (!this.imageProvider) return { image: null };
+    const generated = await this.imageProvider.generate({
+      sourceText: item.source_text,
+      translationText: item.translation_text,
+      sourceLanguageCode: item.source_language_code,
+      translationLanguageCode: item.translation_language_code,
+      context: item.context,
+    });
+    if (!generated) return { image: null };
+    const stored = await withTransaction(this.pool, async (tx) => {
+      const result = await tx.query(
+        `UPDATE product_gotit.learning_items
+         SET study_image_data=$4,study_image_content_type=$5,study_image_model=$6,
+             study_image_revision=learning_revision
+         WHERE application_id=$1 AND application_user_id=$2 AND id=$3
+           AND learning_revision=$7 AND user_status='active' AND deleted_at IS NULL`,
+        [
+          ...scopeValues(scope),
+          itemId,
+          generated.data,
+          generated.contentType,
+          this.imageProvider!.id,
+          item.learning_revision,
+        ],
+      );
+      return result.rowCount === 1;
+    });
+    return {
+      image: stored
+        ? studyImageDto(
+            generated.data,
+            generated.contentType,
+            item.source_text,
+            item.translation_text,
+          )
+        : null,
+    };
   }
   async sessions(scope: ProfileScope, limit: number, cursor?: string) {
     return withTransaction(

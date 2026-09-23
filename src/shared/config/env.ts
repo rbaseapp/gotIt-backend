@@ -25,6 +25,7 @@ const envSchema = z
       .optional(),
     OPENAI_API_KEY: z.string().min(1).optional(),
     OPENAI_TRANSLATION_MODEL: z.string().min(1).max(200).optional(),
+    OPENAI_IMAGE_MODEL: z.string().min(1).max(200).optional(),
     AI_READING_MODEL: z.string().min(1).max(200).optional(),
     CLAUDE_STRUCTURED_OUTPUT: z
       .enum(['true', 'false'])
@@ -72,6 +73,12 @@ const envSchema = z
         code: 'custom',
         path: [v.OPENAI_API_KEY ? 'OPENAI_TRANSLATION_MODEL' : 'OPENAI_API_KEY'],
         message: 'OpenAI translation requires both an API key and a model',
+      });
+    if (v.OPENAI_IMAGE_MODEL && !v.OPENAI_API_KEY)
+      ctx.addIssue({
+        code: 'custom',
+        path: ['OPENAI_IMAGE_MODEL'],
+        message: 'OpenAI image generation requires an API key',
       });
     if (v.AI_READING_MODEL && (!v.ANTHROPIC_API_KEY || !v.ENRICHMENT_SIGNING_SECRET))
       ctx.addIssue({
