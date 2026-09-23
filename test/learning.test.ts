@@ -7,6 +7,7 @@ import {
   previousDay,
   levelForXp,
   xpAwardForDailyTotal,
+  projectOverallMastery,
 } from '../src/modules/learning/learning.policy.js';
 import { scoreAnswer, type AnswerSpec } from '../src/modules/practice/practice.scoring.js';
 import { attemptSchema } from '../src/modules/practice/practice.validation.js';
@@ -122,6 +123,36 @@ test('typed scoring normalizes Unicode, recognizes accepted variants, treats typ
   assert.equal(scoreAnswer(spec, attempt('hi')).score, 100);
   assert.equal(scoreAnswer(spec, attempt('hello', 1)).result, 'partially_correct');
   assert.throws(() => scoreAnswer(spec, attemptSchema.parse({ exerciseId, selfRating: 'easy' })));
+});
+test('overall mastery reflects attempted skills without treating untried skills as failures', () => {
+  const evidence = [
+    {
+      skillType: 'recognition' as const,
+      masteryScore: 100,
+      confidence: 0.03,
+      attemptCount: 1,
+      successCount: 1,
+      failureCount: 0,
+      calendarDays: 1,
+    },
+    {
+      skillType: 'recall' as const,
+      masteryScore: 0,
+      confidence: 0,
+      attemptCount: 0,
+      successCount: 0,
+      failureCount: 0,
+      calendarDays: 0,
+    },
+  ];
+  assert.equal(projectOverallMastery(policy, evidence), 100);
+  assert.equal(
+    projectOverallMastery(policy, [
+      evidence[0]!,
+      { ...evidence[1]!, attemptCount: 1, failureCount: 1 },
+    ]),
+    40,
+  );
 });
 test('WAV validation rejects malformed lengths, channels, formats and excessive duration', () => {
   const data = 3200,

@@ -12,6 +12,16 @@ export const policySchema = z
     minimumActiveRecallSuccesses: z.number().int().min(1).max(100).default(2),
     minimumActiveRecallCalendarDays: z.number().int().min(1).max(30).default(2),
     demotionThreshold: z.number().min(0).max(85).default(60),
+    masteryWeights: z
+      .object({
+        recognition: z.number().positive().default(1),
+        recall: z.number().positive().default(1.5),
+        listening: z.number().positive().default(1),
+        spelling: z.number().positive().default(1),
+        pronunciation: z.number().positive().default(1),
+      })
+      .strict()
+      .prefault({}),
     intervalsDays: z
       .array(z.number().int().min(1).max(365))
       .min(5)
@@ -137,6 +147,23 @@ export function projectEvidence(
     calendarDays: days,
   };
 }
+export function projectOverallMastery(policy: LearningPolicy, evidence: Evidence[]) {
+  // An untried skill is not a failed skill. Learning completion is guarded
+  // separately by active-recall requirements, while this projection describes
+  // the quality of evidence the learner has actually produced.
+  const attempted = evidence.filter((entry) => entry.attemptCount > 0),
+    totalWeight = attempted.reduce((sum, entry) => sum + policy.masteryWeights[entry.skillType], 0);
+  return totalWeight
+    ? Math.round(
+        (attempted.reduce(
+          (sum, entry) => sum + entry.masteryScore * policy.masteryWeights[entry.skillType],
+          0,
+        ) /
+          totalWeight) *
+          100,
+      ) / 100
+    : 0;
+}
 export function decideProgress(
   policy: LearningPolicy,
   evidence: MasteryEvidence,
@@ -146,6 +173,7 @@ export function decideProgress(
   recentResults: number[],
   activeRecallAttempt: boolean,
   canAdvance = true,
+  overallMasteryScore = evidence.activeRecallMasteryScore,
 ) {
   const failedPattern = recentResults.slice(-3).filter((s) => s < 50).length >= 2;
   let stage = current.stage,
@@ -184,7 +212,7 @@ export function decideProgress(
     status,
     stage,
     masterySource,
-    masteryScore: Math.round(evidence.activeRecallMasteryScore * 100) / 100,
+    masteryScore: Math.round(overallMasteryScore * 100) / 100,
     retentionLevel,
     masteryRequirements: masteryRequirements(policy, evidence, stage, status),
     nextReviewAt: new Date(now.getTime() + days * 86400000),

@@ -19,6 +19,7 @@ import {
   levelForXp,
   xpAwardForDailyTotal,
   projectEvidence,
+  projectOverallMastery,
   decideProgress,
   retentionLevelFor,
   masteryRequirements,
@@ -913,6 +914,7 @@ export class PracticeService {
             activeRecall.recent_scores,
             activeRecallAttempt,
             canAdvance,
+            projectOverallMastery(this.policy, evidence),
           );
       // Optional skills remain useful evidence, but they must not postpone the
       // active-recall review that is required to finish learning the item.
