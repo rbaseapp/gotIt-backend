@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
+  nextSmartLearningExercise,
   PracticeService,
   smartLearningSequence,
 } from '../src/modules/practice/practice.service.js';
@@ -23,6 +24,24 @@ test('smart learning skips unavailable activities without starting with recall',
     'flashcards',
     'recall',
   ]);
+});
+
+test('smart learning advances only after each earlier activity was actually attempted', () => {
+  const skills = ['recognition', 'recall', 'listening', 'spelling', 'pronunciation'] as const;
+
+  assert.equal(nextSmartLearningExercise([...skills], []), 'matching');
+  assert.equal(
+    nextSmartLearningExercise([...skills], ['recall', 'listening_spelling']),
+    'matching',
+  );
+  assert.equal(nextSmartLearningExercise([...skills], ['matching', 'flashcards']), 'pronunciation');
+  assert.equal(
+    nextSmartLearningExercise(
+      [...skills],
+      ['matching', 'flashcards', 'pronunciation', 'listening_spelling'],
+    ),
+    'recall',
+  );
 });
 
 test('speech skills are enabled by default and remain gated by provider support', () => {

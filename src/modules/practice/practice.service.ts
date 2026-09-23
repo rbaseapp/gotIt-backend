@@ -40,6 +40,13 @@ import type { GeneratedStudyImage, StudyImageProvider } from './study-image.prov
 const missingSession = () => new AppError(404, 'NOT_FOUND', 'Practice session not found');
 type DbItem = Record<string, any>;
 type ExerciseType = 'flashcards' | 'recall' | 'listening_spelling' | 'matching' | 'pronunciation';
+const SMART_LEARNING_ORDER: ExerciseType[] = [
+  'matching',
+  'flashcards',
+  'pronunciation',
+  'listening_spelling',
+  'recall',
+];
 
 function isHttpsUrl(value: unknown) {
   try {
@@ -87,6 +94,15 @@ export function smartLearningSequence(skills: Skill[], matchingAvailable = true)
       : []),
     ...(skills.includes('recall') ? (['recall'] as const) : []),
   ];
+}
+
+export function nextSmartLearningExercise(
+  skills: Skill[],
+  attemptedTypes: Iterable<string>,
+  matchingAvailable = true,
+): ExerciseType | undefined {
+  const attempted = new Set(attemptedTypes);
+  return smartLearningSequence(skills, matchingAvailable).find((type) => !attempted.has(type));
 }
 
 export class PracticeService {
@@ -723,6 +739,11 @@ export class PracticeService {
                      WHERE total.application_id=$1 AND total.application_user_id=$2
                        AND total.learning_item_id=$3 AND total.result<>'skipped'
                        AND COALESCE(total.learning_revision,1)=$5) total_scored_attempts,
+                   ARRAY(SELECT DISTINCT total.exercise_type
+                     FROM product_gotit.practice_attempts total
+                     WHERE total.application_id=$1 AND total.application_user_id=$2
+                       AND total.learning_item_id=$3 AND total.result<>'skipped'
+                       AND COALESCE(total.learning_revision,1)=$5) attempted_exercise_types,
                    ARRAY(SELECT score FROM(SELECT score,created_at,id FROM history
                      ORDER BY created_at DESC,id DESC LIMIT 10) recent ORDER BY created_at,id) scores
                  FROM history`,
@@ -741,8 +762,11 @@ export class PracticeService {
                 .filter((translation): translation is string => Boolean(translation))
                 .map(lookupText),
             ).size,
-            learningSequence = smartLearningSequence(available, distinctMeanings >= 2),
-            introductoryType = learningSequence[totalScoredAttempts],
+            introductoryType = nextSmartLearningExercise(
+              available,
+              activeRecall.attempted_exercise_types,
+              distinctMeanings >= 2,
+            ),
             hasMasteryGap =
               row.learning_status !== 'mastered' &&
               (totalScoredAttempts < this.policy.minimumScoredAttempts ||
@@ -918,6 +942,14 @@ export class PracticeService {
           prompt,
           expiresAt,
         });
+      }
+      if (session.session_type === 'smart_review') {
+        const rank = new Map(SMART_LEARNING_ORDER.map((type, index) => [type, index]));
+        exercises.sort(
+          (left, right) =>
+            (rank.get(left.exerciseType as ExerciseType) ?? SMART_LEARNING_ORDER.length) -
+            (rank.get(right.exerciseType as ExerciseType) ?? SMART_LEARNING_ORDER.length),
+        );
       }
       return {
         exercises,
