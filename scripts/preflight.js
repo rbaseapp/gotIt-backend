@@ -63,6 +63,17 @@ export async function verifyRuntimeSchema(client, { strictRole = true } = {}) {
       'learning_item_id',
       'excluded_at',
     ],
+    study_image_assets: [
+      'source_language_code',
+      'normalized_source_text',
+      'translation_language_code',
+      'normalized_translation_text',
+      'image_model',
+      'sense_key',
+      'visual_brief',
+      'image_data',
+      'image_content_type',
+    ],
   };
   const columns = (
     await client.query(
@@ -156,7 +167,7 @@ export async function verifyRuntimeSchema(client, { strictRole = true } = {}) {
     schema: 'ok',
     privileges: 'ok',
     role: strictRole ? 'product-only' : 'not-enforced',
-    operationalTables: 9,
+    operationalTables: 10,
   };
 }
 

@@ -36,7 +36,11 @@ import type {
   ExercisesInput,
   AttemptInput,
 } from './practice.validation.js';
-import type { GeneratedStudyImage, StudyImageProvider } from './study-image.provider.js';
+import {
+  literalStudyImageBrief,
+  type GeneratedStudyImage,
+  type StudyImageProvider,
+} from './study-image.provider.js';
 const missingSession = () => new AppError(404, 'NOT_FOUND', 'Practice session not found');
 type DbItem = Record<string, any>;
 type ExerciseType = 'flashcards' | 'recall' | 'listening_spelling' | 'matching' | 'pronunciation';
@@ -477,11 +481,15 @@ export class PracticeService {
              li.learning_revision,li.study_image_data,li.study_image_content_type,
              li.study_image_model,li.study_image_revision,
              li.study_image_kind,li.study_image_provider,li.study_image_source_url,
-             li.study_image_creator,
+             li.study_image_creator,li.normalized_source_text,
              (SELECT translation_text FROM product_gotit.item_translations t
                WHERE t.application_id=li.application_id AND t.application_user_id=li.application_user_id
                  AND t.learning_item_id=li.id AND t.is_current
                ORDER BY t.is_primary DESC,t.id LIMIT 1) translation_text,
+             (SELECT normalized_text FROM product_gotit.item_translations t
+               WHERE t.application_id=li.application_id AND t.application_user_id=li.application_user_id
+                 AND t.learning_item_id=li.id AND t.is_current
+               ORDER BY t.is_primary DESC,t.id LIMIT 1) normalized_translation_text,
              COALESCE((SELECT sentence_text FROM product_gotit.item_occurrences o
                WHERE o.application_id=li.application_id AND o.application_user_id=li.application_user_id
                  AND o.learning_item_id=li.id AND o.learning_revision=li.learning_revision
@@ -520,6 +528,58 @@ export class PracticeService {
         image: cachedImage,
       };
     if (!this.imageProvider) return { image: cachedImage };
+    const shared = await withTransaction(this.pool, async (tx) => {
+      const result = await tx.query(
+        `UPDATE product_gotit.learning_items li
+         SET study_image_data=asset.image_data,
+             study_image_content_type=asset.image_content_type,
+             study_image_model=asset.image_model,
+             study_image_revision=li.learning_revision,
+             study_image_kind=asset.image_kind,
+             study_image_provider=asset.image_provider,
+             study_image_source_url=asset.image_source_url,
+             study_image_creator=asset.image_creator
+         FROM (
+           SELECT image_data,image_content_type,image_model,image_kind,image_provider,
+                  image_source_url,image_creator
+           FROM product_gotit.study_image_assets
+           WHERE source_language_code=$4 AND normalized_source_text=$5
+             AND translation_language_code=$6 AND normalized_translation_text=$7
+             AND image_model=$8
+           LIMIT 1
+         ) asset
+         WHERE li.application_id=$1 AND li.application_user_id=$2 AND li.id=$3
+           AND li.learning_revision=$9 AND li.deleted_at IS NULL
+         RETURNING asset.image_data,asset.image_content_type,asset.image_kind,
+                   asset.image_provider,asset.image_source_url,asset.image_creator`,
+        [
+          ...scopeValues(scope),
+          itemId,
+          item.source_language_code,
+          item.normalized_source_text,
+          item.translation_language_code,
+          item.normalized_translation_text,
+          this.imageProvider!.id,
+          item.learning_revision,
+        ],
+      );
+      return result.rows[0];
+    });
+    if (shared)
+      return {
+        image: studyImageDto(
+          shared.image_data,
+          shared.image_content_type,
+          item.source_text,
+          item.translation_text,
+          {
+            kind: shared.image_kind,
+            provider: shared.image_provider,
+            sourceUrl: shared.image_source_url,
+            creator: shared.image_creator,
+          },
+        ),
+      };
     const generated = await this.imageProvider.generate({
       sourceText: item.source_text,
       translationText: item.translation_text,
@@ -528,7 +588,47 @@ export class PracticeService {
       context: item.context,
     });
     if (!generated) return { image: cachedImage };
+    const visual =
+      generated.visual ??
+      literalStudyImageBrief({
+        sourceText: item.source_text,
+        translationText: item.translation_text,
+        sourceLanguageCode: item.source_language_code,
+        translationLanguageCode: item.translation_language_code,
+        context: item.context,
+      });
     const stored = await withTransaction(this.pool, async (tx) => {
+      const asset = (
+        await tx.query(
+          `INSERT INTO product_gotit.study_image_assets
+             (source_language_code,normalized_source_text,translation_language_code,
+              normalized_translation_text,image_model,sense_key,visual_brief,image_data,
+              image_content_type,image_kind,image_provider,image_source_url,image_creator)
+           VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+           ON CONFLICT
+             (source_language_code,normalized_source_text,translation_language_code,
+              normalized_translation_text,image_model)
+           DO UPDATE SET image_model=EXCLUDED.image_model
+           RETURNING image_data,image_content_type,image_kind,image_provider,
+                     image_source_url,image_creator`,
+          [
+            item.source_language_code,
+            item.normalized_source_text,
+            item.translation_language_code,
+            item.normalized_translation_text,
+            this.imageProvider!.id,
+            visual.senseKey,
+            visual,
+            generated.data,
+            generated.contentType,
+            generated.kind,
+            generated.provider,
+            generated.sourceUrl,
+            generated.creator,
+          ],
+        )
+      ).rows[0];
+      if (!asset) throw new Error('Study image asset could not be stored');
       const result = await tx.query(
         `UPDATE product_gotit.learning_items
          SET study_image_data=$4,study_image_content_type=$5,study_image_model=$6,
@@ -539,26 +639,31 @@ export class PracticeService {
         [
           ...scopeValues(scope),
           itemId,
-          generated.data,
-          generated.contentType,
+          asset.image_data,
+          asset.image_content_type,
           this.imageProvider!.id,
           item.learning_revision,
-          generated.kind,
-          generated.provider,
-          generated.sourceUrl,
-          generated.creator,
+          asset.image_kind,
+          asset.image_provider,
+          asset.image_source_url,
+          asset.image_creator,
         ],
       );
-      return result.rowCount === 1;
+      return result.rowCount === 1 ? asset : null;
     });
     return {
       image: stored
         ? studyImageDto(
-            generated.data,
-            generated.contentType,
+            stored.image_data,
+            stored.image_content_type,
             item.source_text,
             item.translation_text,
-            generated,
+            {
+              kind: stored.image_kind,
+              provider: stored.image_provider,
+              sourceUrl: stored.image_source_url,
+              creator: stored.image_creator,
+            },
           )
         : null,
     };

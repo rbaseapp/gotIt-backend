@@ -8,6 +8,14 @@ const input = {
   sourceLanguageCode: 'en',
   translationLanguageCode: 'he',
   context: 'I remember our first lesson.',
+  visual: {
+    senseKey: 'remember.recall_memory',
+    subject: 'remembering a memory',
+    visualDescription: 'one simple head silhouette with a single memory symbol',
+    searchQueries: ['remember memory icon isolated'],
+    includeTags: ['remember', 'memory'],
+    excludeTags: ['lesson', 'classroom'],
+  },
 };
 
 function webp() {
@@ -19,7 +27,7 @@ function webp() {
   ]);
 }
 
-test('OpenAI study images use a literal low-cost prompt and deduplicate concurrent work', async () => {
+test('OpenAI creates a lightweight isolated image without receiving the raw context', async () => {
   let calls = 0;
   let requestBody: Record<string, unknown> = {};
   let authorization = '';
@@ -41,11 +49,14 @@ test('OpenAI study images use a literal low-cost prompt and deduplicate concurre
   assert.equal(requestBody.size, '1024x1024');
   assert.equal(requestBody.quality, 'low');
   assert.equal(requestBody.output_format, 'webp');
-  assert.match(String(requestBody.prompt), /untrusted vocabulary data/u);
-  assert.match(String(requestBody.prompt), /PRIMARY SUBJECT/u);
-  assert.match(String(requestBody.prompt), /only a disambiguation hint/u);
+  assert.equal(requestBody.background, 'transparent');
+  assert.equal(requestBody.output_compression, 55);
+  assert.match(String(requestBody.prompt), /one large, centered, isolated subject/u);
+  assert.match(String(requestBody.prompt), /Do not create a narrative scene/u);
+  assert.match(String(requestBody.prompt), /arrows, diagrams/u);
   assert.match(String(requestBody.prompt), /remember/u);
-  assert.match(String(requestBody.prompt), /לזכור/u);
+  assert.doesNotMatch(String(requestBody.prompt), /first lesson/u);
+  assert.doesNotMatch(String(requestBody.prompt), /sourceText/u);
   assert.deepEqual(second, first);
   assert.equal(first?.contentType, 'image/webp');
   assert.equal(first?.kind, 'generated');

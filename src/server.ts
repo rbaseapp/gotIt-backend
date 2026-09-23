@@ -23,6 +23,7 @@ import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { GoogleAuth } from 'google-auth-library';
 import { OpenAiStudyImageProvider } from './modules/practice/openai-study-image.provider.js';
+import { OpenAiStudyImageBriefResolver } from './modules/practice/openai-study-image-brief.resolver.js';
 import { PixabayStudyImageProvider } from './modules/practice/pixabay-study-image.provider.js';
 import { FallbackStudyImageProvider } from './modules/practice/study-image.provider.js';
 import { WordPackRepository } from './modules/word-packs/word-packs.repository.js';
@@ -71,12 +72,17 @@ const studyImageProviders = [
       ]
     : []),
 ];
+const studyImageBriefResolver = env.OPENAI_API_KEY
+  ? new OpenAiStudyImageBriefResolver(env.OPENAI_API_KEY, env.OPENAI_TRANSLATION_MODEL!, fetch)
+  : undefined;
 const practiceService: PracticeService = new PracticeService(
   pool,
   profileService,
   learningPolicy,
   (...args): boolean => speechService.supports(...args),
-  studyImageProviders.length ? new FallbackStudyImageProvider(studyImageProviders) : undefined,
+  studyImageProviders.length
+    ? new FallbackStudyImageProvider(studyImageProviders, studyImageBriefResolver)
+    : undefined,
 );
 const googleSpeechAccessToken =
   env.GOOGLE_SERVICE_ACCOUNT_JSON || env.GOOGLE_APPLICATION_CREDENTIALS

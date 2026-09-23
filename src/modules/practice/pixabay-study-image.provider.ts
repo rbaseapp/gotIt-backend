@@ -5,6 +5,7 @@ import type {
   StudyImageInput,
   StudyImageProvider,
 } from './study-image.provider.js';
+import { literalStudyImageBrief } from './study-image.provider.js';
 
 const hitSchema = z.object({
   id: z.number().int().positive(),
@@ -13,6 +14,7 @@ const hitSchema = z.object({
   tags: z.string().max(1_000),
   user: z.string().max(200),
   likes: z.number().int().nonnegative().default(0),
+  imageType: z.enum(['photo', 'illustration', 'vector']).optional(),
 });
 const searchSchema = z.object({ hits: z.array(hitSchema).max(20) });
 type PixabayHit = z.output<typeof hitSchema>;
@@ -80,25 +82,37 @@ function tokens(value: string) {
   return result;
 }
 
-function rank(hits: PixabayHit[], subject: string, context: string | null) {
-  const phrase = normalized(subject);
-  const requiredSubjectOverlap = Math.max(1, lexicalTokens(subject).length);
-  const subjectTokens = tokens(subject);
-  const contextTokens = tokens(context ?? '');
+const isolationTokens = new Set([
+  'isolated',
+  'cutout',
+  'transparent',
+  'object',
+  'icon',
+  'illustration',
+  'vector',
+  'white',
+]);
+
+function rank(hits: PixabayHit[], input: StudyImageInput) {
+  const visual = input.visual ?? literalStudyImageBrief(input);
+  const includeGroups = visual.includeTags.map((tag) => tokens(tag)).filter((group) => group.size);
+  const excludedTokens = tokens(visual.excludeTags.join(' '));
   return hits
     .map((hit) => {
-      const tagText = normalized(hit.tags);
       const tagTokens = tokens(hit.tags);
-      const subjectOverlap = [...subjectTokens].filter((token) => tagTokens.has(token)).length;
-      const exactSubject = Boolean(phrase) && ` ${tagText} `.includes(` ${phrase} `);
-      if (!exactSubject && subjectOverlap < requiredSubjectOverlap) return null;
-      const contextOverlap = [...contextTokens].filter((token) => tagTokens.has(token)).length;
+      const matchingGroups = includeGroups.filter((group) =>
+        [...group].every((token) => tagTokens.has(token)),
+      );
+      const subjectOverlap = matchingGroups.reduce((total, group) => total + group.size, 0);
+      const excludedOverlap = [...excludedTokens].filter((token) => tagTokens.has(token)).length;
+      const isolationOverlap = [...isolationTokens].filter((token) => tagTokens.has(token)).length;
+      if (!subjectOverlap || excludedOverlap) return null;
       return {
         hit,
         score:
-          (exactSubject ? 100 : 0) +
-          subjectOverlap * 20 +
-          Math.min(contextOverlap, 5) * 5 +
+          subjectOverlap * 25 +
+          isolationOverlap * 12 +
+          (hit.imageType === 'vector' ? 10 : hit.imageType === 'illustration' ? 6 : 0) +
           Math.min(Math.log10(hit.likes + 1), 3) * 0.1,
       };
     })
@@ -158,7 +172,7 @@ async function boundedBody(response: Response) {
 }
 
 export class PixabayStudyImageProvider implements StudyImageProvider {
-  readonly id = 'pixabay:v1';
+  readonly id = 'pixabay:v2-isolated';
   private readonly cache = new Map<string, { expiresAt: number; hits: PixabayHit[] }>();
   private readonly pending = new Map<string, Promise<GeneratedStudyImage | null>>();
 
@@ -171,11 +185,10 @@ export class PixabayStudyImageProvider implements StudyImageProvider {
     const input = {
       ...raw,
       sourceText: bounded(raw.sourceText, 100),
-      context: raw.context ? bounded(raw.context, 500) : null,
     };
     if (!input.sourceText) return null;
     const key = createHash('sha256')
-      .update(JSON.stringify({ sourceText: input.sourceText, context: input.context }))
+      .update(JSON.stringify(input.visual ?? literalStudyImageBrief(input)))
       .digest('hex');
     const existing = this.pending.get(key);
     if (existing) return existing;
@@ -185,8 +198,12 @@ export class PixabayStudyImageProvider implements StudyImageProvider {
   }
 
   private async find(input: StudyImageInput): Promise<GeneratedStudyImage | null> {
-    const hits = await this.search(input.sourceText);
-    for (const hit of rank(hits, input.sourceText, input.context).slice(0, 3)) {
+    const visual = input.visual ?? literalStudyImageBrief(input);
+    const hits = (
+      await Promise.all(visual.searchQueries.slice(0, 3).map((query) => this.search(query)))
+    ).flat();
+    const uniqueHits = [...new Map(hits.map((hit) => [hit.id, hit])).values()];
+    for (const hit of rank(uniqueHits, { ...input, visual }).slice(0, 3)) {
       const image = await this.download(hit);
       if (image) return image;
     }
@@ -194,7 +211,8 @@ export class PixabayStudyImageProvider implements StudyImageProvider {
   }
 
   private async search(subject: string) {
-    const query = normalized(subject).slice(0, 100);
+    const base = normalized(subject).slice(0, 80);
+    const query = bounded(/\bisolated\b/u.test(base) ? base : `${base} isolated`, 100);
     if (!query) return [];
     const cached = this.cache.get(query);
     if (cached && cached.expiresAt > Date.now()) return cached.hits;
@@ -203,12 +221,12 @@ export class PixabayStudyImageProvider implements StudyImageProvider {
       key: this.apiKey,
       q: query,
       image_type: 'all',
-      orientation: 'horizontal',
       safesearch: 'true',
       order: 'popular',
-      min_width: '640',
-      min_height: '360',
-      per_page: '10',
+      colors: 'transparent',
+      min_width: '400',
+      min_height: '400',
+      per_page: '20',
     }).toString();
     try {
       const response = await this.request(url, { signal: AbortSignal.timeout(8_000) });

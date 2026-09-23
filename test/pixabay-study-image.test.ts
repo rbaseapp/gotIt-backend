@@ -9,11 +9,19 @@ const input = {
   sourceLanguageCode: 'en',
   translationLanguageCode: 'he',
   context: 'We sat on the bank beside the river.',
+  visual: {
+    senseKey: 'bank.river_edge',
+    subject: 'river bank',
+    visualDescription: 'one isolated grassy river bank edge',
+    searchQueries: ['river bank isolated'],
+    includeTags: ['river bank', 'riverbank'],
+    excludeTags: ['money', 'finance'],
+  },
 };
 
 const jpeg = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3, 4]);
 
-test('Pixabay searches only for the term and uses context solely to rank matching results', async () => {
+test('Pixabay searches only for the resolved visual sense and never sends raw context', async () => {
   const requests: URL[] = [];
   const provider = new PixabayStudyImageProvider('pixabay-secret', (async (value) => {
     const url = new URL(String(value));
@@ -46,8 +54,9 @@ test('Pixabay searches only for the term and uses context solely to rank matchin
 
   const image = await provider.generate(input);
 
-  assert.equal(requests[0]?.searchParams.get('q'), 'bank');
+  assert.equal(requests[0]?.searchParams.get('q'), 'river bank isolated');
   assert.equal(requests[0]?.searchParams.get('safesearch'), 'true');
+  assert.equal(requests[0]?.searchParams.get('colors'), 'transparent');
   assert.equal(requests[0]?.searchParams.has('context'), false);
   assert.equal(requests[1]?.href, 'https://cdn.pixabay.com/photo/bank-river.jpg');
   assert.equal(image?.kind, 'stock');
@@ -91,7 +100,7 @@ test('Pixabay rejects unrelated results and the chain falls back to AI', async (
 
   assert.equal(fallbackCalls, 1);
   assert.equal(image?.kind, 'generated');
-  assert.match(new FallbackStudyImageProvider([pixabay, fallback]).id, /^hybrid:v1:/u);
+  assert.match(new FallbackStudyImageProvider([pixabay, fallback]).id, /^hybrid:v2-isolated:/u);
 });
 
 test('Pixabay accepts a singular tag for a plural vocabulary term', async () => {
@@ -120,6 +129,14 @@ test('Pixabay accepts a singular tag for a plural vocabulary term', async () => 
     sourceText: 'fertilizers',
     translationText: 'דשנים',
     context: 'Fertilizers and ceramics are among the industrial uses.',
+    visual: {
+      senseKey: 'fertilizer.soil_nutrient',
+      subject: 'fertilizer',
+      visualDescription: 'one isolated bag of plant fertilizer',
+      searchQueries: ['fertilizer isolated'],
+      includeTags: ['fertilizer'],
+      excludeTags: [],
+    },
   });
 
   assert.equal(downloaded, true);
@@ -152,6 +169,14 @@ test('Pixabay rejects a partial tag match for a multi-word term', async () => {
     sourceText: 'coffee table',
     translationText: 'שולחן קפה',
     context: 'The keys are on the coffee table.',
+    visual: {
+      senseKey: 'coffee_table.furniture',
+      subject: 'coffee table',
+      visualDescription: 'one isolated coffee table',
+      searchQueries: ['coffee table isolated'],
+      includeTags: ['coffee table'],
+      excludeTags: ['drink'],
+    },
   });
 
   assert.equal(image, null);

@@ -881,7 +881,7 @@ test(
             client.release();
           }
           const inspection = await inspectProduction(db.runtimePool.options.connectionString);
-          assert.equal(inspection.productTableCount, 29);
+          assert.equal(inspection.productTableCount, 30);
           assert.deepEqual(inspection.v1, {
             learningRevision: true,
             captureReceipts: true,
@@ -1296,6 +1296,85 @@ test(
               )
             ).rows,
             coreBefore,
+          );
+        },
+      );
+      await t.test(
+        'study images are reused across users for the same translated sense',
+        async () => {
+          const generationBaseline = studyImageGenerations;
+          const imageResponses = [];
+          const directPractices = new PracticeService(
+            db.adminPool,
+            profiles,
+            undefined,
+            undefined,
+            {
+              id: 'test:study-image',
+              generate: async () => {
+                studyImageGenerations++;
+                return {
+                  data: studyImageData,
+                  contentType: 'image/webp',
+                  kind: 'generated',
+                  provider: 'Integration AI',
+                  sourceUrl: null,
+                  creator: null,
+                };
+              },
+            },
+          );
+          for (const user of [0, 1]) {
+            const captured = await call(
+              'post',
+              '/captures',
+              {
+                item: {
+                  sourceText: 'shared visual term',
+                  sourceLanguageCode: 'en',
+                  translationLanguageCode: 'he',
+                  itemType: 'phrase',
+                },
+                translation: { text: 'משמעות חזותית משותפת' },
+                context: {
+                  selectedText: 'shared visual term',
+                  sentenceText:
+                    user === 0
+                      ? 'The first context is deliberately different.'
+                      : 'Another learner found it in an unrelated sentence.',
+                },
+                senseDecision: { mode: 'auto' },
+              },
+              randomUUID(),
+              user,
+            ).expect(201);
+            const session = await call(
+              'post',
+              '/practice/sessions',
+              {
+                sessionType: 'recall',
+                learningItemIds: [captured.body.capture.learningItemId],
+              },
+              randomUUID(),
+              user,
+            ).expect(201);
+            imageResponses.push(
+              await directPractices.studyImage(
+                { applicationId, applicationUserId: users[user]! },
+                session.body.session.id,
+                captured.body.capture.learningItemId,
+              ),
+            );
+          }
+          assert.deepEqual(imageResponses[1]!.image, imageResponses[0]!.image);
+          assert.equal(studyImageGenerations, generationBaseline + 1);
+          assert.equal(
+            (
+              await db.adminPool.query(
+                'SELECT count(*)::integer count FROM product_gotit.study_image_assets',
+              )
+            ).rows[0].count,
+            1,
           );
         },
       );
