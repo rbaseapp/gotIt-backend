@@ -779,6 +779,33 @@ export class PracticeService {
         )
       ).rows;
       if (!rows.length) throw new AppError(409, 'NO_ELIGIBLE_ITEMS', 'No eligible learning items');
+      const choiceRows =
+        session.session_type === 'smart_review'
+          ? [
+              ...rows,
+              ...(
+                await tx.query(
+                  `SELECT li.*,ARRAY(SELECT translation_text FROM product_gotit.item_translations t
+                    WHERE t.application_id=li.application_id
+                      AND t.application_user_id=li.application_user_id
+                      AND t.learning_item_id=li.id AND t.is_current
+                    ORDER BY is_primary DESC,id) translations
+                   FROM product_gotit.learning_items li
+                   WHERE li.application_id=$1 AND li.application_user_id=$2
+                     AND NOT(li.id=ANY($3::uuid[]))
+                     AND li.user_status='active' AND li.deleted_at IS NULL
+                     AND EXISTS(SELECT 1 FROM product_gotit.learning_items target
+                       WHERE target.application_id=li.application_id
+                         AND target.application_user_id=li.application_user_id
+                         AND target.id=ANY($3::uuid[])
+                         AND target.source_language_code=li.source_language_code
+                         AND target.translation_language_code=li.translation_language_code)
+                   ORDER BY li.created_at,id LIMIT 50`,
+                  [...scopeValues(scope), ids],
+                )
+              ).rows,
+            ]
+          : rows;
       const matching = (input.exerciseType ?? session.session_type) === 'matching';
       const matchingReverse = input.direction === 'translation_to_source';
       let exerciseRows = rows;
@@ -860,7 +887,12 @@ export class PracticeService {
             ).masteryScore,
             available = this.availableSkills(profile, row.source_language_code),
             distinctMeanings = new Set(
-              rows
+              choiceRows
+                .filter(
+                  (candidate) =>
+                    candidate.source_language_code === row.source_language_code &&
+                    candidate.translation_language_code === row.translation_language_code,
+                )
                 .map((candidate) => candidate.translations[0] as string | undefined)
                 .filter((translation): translation is string => Boolean(translation))
                 .map(lookupText),
@@ -868,7 +900,7 @@ export class PracticeService {
             introductoryType = nextSmartLearningExercise(
               available,
               activeRecall.attempted_exercise_types,
-              distinctMeanings >= 2,
+              rows.length >= 2 && distinctMeanings >= 2,
             ),
             hasMasteryGap =
               row.learning_status !== 'mastered' &&
@@ -995,7 +1027,12 @@ export class PracticeService {
           }));
         } else if (kind === 'multiple_choice') {
           const choices = [{ id: randomUUID(), text: accepted[0]!, correct: true }];
-          for (const other of rows) {
+          for (const other of choiceRows) {
+            if (
+              other.source_language_code !== row.source_language_code ||
+              other.translation_language_code !== row.translation_language_code
+            )
+              continue;
             const text = reverse ? other.source_text : other.translations[0];
             if (
               text &&
