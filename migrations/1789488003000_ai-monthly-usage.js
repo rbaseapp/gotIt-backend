@@ -8,7 +8,8 @@ export const up = (pgm) => {
       updated_at timestamptz NOT NULL DEFAULT now(),
       PRIMARY KEY(application_id,application_user_id,usage_month),
       FOREIGN KEY(application_id,application_user_id)
-        REFERENCES core.application_users(application_id,id) ON DELETE CASCADE
+        REFERENCES product_gotit.user_profiles(application_id,application_user_id)
+        ON DELETE CASCADE
     );
   `);
 };
