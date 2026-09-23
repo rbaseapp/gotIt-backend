@@ -72,6 +72,16 @@ export function createRoutes(dependencies: AppDependencies) {
   });
 
   router.use('/api/v1', ...authenticate);
+  const requireVocabularyWrite = createRequireEntitlementMiddleware(
+    dependencies.coreAuthClient,
+    'vocabulary.write',
+    dependencies.enforcePaidEntitlements === true,
+  );
+  const requirePractice = createRequireEntitlementMiddleware(
+    dependencies.coreAuthClient,
+    'practice.play',
+    dependencies.enforcePaidEntitlements === true,
+  );
   router.get('/api/v1/capabilities', async (req, res) => {
     const profile = await dependencies.profileService.getProfile(req.gotitAuth!);
     res.json({
@@ -91,11 +101,20 @@ export function createRoutes(dependencies: AppDependencies) {
   });
   router.use('/api/v1/profile', createProfileRoutes(dependencies.profileService));
   if (dependencies.libraryService) {
-    router.use('/api/v1/learning-items', createLibraryRoutes(dependencies.libraryService));
-    router.use('/api/v1/tags', createTagRoutes(dependencies.libraryService));
+    router.use(
+      '/api/v1/learning-items',
+      createLibraryRoutes(dependencies.libraryService, requireVocabularyWrite),
+    );
+    router.use(
+      '/api/v1/tags',
+      createTagRoutes(dependencies.libraryService, requireVocabularyWrite),
+    );
   }
   if (dependencies.practiceService) {
-    router.use('/api/v1/practice', createPracticeRoutes(dependencies.practiceService));
+    router.use(
+      '/api/v1/practice',
+      createPracticeRoutes(dependencies.practiceService, requirePractice),
+    );
     router.use('/api/v1/learning', createLearningRoutes(dependencies.practiceService));
   }
   if (dependencies.dashboardService) {
@@ -141,10 +160,17 @@ export function createRoutes(dependencies: AppDependencies) {
   if (dependencies.transferPool && dependencies.captureService)
     router.use(
       '/api/v1',
-      createTransferRoutes(dependencies.transferPool, dependencies.captureService),
+      createTransferRoutes(
+        dependencies.transferPool,
+        dependencies.captureService,
+        requireVocabularyWrite,
+      ),
     );
   if (dependencies.captureService) {
-    router.use('/api/v1/captures', createCaptureRoutes(dependencies.captureService));
+    router.use(
+      '/api/v1/captures',
+      createCaptureRoutes(dependencies.captureService, requireVocabularyWrite),
+    );
     router.use('/api/v1/learning-items', createLearningItemRoutes(dependencies.captureService));
   }
 

@@ -15,7 +15,7 @@ const envSchema = z
     CORE_AUTH_TIMEOUT_MS: z.coerce.number().int().positive().max(30_000).default(3000),
     ENFORCE_PAID_ENTITLEMENTS: z
       .enum(['true', 'false'])
-      .default('false')
+      .default('true')
       .transform((value) => value === 'true'),
     ANTHROPIC_API_KEY: z.string().min(1).optional(),
     ANTHROPIC_WORKSPACE_ID: z

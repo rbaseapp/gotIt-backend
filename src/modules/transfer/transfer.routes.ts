@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, type RequestHandler } from 'express';
 import { z } from 'zod';
 import type { Pool } from 'pg';
 import { withTransaction } from '../../shared/database/transaction.js';
@@ -25,7 +25,11 @@ export const importSchema = z
       if (entry.capture.clientEventId && entry.capture.clientEventId !== entry.eventId)
         ctx.addIssue({ code: 'custom', message: 'Capture event mismatch' });
   });
-export function createTransferRoutes(pool: Pool, capture: CaptureService) {
+export function createTransferRoutes(
+  pool: Pool,
+  capture: CaptureService,
+  requireWrite: RequestHandler,
+) {
   const router = Router();
   router.get('/export', async (req, res) => {
     const page = parseInput(pageSchema, req.query),
@@ -57,7 +61,7 @@ export function createTransferRoutes(pool: Pool, capture: CaptureService) {
     );
     res.json({ ...data, requestId: req.id });
   });
-  router.post('/import', async (req, res) => {
+  router.post('/import', requireWrite, async (req, res) => {
     const input = parseInput(importSchema, req.body),
       results = [],
       deadline = Date.now() + 60000;

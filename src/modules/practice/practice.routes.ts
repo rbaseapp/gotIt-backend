@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, type RequestHandler } from 'express';
 import { parseInput, uuidSchema } from '../capture/capture.validation.js';
 import { pageSchema } from '../library/library.validation.js';
 import {
@@ -9,7 +9,7 @@ import {
 } from './practice.validation.js';
 import type { PracticeService } from './practice.service.js';
 
-export function createPracticeRoutes(service: PracticeService) {
+export function createPracticeRoutes(service: PracticeService, requirePlay: RequestHandler) {
   const router = Router();
   router.get('/sessions', async (req, res) => {
     const page = parseInput(pageSchema, req.query);
@@ -18,7 +18,7 @@ export function createPracticeRoutes(service: PracticeService) {
       requestId: req.id,
     });
   });
-  router.post('/sessions', async (req, res) => {
+  router.post('/sessions', requirePlay, async (req, res) => {
     const result = await service.createSession(
       req.gotitAuth!,
       parseInput(uuidSchema, req.get('Idempotency-Key')),
@@ -32,7 +32,7 @@ export function createPracticeRoutes(service: PracticeService) {
       requestId: req.id,
     }),
   );
-  router.patch('/sessions/:id', async (req, res) =>
+  router.patch('/sessions/:id', requirePlay, async (req, res) =>
     res.json({
       session: await service.closeSession(
         req.gotitAuth!,
@@ -42,7 +42,7 @@ export function createPracticeRoutes(service: PracticeService) {
       requestId: req.id,
     }),
   );
-  router.post('/sessions/:id/exercises', async (req, res) =>
+  router.post('/sessions/:id/exercises', requirePlay, async (req, res) =>
     res.status(201).json({
       ...(await service.issueExercises(
         req.gotitAuth!,
@@ -52,7 +52,7 @@ export function createPracticeRoutes(service: PracticeService) {
       requestId: req.id,
     }),
   );
-  router.post('/attempts', async (req, res) => {
+  router.post('/attempts', requirePlay, async (req, res) => {
     const result = await service.submitAttempt(
       req.gotitAuth!,
       parseInput(uuidSchema, req.get('Idempotency-Key')),

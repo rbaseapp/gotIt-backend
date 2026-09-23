@@ -33,6 +33,7 @@ export const API_ROUTES = [
   ['GET', '/dashboard/activity'],
   ['GET', '/gamification'],
   ['POST', '/reading/preview'],
+  ['GET', '/reading/quota'],
   ['POST', '/reading'],
   ['GET', '/reading'],
   ['GET', '/reading/:id'],

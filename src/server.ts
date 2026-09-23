@@ -8,6 +8,7 @@ import { PracticeService } from './modules/practice/practice.service.js';
 import { DashboardService } from './modules/dashboard/dashboard.service.js';
 import { ReadingService } from './modules/reading/reading.service.js';
 import { AnthropicReadingGenerator } from './modules/reading/anthropic-reading.js';
+import { AiMonthlyQuota } from './modules/reading/ai-monthly-quota.js';
 import { SpeechService } from './modules/speech/speech.service.js';
 import { AzureSpeechProvider } from './modules/speech/azure-speech.provider.js';
 import { GoogleSpeechProvider } from './modules/speech/google-speech.provider.js';
@@ -119,6 +120,8 @@ const app = createApp({
     practiceService,
     readingGenerator,
     env.ENRICHMENT_SIGNING_SECRET,
+    Date.now,
+    new AiMonthlyQuota(pool),
   ),
   speechService,
   enforcePaidEntitlements: env.ENFORCE_PAID_ENTITLEMENTS,

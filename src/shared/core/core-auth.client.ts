@@ -16,15 +16,25 @@ const coreMeResponseSchema = z
   .passthrough();
 
 const billingStatusSchema = z.object({
-  tier: z.enum(['free', 'paid']),
+  tier: z.enum(['free', 'trial', 'paid']),
   access: z.boolean(),
   plan: z.object({ key: z.string(), name: z.string(), kind: z.enum(['free', 'paid']) }),
   entitlements: z.array(z.string()),
-  subscription: z.object({
-    status: z.enum(['trialing', 'active', 'past_due', 'paused', 'canceled']),
-    cancelAtPeriodEnd: z.boolean(),
-    currentPeriodEndsAt: z.string().datetime({ offset: true }).nullable(),
-  }).nullable(),
+  subscription: z
+    .object({
+      status: z.enum(['trialing', 'active', 'past_due', 'paused', 'canceled']),
+      cancelAtPeriodEnd: z.boolean(),
+      currentPeriodEndsAt: z.string().datetime({ offset: true }).nullable(),
+    })
+    .nullable(),
+  trial: z
+    .object({
+      status: z.enum(['active', 'expired']),
+      startedAt: z.string().datetime({ offset: true }),
+      endsAt: z.string().datetime({ offset: true }),
+      daysRemaining: z.number().int().nonnegative(),
+    })
+    .nullable(),
 });
 
 export type CoreBillingStatus = z.infer<typeof billingStatusSchema>;
@@ -125,14 +135,24 @@ export class CoreAuthClient {
         signal: AbortSignal.timeout(this.options.timeoutMs),
       });
     } catch (error) {
-      throw new AppError(503, 'CORE_BILLING_UNAVAILABLE', 'Billing service is unavailable',
-        error instanceof Error ? { cause: error.name } : undefined);
+      throw new AppError(
+        503,
+        'CORE_BILLING_UNAVAILABLE',
+        'Billing service is unavailable',
+        error instanceof Error ? { cause: error.name } : undefined,
+      );
     }
     if (response.status === 401 || response.status === 403)
       throw new AppError(401, 'UNAUTHORIZED', 'Invalid or expired access token');
-    if (!response.ok) throw new AppError(503, 'CORE_BILLING_UNAVAILABLE', 'Billing service is unavailable');
+    if (!response.ok)
+      throw new AppError(503, 'CORE_BILLING_UNAVAILABLE', 'Billing service is unavailable');
     const parsed = billingStatusSchema.safeParse(await response.json().catch(() => undefined));
-    if (!parsed.success) throw new AppError(503, 'CORE_BILLING_INVALID_RESPONSE', 'Billing service returned an invalid response');
+    if (!parsed.success)
+      throw new AppError(
+        503,
+        'CORE_BILLING_INVALID_RESPONSE',
+        'Billing service returned an invalid response',
+      );
     return parsed.data;
   }
 }

@@ -27,6 +27,13 @@ export async function verifyRuntimeSchema(client, { strictRole = true } = {}) {
       'consumed_at',
     ],
     api_rate_limits: ['bucket_key', 'window_start', 'request_count', 'expires_at'],
+    ai_monthly_usage: [
+      'application_id',
+      'application_user_id',
+      'usage_month',
+      'generation_count',
+      'updated_at',
+    ],
   };
   const columns = (
     await client.query(
@@ -101,7 +108,7 @@ export async function verifyRuntimeSchema(client, { strictRole = true } = {}) {
     schema: 'ok',
     privileges: 'ok',
     role: strictRole ? 'product-only' : 'not-enforced',
-    operationalTables: 2,
+    operationalTables: 3,
   };
 }
 

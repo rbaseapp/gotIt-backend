@@ -16,6 +16,7 @@ import {
   type ReadingTarget,
 } from './reading.validation.js';
 import { bindReadingTargets, completeMissingTargets } from './reading-content.js';
+import type { AiMonthlyQuotaContract, AiMonthlyQuotaStatus } from './ai-monthly-quota.js';
 
 const targetSchema = z
   .object({
@@ -140,6 +141,7 @@ export class ReadingService {
     private readonly generator?: ReadingGenerator,
     secret?: string,
     private readonly now: () => number = Date.now,
+    private readonly quota?: AiMonthlyQuotaContract,
   ) {
     this.key = secret
       ? createHash('sha256').update(`gotit-reading-v1:${secret}`).digest()
@@ -147,6 +149,9 @@ export class ReadingService {
   }
   get available() {
     return Boolean(this.generator && this.key);
+  }
+  async quotaStatus(scope: ProfileScope): Promise<AiMonthlyQuotaStatus | null> {
+    return this.quota ? this.quota.status(scope) : null;
   }
   async preview(scope: ProfileScope, input: ReadingInput) {
     if (!this.generator || !this.key)
@@ -192,139 +197,145 @@ export class ReadingService {
       },
       true,
     );
-    const generationDeadline = Date.now() + 45000;
-    const maxAttempts = 3;
-    let content: z.output<typeof generatedReadingSchema> | undefined;
-    let fallbackContent: z.output<typeof generatedReadingSchema> | undefined;
-    let providerModel: string | null = null;
-    let bound: ReturnType<typeof bindReadingTargets>['bound'] | undefined;
-    let repair: Parameters<ReadingGenerator['generate']>[0]['repair'];
-    let lastError: unknown;
-    let lastTimedOut = false;
-    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-      const remaining = generationDeadline - Date.now();
-      if (remaining <= 0) {
-        lastTimedOut = true;
-        break;
-      }
-      const controller = new AbortController();
-      const attemptsLeft = maxAttempts - attempt + 1;
-      const timer = setTimeout(
-        () => controller.abort(),
-        Math.min(20000, Math.max(1, Math.floor(remaining / attemptsLeft))),
-      );
-      try {
-        const generated = await Promise.race([
-          this.generator.generate(
-            { ...input, topic, effectiveLevel, targets, ...(repair ? { repair } : {}) },
-            controller.signal,
-          ),
-          new Promise<never>((_resolve, reject) =>
-            controller.signal.addEventListener(
-              'abort',
-              () => reject(new Error('Reading deadline')),
-              { once: true },
+    if (this.quota) await this.quota.reserve(scope);
+    try {
+      const generationDeadline = Date.now() + 45000;
+      const maxAttempts = 3;
+      let content: z.output<typeof generatedReadingSchema> | undefined;
+      let fallbackContent: z.output<typeof generatedReadingSchema> | undefined;
+      let providerModel: string | null = null;
+      let bound: ReturnType<typeof bindReadingTargets>['bound'] | undefined;
+      let repair: Parameters<ReadingGenerator['generate']>[0]['repair'];
+      let lastError: unknown;
+      let lastTimedOut = false;
+      for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        const remaining = generationDeadline - Date.now();
+        if (remaining <= 0) {
+          lastTimedOut = true;
+          break;
+        }
+        const controller = new AbortController();
+        const attemptsLeft = maxAttempts - attempt + 1;
+        const timer = setTimeout(
+          () => controller.abort(),
+          Math.min(20000, Math.max(1, Math.floor(remaining / attemptsLeft))),
+        );
+        try {
+          const generated = await Promise.race([
+            this.generator.generate(
+              { ...input, topic, effectiveLevel, targets, ...(repair ? { repair } : {}) },
+              controller.signal,
             ),
-          ),
-        ]);
-        const parsed = generatedReadingSchema
-          .extend({ providerModel: z.string().max(200).nullable() })
-          .parse(generated);
-        providerModel = parsed.providerModel;
-        const { providerModel: _providerModel, ...candidate } = parsed;
-        const binding = bindReadingTargets(candidate.bodyText, targets);
-        if (!binding.missing.length) {
-          content = candidate;
-          bound = binding.bound;
-          break;
-        }
-        fallbackContent = candidate;
-        if (attempt < maxAttempts) {
-          repair = {
-            previousTitle: candidate.title,
-            previousBodyText: candidate.bodyText,
-            missingTargetTexts: binding.missing.map((target) => target.sourceText),
-          };
-          continue;
-        }
-        const completed = completeMissingTargets(candidate, targets);
-        if (!completed)
-          throw new AppError(
-            503,
-            'READING_UNAVAILABLE',
-            'Reading targets exceed the publication limit',
-          );
-        const completedBinding = bindReadingTargets(completed.bodyText, targets);
-        if (completedBinding.missing.length)
-          throw new AppError(503, 'READING_UNAVAILABLE', 'Reading targets could not be bound');
-        content = completed;
-        bound = completedBinding.bound;
-        break;
-      } catch (error) {
-        lastError = error;
-        lastTimedOut = controller.signal.aborted;
-        if (
-          attempt === maxAttempts ||
-          !retryableReadingFailure(error, lastTimedOut) ||
-          generationDeadline <= Date.now()
-        )
-          break;
-      } finally {
-        clearTimeout(timer);
-      }
-    }
-    if ((!content || !bound) && fallbackContent) {
-      const completed = completeMissingTargets(fallbackContent, targets);
-      if (completed) {
-        const completedBinding = bindReadingTargets(completed.bodyText, targets);
-        if (!completedBinding.missing.length) {
+            new Promise<never>((_resolve, reject) =>
+              controller.signal.addEventListener(
+                'abort',
+                () => reject(new Error('Reading deadline')),
+                { once: true },
+              ),
+            ),
+          ]);
+          const parsed = generatedReadingSchema
+            .extend({ providerModel: z.string().max(200).nullable() })
+            .parse(generated);
+          providerModel = parsed.providerModel;
+          const { providerModel: _providerModel, ...candidate } = parsed;
+          const binding = bindReadingTargets(candidate.bodyText, targets);
+          if (!binding.missing.length) {
+            content = candidate;
+            bound = binding.bound;
+            break;
+          }
+          fallbackContent = candidate;
+          if (attempt < maxAttempts) {
+            repair = {
+              previousTitle: candidate.title,
+              previousBodyText: candidate.bodyText,
+              missingTargetTexts: binding.missing.map((target) => target.sourceText),
+            };
+            continue;
+          }
+          const completed = completeMissingTargets(candidate, targets);
+          if (!completed)
+            throw new AppError(
+              503,
+              'READING_UNAVAILABLE',
+              'Reading targets exceed the publication limit',
+            );
+          const completedBinding = bindReadingTargets(completed.bodyText, targets);
+          if (completedBinding.missing.length)
+            throw new AppError(503, 'READING_UNAVAILABLE', 'Reading targets could not be bound');
           content = completed;
           bound = completedBinding.bound;
+          break;
+        } catch (error) {
+          lastError = error;
+          lastTimedOut = controller.signal.aborted;
+          if (
+            attempt === maxAttempts ||
+            !retryableReadingFailure(error, lastTimedOut) ||
+            generationDeadline <= Date.now()
+          )
+            break;
+        } finally {
+          clearTimeout(timer);
         }
       }
-    }
-    if (!content || !bound) throw readingFailure(lastError, lastTimedOut);
-    const ticket = ticketSchema.parse({
-      version: 1,
-      id: randomUUID(),
-      ...scope,
-      expiresAt: this.now() + 15 * 60000,
-      input,
-      topic,
-      effectiveLevel,
-      content,
-      providerName: this.generator.id,
-      providerModel,
-      targets: bound,
-    });
-    const nonce = randomBytes(12),
-      cipher = createCipheriv('aes-256-gcm', this.key, nonce);
-    cipher.setAAD(Buffer.from('gotit-reading-v1'));
-    const ciphertext = Buffer.concat([
-      cipher.update(JSON.stringify(ticket), 'utf8'),
-      cipher.final(),
-    ]);
-    if (ciphertext.length > 95000)
-      throw new AppError(
-        503,
-        'READING_UNAVAILABLE',
-        'Generated passage exceeds the publication limit',
-      );
-    return {
-      reading: {
-        id: ticket.id,
-        ...content,
-        contentType: input.contentType,
-        targetLanguageCode: input.targetLanguageCode,
+      if ((!content || !bound) && fallbackContent) {
+        const completed = completeMissingTargets(fallbackContent, targets);
+        if (completed) {
+          const completedBinding = bindReadingTargets(completed.bodyText, targets);
+          if (!completedBinding.missing.length) {
+            content = completed;
+            bound = completedBinding.bound;
+          }
+        }
+      }
+      if (!content || !bound) throw readingFailure(lastError, lastTimedOut);
+      const ticket = ticketSchema.parse({
+        version: 1,
+        id: randomUUID(),
+        ...scope,
+        expiresAt: this.now() + 15 * 60000,
+        input,
+        topic,
         effectiveLevel,
-        targets: bound.map(({ snapshotHash, ...target }) => target),
-      },
-      publicationToken: Buffer.concat([nonce, cipher.getAuthTag(), ciphertext]).toString(
-        'base64url',
-      ),
-      expiresAt: new Date(ticket.expiresAt),
-      provider: { name: ticket.providerName, model: ticket.providerModel },
-    };
+        content,
+        providerName: this.generator.id,
+        providerModel,
+        targets: bound,
+      });
+      const nonce = randomBytes(12),
+        cipher = createCipheriv('aes-256-gcm', this.key, nonce);
+      cipher.setAAD(Buffer.from('gotit-reading-v1'));
+      const ciphertext = Buffer.concat([
+        cipher.update(JSON.stringify(ticket), 'utf8'),
+        cipher.final(),
+      ]);
+      if (ciphertext.length > 95000)
+        throw new AppError(
+          503,
+          'READING_UNAVAILABLE',
+          'Generated passage exceeds the publication limit',
+        );
+      return {
+        reading: {
+          id: ticket.id,
+          ...content,
+          contentType: input.contentType,
+          targetLanguageCode: input.targetLanguageCode,
+          effectiveLevel,
+          targets: bound.map(({ snapshotHash, ...target }) => target),
+        },
+        publicationToken: Buffer.concat([nonce, cipher.getAuthTag(), ciphertext]).toString(
+          'base64url',
+        ),
+        expiresAt: new Date(ticket.expiresAt),
+        provider: { name: ticket.providerName, model: ticket.providerModel },
+      };
+    } catch (error) {
+      if (this.quota) await this.quota.release(scope);
+      throw error;
+    }
   }
   private decode(scope: ProfileScope, token: string) {
     try {

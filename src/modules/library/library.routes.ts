@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, type RequestHandler } from 'express';
 import { z } from 'zod';
 import { parseInput, uuidSchema } from '../capture/capture.validation.js';
 import {
@@ -11,7 +11,7 @@ import {
   pageSchema,
 } from './library.validation.js';
 import type { LibraryRepository } from './library.repository.js';
-export function createLibraryRoutes(service: LibraryRepository) {
+export function createLibraryRoutes(service: LibraryRepository, requireWrite: RequestHandler) {
   const router = Router();
   router.get('/', async (req, res) =>
     res.json({
@@ -19,13 +19,13 @@ export function createLibraryRoutes(service: LibraryRepository) {
       requestId: req.id,
     }),
   );
-  router.post('/bulk', async (req, res) =>
+  router.post('/bulk', requireWrite, async (req, res) =>
     res.json({
       ...(await service.bulk(req.gotitAuth!, parseInput(bulkSchema, req.body))),
       requestId: req.id,
     }),
   );
-  router.patch('/:id', async (req, res) =>
+  router.patch('/:id', requireWrite, async (req, res) =>
     res.json({
       learningItem: await service.edit(
         req.gotitAuth!,
@@ -35,7 +35,7 @@ export function createLibraryRoutes(service: LibraryRepository) {
       requestId: req.id,
     }),
   );
-  router.delete('/:id', async (req, res) =>
+  router.delete('/:id', requireWrite, async (req, res) =>
     res.json({
       ...(await service.bulk(req.gotitAuth!, {
         ids: [parseInput(uuidSchema, req.params.id)],
@@ -44,7 +44,7 @@ export function createLibraryRoutes(service: LibraryRepository) {
       requestId: req.id,
     }),
   );
-  router.post('/:id/restore', async (req, res) =>
+  router.post('/:id/restore', requireWrite, async (req, res) =>
     res.json({
       ...(await service.bulk(req.gotitAuth!, {
         ids: [parseInput(uuidSchema, req.params.id)],
@@ -53,7 +53,7 @@ export function createLibraryRoutes(service: LibraryRepository) {
       requestId: req.id,
     }),
   );
-  router.post('/:id/mastery', async (req, res) => {
+  router.post('/:id/mastery', requireWrite, async (req, res) => {
     const input = parseInput(z.object({ mastered: z.boolean() }).strict(), req.body);
     res.json({
       ...(await service.bulk(req.gotitAuth!, {
@@ -63,7 +63,7 @@ export function createLibraryRoutes(service: LibraryRepository) {
       requestId: req.id,
     });
   });
-  router.put('/:id/tags', async (req, res) =>
+  router.put('/:id/tags', requireWrite, async (req, res) =>
     res.json({
       ...(await service.setTags(
         req.gotitAuth!,
@@ -107,7 +107,7 @@ export function createLibraryRoutes(service: LibraryRepository) {
       requestId: req.id,
     }),
   );
-  router.put('/:id/examples', async (req, res) =>
+  router.put('/:id/examples', requireWrite, async (req, res) =>
     res.json({
       examples: await service.examples(
         req.gotitAuth!,
@@ -119,7 +119,7 @@ export function createLibraryRoutes(service: LibraryRepository) {
   );
   return router;
 }
-export function createTagRoutes(service: LibraryRepository) {
+export function createTagRoutes(service: LibraryRepository, requireWrite: RequestHandler) {
   const router = Router();
   router.get('/', async (req, res) => {
     const page = parseInput(pageSchema, req.query);
@@ -128,13 +128,13 @@ export function createTagRoutes(service: LibraryRepository) {
       requestId: req.id,
     });
   });
-  router.post('/', async (req, res) =>
+  router.post('/', requireWrite, async (req, res) =>
     res.status(201).json({
       tag: await service.saveTag(req.gotitAuth!, parseInput(tagSchema, req.body).name),
       requestId: req.id,
     }),
   );
-  router.patch('/:id', async (req, res) =>
+  router.patch('/:id', requireWrite, async (req, res) =>
     res.json({
       tag: await service.saveTag(
         req.gotitAuth!,
@@ -144,7 +144,7 @@ export function createTagRoutes(service: LibraryRepository) {
       requestId: req.id,
     }),
   );
-  router.delete('/:id', async (req, res) =>
+  router.delete('/:id', requireWrite, async (req, res) =>
     res.json({
       ...(await service.deleteTag(req.gotitAuth!, parseInput(uuidSchema, req.params.id))),
       requestId: req.id,

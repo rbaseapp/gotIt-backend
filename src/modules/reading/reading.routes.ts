@@ -5,6 +5,9 @@ import { publicationSchema, readingInputSchema } from './reading.validation.js';
 import type { ReadingService } from './reading.service.js';
 export function createReadingRoutes(service: ReadingService, requireGeneration: RequestHandler) {
   const router = Router();
+  router.get('/quota', async (req, res) =>
+    res.json({ quota: await service.quotaStatus(req.gotitAuth!), requestId: req.id }),
+  );
   router.post('/preview', requireGeneration, async (req, res) =>
     res.json({
       ...(await service.preview(req.gotitAuth!, parseInput(readingInputSchema, req.body))),
@@ -32,7 +35,7 @@ export function createReadingRoutes(service: ReadingService, requireGeneration: 
       requestId: req.id,
     }),
   );
-  router.delete('/:id', async (req, res) =>
+  router.delete('/:id', requireGeneration, async (req, res) =>
     res.json({
       ...(await service.remove(req.gotitAuth!, parseInput(uuidSchema, req.params.id))),
       requestId: req.id,

@@ -133,7 +133,7 @@ fabricate audio or scores.
 
 ## Paid feature enforcement
 
-Paid entitlement enforcement is temporarily disabled, so every authenticated user can use reading generation, speech audio, and pronunciation assessment while subscriptions are not yet available. Keep `ENFORCE_PAID_ENTITLEMENTS=false` until the paid-subscription launch is complete. The existing Core billing integration remains in place; setting the flag to `true` restores server-side checks for `reading.ai`, `speech.audio`, and `speech.pronunciation`, returning `402 SUBSCRIPTION_REQUIRED` when access is missing. GotIt never accepts or stores card data.
+Paid entitlement enforcement is enabled by default. A new account receives the Core-managed 14-day Pro trial; an active subscription keeps all learning capabilities open. After both trial and paid access end, dashboard and saved vocabulary remain readable while capture, library mutations, imports, games, AI reading generation, speech, and pronunciation return `402 SUBSCRIPTION_REQUIRED`. AI reading generation is additionally limited to four successful creations per UTC calendar month for both trial and paid accounts. GotIt never accepts or stores card data.
 
 ## HTTP, deployment and verification
 

@@ -47,14 +47,22 @@ test('CoreAuthClient maps Core /auth/me user to trusted GotIt identity', async (
 test('CoreAuthClient loads billing entitlements from the application-scoped Core endpoint', async () => {
   let seenUrl = '';
   const client = new CoreAuthClient({
-    baseUrl: 'https://core.example.test', applicationKey: 'gotit', timeoutMs: 1000,
+    baseUrl: 'https://core.example.test',
+    applicationKey: 'gotit',
+    timeoutMs: 1000,
     fetchImpl: async (input) => {
       seenUrl = String(input);
       return Response.json({
-        tier: 'paid', access: true,
+        tier: 'paid',
+        access: true,
         plan: { key: 'pro-monthly', name: 'Pro', kind: 'paid' },
         entitlements: ['reading.ai', 'speech.audio'],
-        subscription: { status: 'active', cancelAtPeriodEnd: false, currentPeriodEndsAt: '2030-01-01T00:00:00.000Z' },
+        subscription: {
+          status: 'active',
+          cancelAtPeriodEnd: false,
+          currentPeriodEndsAt: '2030-01-01T00:00:00.000Z',
+        },
+        trial: null,
       });
     },
   });
