@@ -19,7 +19,10 @@ export function createRequireEntitlementMiddleware(
     try {
       if (!request.gotitCoreAccessToken)
         throw new AppError(401, 'UNAUTHORIZED', 'Authentication is required');
-      const billing = await core.getBillingStatus(request.gotitCoreAccessToken, String(request.id));
+      const billing =
+        request.gotitBillingStatus ??
+        (await core.getBillingStatus(request.gotitCoreAccessToken, String(request.id)));
+      request.gotitBillingStatus = billing;
       if (!billing.access || !billing.entitlements.includes(entitlement)) {
         throw new AppError(
           402,
@@ -29,6 +32,34 @@ export function createRequireEntitlementMiddleware(
             entitlement,
             currentPlan: billing.plan.key,
           },
+        );
+      }
+      next();
+    } catch (error) {
+      next(error);
+    }
+  };
+}
+
+export function createRequirePaidTierMiddleware(core: CoreAuthClient, enabled = true) {
+  return async function requirePaidTier(request: Request, _response: Response, next: NextFunction) {
+    if (!enabled) {
+      next();
+      return;
+    }
+    try {
+      if (!request.gotitCoreAccessToken)
+        throw new AppError(401, 'UNAUTHORIZED', 'Authentication is required');
+      const billing =
+        request.gotitBillingStatus ??
+        (await core.getBillingStatus(request.gotitCoreAccessToken, String(request.id)));
+      request.gotitBillingStatus = billing;
+      if (!billing.access || billing.tier !== 'paid') {
+        throw new AppError(
+          402,
+          'SUBSCRIPTION_REQUIRED',
+          'AI translation requires a paid subscription',
+          { feature: 'translation.ai', currentPlan: billing.plan.key },
         );
       }
       next();

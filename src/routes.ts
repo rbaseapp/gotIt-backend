@@ -18,7 +18,10 @@ import { API_ROUTES } from './shared/http/api-catalog.js';
 import { AppError } from './shared/errors/app-error.js';
 import type { AppDependencies } from './shared/http/dependencies.js';
 import { createAuthenticateMiddleware } from './shared/middleware/authenticate.js';
-import { createRequireEntitlementMiddleware } from './shared/middleware/require-entitlement.js';
+import {
+  createRequireEntitlementMiddleware,
+  createRequirePaidTierMiddleware,
+} from './shared/middleware/require-entitlement.js';
 import { createWordPackRoutes } from './modules/word-packs/word-packs.routes.js';
 
 export function createRoutes(dependencies: AppDependencies) {
@@ -81,6 +84,10 @@ export function createRoutes(dependencies: AppDependencies) {
   const requirePractice = createRequireEntitlementMiddleware(
     dependencies.coreAuthClient,
     'practice.play',
+    dependencies.enforcePaidEntitlements === true,
+  );
+  const requirePaidAiTranslation = createRequirePaidTierMiddleware(
+    dependencies.coreAuthClient,
     dependencies.enforcePaidEntitlements === true,
   );
   router.get('/api/v1/capabilities', async (req, res) => {
@@ -175,7 +182,11 @@ export function createRoutes(dependencies: AppDependencies) {
   if (dependencies.captureService) {
     router.use(
       '/api/v1/captures',
-      createCaptureRoutes(dependencies.captureService, requireVocabularyWrite),
+      createCaptureRoutes(
+        dependencies.captureService,
+        requireVocabularyWrite,
+        requirePaidAiTranslation,
+      ),
     );
     router.use('/api/v1/learning-items', createLearningItemRoutes(dependencies.captureService));
   }

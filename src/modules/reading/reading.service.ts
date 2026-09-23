@@ -16,7 +16,11 @@ import {
   type ReadingTarget,
 } from './reading.validation.js';
 import { bindReadingTargets, completeMissingTargets } from './reading-content.js';
-import type { AiMonthlyQuotaContract, AiMonthlyQuotaStatus } from './ai-monthly-quota.js';
+import type {
+  AiMonthlyQuotaContract,
+  AiMonthlyQuotaStatus,
+  AiQuotaPolicy,
+} from './ai-monthly-quota.js';
 
 const targetSchema = z
   .object({
@@ -150,10 +154,13 @@ export class ReadingService {
   get available() {
     return Boolean(this.generator && this.key);
   }
-  async quotaStatus(scope: ProfileScope): Promise<AiMonthlyQuotaStatus | null> {
-    return this.quota ? this.quota.status(scope) : null;
+  async quotaStatus(
+    scope: ProfileScope,
+    policy?: AiQuotaPolicy,
+  ): Promise<AiMonthlyQuotaStatus | null> {
+    return this.quota ? this.quota.status(scope, policy) : null;
   }
-  async preview(scope: ProfileScope, input: ReadingInput) {
+  async preview(scope: ProfileScope, input: ReadingInput, quotaPolicy?: AiQuotaPolicy) {
     if (!this.generator || !this.key)
       throw new AppError(
         503,
@@ -197,7 +204,7 @@ export class ReadingService {
       },
       true,
     );
-    if (this.quota) await this.quota.reserve(scope);
+    if (this.quota) await this.quota.reserve(scope, quotaPolicy);
     try {
       const generationDeadline = Date.now() + 45000;
       const maxAttempts = 3;
@@ -333,7 +340,7 @@ export class ReadingService {
         provider: { name: ticket.providerName, model: ticket.providerModel },
       };
     } catch (error) {
-      if (this.quota) await this.quota.release(scope);
+      if (this.quota) await this.quota.release(scope, quotaPolicy);
       throw error;
     }
   }

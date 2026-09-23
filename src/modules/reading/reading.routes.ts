@@ -3,14 +3,25 @@ import { parseInput, uuidSchema } from '../capture/capture.validation.js';
 import { pageSchema } from '../library/library.validation.js';
 import { publicationSchema, readingInputSchema } from './reading.validation.js';
 import type { ReadingService } from './reading.service.js';
+import { aiQuotaPolicyForTier } from './ai-monthly-quota.js';
 export function createReadingRoutes(service: ReadingService, requireGeneration: RequestHandler) {
   const router = Router();
-  router.get('/quota', async (req, res) =>
-    res.json({ quota: await service.quotaStatus(req.gotitAuth!), requestId: req.id }),
+  router.get('/quota', requireGeneration, async (req, res) =>
+    res.json({
+      quota: await service.quotaStatus(
+        req.gotitAuth!,
+        aiQuotaPolicyForTier(req.gotitBillingStatus?.tier),
+      ),
+      requestId: req.id,
+    }),
   );
   router.post('/preview', requireGeneration, async (req, res) =>
     res.json({
-      ...(await service.preview(req.gotitAuth!, parseInput(readingInputSchema, req.body))),
+      ...(await service.preview(
+        req.gotitAuth!,
+        parseInput(readingInputSchema, req.body),
+        aiQuotaPolicyForTier(req.gotitBillingStatus?.tier),
+      )),
       requestId: req.id,
     }),
   );

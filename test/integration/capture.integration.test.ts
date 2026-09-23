@@ -173,7 +173,57 @@ test(
           const metadata = await database.adminPool.query(
             'SELECT count(*)::integer AS count FROM gotit_migrations.pgmigrations',
           );
-          assert.equal(metadata.rows[0].count, 9);
+          assert.equal(metadata.rows[0].count, 10);
+          const catalog = await database.adminPool.query(`
+            SELECT tp.slug,
+              count(DISTINCT tr.id)::integer AS tracks,
+              count(DISTINCT p.id)::integer AS packs,
+              count(DISTINCT e.id)::integer AS entries,
+              array_agg(DISTINCT tr.level_code ORDER BY tr.level_code) AS levels
+            FROM product_gotit.word_topics tp
+            JOIN product_gotit.word_tracks tr ON tr.topic_id=tp.id
+            JOIN product_gotit.word_packs p ON p.track_id=tr.id
+            JOIN product_gotit.word_pack_entries e ON e.pack_id=p.id
+            WHERE tp.slug IN ('sports','fruits-and-vegetables','everyday-words','software-development','current-events')
+            GROUP BY tp.slug ORDER BY tp.slug
+          `);
+          assert.deepEqual(catalog.rows, [
+            {
+              slug: 'current-events',
+              tracks: 2,
+              packs: 4,
+              entries: 48,
+              levels: ['advanced', 'beginner'],
+            },
+            {
+              slug: 'everyday-words',
+              tracks: 2,
+              packs: 4,
+              entries: 48,
+              levels: ['advanced', 'beginner'],
+            },
+            {
+              slug: 'fruits-and-vegetables',
+              tracks: 2,
+              packs: 2,
+              entries: 24,
+              levels: ['advanced', 'beginner'],
+            },
+            {
+              slug: 'software-development',
+              tracks: 2,
+              packs: 4,
+              entries: 48,
+              levels: ['advanced', 'beginner'],
+            },
+            {
+              slug: 'sports',
+              tracks: 2,
+              packs: 2,
+              entries: 24,
+              levels: ['advanced', 'beginner'],
+            },
+          ]);
           const originalCore = await database.adminPool.query(
             'SELECT count(*)::integer AS count FROM public.pgmigrations',
           );
@@ -197,7 +247,7 @@ test(
               randomUUID(),
             ],
           );
-          for (let migration = 0; migration < 9; migration++) await database.migrate('down');
+          for (let migration = 0; migration < 10; migration++) await database.migrate('down');
           const absent = await database.adminPool
             .query(`SELECT column_name FROM information_schema.columns WHERE table_schema='product_gotit'
           AND table_name='item_occurrences' AND column_name='capture_receipt'`);

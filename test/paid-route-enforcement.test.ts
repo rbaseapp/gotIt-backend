@@ -87,3 +87,50 @@ test('expired free accounts cannot save words or start practice sessions', async
   assert.equal(practiceCalls, 0);
   assert.equal(wordPackCalls, 0);
 });
+
+test('trial accounts can save words but cannot request AI translation', async () => {
+  let previewCalls = 0;
+  const coreAuthClient = {
+    async validateAccessToken() {
+      return identity;
+    },
+    async getBillingStatus() {
+      return {
+        tier: 'trial',
+        access: true,
+        plan: { key: 'pro-trial', name: 'GotIt trial', kind: 'paid' },
+        entitlements: ['vocabulary.write'],
+        subscription: null,
+        trial: {
+          status: 'active',
+          startedAt: '2030-01-01T00:00:00.000Z',
+          endsAt: '2030-01-15T00:00:00.000Z',
+          daysRemaining: 6,
+        },
+      };
+    },
+  } as unknown as CoreAuthClient;
+  const app = createApp({
+    logger: createLogger('silent'),
+    checkDatabase: async () => {},
+    coreAuthClient,
+    profileService: {} as never,
+    captureService: {
+      preview: async () => {
+        previewCalls++;
+        return {};
+      },
+    } as never,
+    enforcePaidEntitlements: true,
+  });
+
+  const ai = await request(app)
+    .post('/api/v1/captures/preview')
+    .set('authorization', 'Bearer token')
+    .send({ translationMethod: 'ai' });
+
+  assert.equal(ai.status, 402);
+  assert.equal(ai.body.error.code, 'SUBSCRIPTION_REQUIRED');
+  assert.equal(ai.body.error.details.feature, 'translation.ai');
+  assert.equal(previewCalls, 0);
+});
