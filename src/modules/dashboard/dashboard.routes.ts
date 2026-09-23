@@ -4,9 +4,21 @@ import { parseInput } from '../capture/capture.validation.js';
 import type { DashboardService } from './dashboard.service.js';
 export function createDashboardRoutes(service: DashboardService) {
   const router = Router();
-  router.get('/', async (req, res) =>
-    res.json({ ...(await service.dashboard(req.gotitAuth!)), requestId: req.id }),
-  );
+  router.get('/', async (req, res) => {
+    const input = parseInput(
+      z
+        .object({
+          recentPage: z.coerce.number().int().min(1).max(100000).default(1),
+          recentLimit: z.coerce.number().int().min(1).max(20).default(6),
+        })
+        .strict(),
+      req.query,
+    );
+    res.json({
+      ...(await service.dashboard(req.gotitAuth!, input.recentPage, input.recentLimit)),
+      requestId: req.id,
+    });
+  });
   router.get('/activity', async (req, res) => {
     const input = parseInput(
       z.object({ days: z.coerce.number().int().min(1).max(366).default(30) }).strict(),

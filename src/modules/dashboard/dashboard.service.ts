@@ -76,7 +76,7 @@ export class DashboardService {
       true,
     );
   }
-  async dashboard(scope: ProfileScope) {
+  async dashboard(scope: ProfileScope, recentPage = 1, recentLimit = 6) {
     const profile = await this.profiles.getProfile(scope),
       today = calendarDay(new Date(), profile.timezone);
     const data = await withTransaction(
@@ -135,10 +135,31 @@ export class DashboardService {
             [...scopeValues(scope), today, profile.timezone],
           )
         ).rows[0]!;
+        const recentTotal = Number(
+          (
+            await tx.query(
+              `SELECT count(*)::integer AS count FROM product_gotit.practice_attempts
+               WHERE application_id=$1 AND application_user_id=$2`,
+              scopeValues(scope),
+            )
+          ).rows[0]?.count ?? 0,
+        );
         const recent = (
           await tx.query(
-            `SELECT id,learning_item_id AS "learningItemId",exercise_type AS "exerciseType",result,score::float8 AS score,created_at AS "createdAt" FROM product_gotit.practice_attempts WHERE application_id=$1 AND application_user_id=$2 ORDER BY created_at DESC,id DESC LIMIT 10`,
-            scopeValues(scope),
+            `SELECT attempt.id,attempt.learning_item_id AS "learningItemId",
+              attempt.exercise_type AS "exerciseType",attempt.result,attempt.score::float8 AS score,
+              attempt.created_at AS "createdAt",item.source_text AS "sourceText",
+              (SELECT translation_text FROM product_gotit.item_translations translation
+               WHERE translation.application_id=item.application_id
+                 AND translation.application_user_id=item.application_user_id
+                 AND translation.learning_item_id=item.id AND translation.is_current AND translation.is_primary
+               ORDER BY translation.id LIMIT 1) AS "primaryTranslation"
+             FROM product_gotit.practice_attempts attempt
+             JOIN product_gotit.learning_items item ON item.application_id=attempt.application_id
+               AND item.application_user_id=attempt.application_user_id AND item.id=attempt.learning_item_id
+             WHERE attempt.application_id=$1 AND attempt.application_user_id=$2
+             ORDER BY attempt.created_at DESC,attempt.id DESC LIMIT $3 OFFSET $4`,
+            [...scopeValues(scope), recentLimit, (recentPage - 1) * recentLimit],
           )
         ).rows;
         const value =
@@ -152,6 +173,12 @@ export class DashboardService {
           skills,
           modes,
           recentActivity: recent,
+          recentActivityPagination: {
+            page: recentPage,
+            pageCount: Math.max(1, Math.ceil(recentTotal / recentLimit)),
+            totalCount: recentTotal,
+            pageSize: recentLimit,
+          },
           dailyGoal: {
             ...profile.dailyGoal,
             current: value,

@@ -9,6 +9,7 @@ export const listSchema = z
   .object({
     limit: z.coerce.number().int().min(1).max(100).default(30),
     cursor: z.string().max(2048).optional(),
+    page: z.coerce.number().int().min(1).max(100000).optional(),
     search: textSchema(500).optional(),
     sourceLanguageCode: languageSchema.optional(),
     translationLanguageCode: languageSchema.optional(),
@@ -17,6 +18,7 @@ export const listSchema = z
     difficult: z.enum(['true', 'false']).optional(),
     highPriority: z.enum(['true', 'false']).optional(),
     due: z.enum(['true', 'false']).optional(),
+    practiced: z.enum(['true', 'false']).optional(),
     tagId: uuidSchema.optional(),
     packIds: z
       .string()
@@ -31,10 +33,19 @@ export const listSchema = z
       )
       .optional(),
     sort: z
-      .enum(['recent', 'alphabetical', 'weakest', 'strongest', 'due_next', 'most_practiced'])
-      .default('recent'),
+      .enum([
+        'recent',
+        'alphabetical',
+        'learning_status',
+        'weakest',
+        'strongest',
+        'due_next',
+        'most_practiced',
+      ])
+      .default('alphabetical'),
   })
-  .strict();
+  .strict()
+  .refine((value) => !(value.cursor && value.page), 'Use either cursor or page pagination');
 export const editSchema = z
   .object({
     sourceText: textSchema(500).optional(),

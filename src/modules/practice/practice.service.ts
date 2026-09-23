@@ -48,8 +48,8 @@ const SMART_LEARNING_ORDER: ExerciseType[] = [
   'matching',
   'flashcards',
   'pronunciation',
-  'listening_spelling',
   'recall',
+  'listening_spelling',
 ];
 
 function isHttpsUrl(value: unknown) {
@@ -93,10 +93,10 @@ export function smartLearningSequence(skills: Skill[], matchingAvailable = true)
     ...(matchingAvailable && skills.includes('recognition') ? (['matching'] as const) : []),
     ...(skills.includes('recognition') ? (['flashcards'] as const) : []),
     ...(skills.includes('pronunciation') ? (['pronunciation'] as const) : []),
+    ...(skills.includes('recall') ? (['recall'] as const) : []),
     ...(skills.includes('listening') && skills.includes('spelling')
       ? (['listening_spelling'] as const)
       : []),
-    ...(skills.includes('recall') ? (['recall'] as const) : []),
   ];
 }
 
@@ -670,15 +670,30 @@ export class PracticeService {
     return withTransaction(
       this.pool,
       async (tx) => {
+        const totalCount = Number(
+          (
+            await tx.query(
+              'SELECT count(*)::integer AS count FROM product_gotit.practice_sessions WHERE application_id=$1 AND application_user_id=$2',
+              scopeValues(scope),
+            )
+          ).rows[0]?.count ?? 0,
+        );
         const rows = (
           await tx.query(
-            'SELECT * FROM product_gotit.practice_sessions WHERE application_id=$1 AND application_user_id=$2 AND ($3::uuid IS NULL OR id>$3) ORDER BY id LIMIT $4',
+            `SELECT session.* FROM product_gotit.practice_sessions session
+             WHERE session.application_id=$1 AND session.application_user_id=$2
+               AND ($3::uuid IS NULL OR (session.started_at,session.id)<(
+                 SELECT cursor.started_at,cursor.id FROM product_gotit.practice_sessions cursor
+                 WHERE cursor.application_id=$1 AND cursor.application_user_id=$2 AND cursor.id=$3
+               ))
+             ORDER BY session.started_at DESC,session.id DESC LIMIT $4`,
             [...scopeValues(scope), cursor ?? null, limit + 1],
           )
         ).rows;
         return {
           items: rows.slice(0, limit).map((r) => this.sessionDto(r)),
           nextCursor: rows.length > limit ? rows[limit - 1]!.id : null,
+          totalCount,
         };
       },
       true,
@@ -873,7 +888,8 @@ export class PracticeService {
                      FROM product_gotit.practice_attempts total
                      WHERE total.application_id=$1 AND total.application_user_id=$2
                        AND total.learning_item_id=$3 AND total.result<>'skipped'
-                       AND COALESCE(total.learning_revision,1)=$5) attempted_exercise_types,
+                       AND total.score>=85
+                       AND COALESCE(total.learning_revision,1)=$5) mastered_exercise_types,
                    ARRAY(SELECT score FROM(SELECT score,created_at,id FROM history
                      ORDER BY created_at DESC,id DESC LIMIT 10) recent ORDER BY created_at,id) scores
                  FROM history`,
@@ -899,7 +915,7 @@ export class PracticeService {
             ).size,
             introductoryType = nextSmartLearningExercise(
               available,
-              activeRecall.attempted_exercise_types,
+              activeRecall.mastered_exercise_types,
               rows.length >= 2 && distinctMeanings >= 2,
             ),
             hasMasteryGap =

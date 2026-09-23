@@ -221,6 +221,16 @@ test(
           const list = await call('get', '/learning-items?limit=1&sort=alphabetical').expect(200);
           assert.equal(list.body.items.length, 1);
           assert.ok(list.body.nextCursor);
+          assert.ok(list.body.totalCount >= 2);
+          const numbered = await call(
+            'get',
+            '/learning-items?limit=1&page=2&sort=alphabetical',
+          ).expect(200);
+          assert.equal(numbered.body.page, 2);
+          assert.ok(numbered.body.pageCount >= 2);
+          assert.equal(numbered.body.totalCount, list.body.totalCount);
+          assert.notEqual(numbered.body.items[0].id, list.body.items[0].id);
+          await call('get', '/learning-items?sort=learning_status').expect(200);
           const next = await call(
             'get',
             `/learning-items?limit=1&sort=alphabetical&cursor=${list.body.nextCursor}`,
@@ -825,6 +835,15 @@ test(
           );
           const dashboard = await call('get', '/dashboard').expect(200);
           assert.equal(dashboard.body.counts.total, 4);
+          assert.ok(dashboard.body.recentActivityPagination.totalCount > 0);
+          assert.equal(dashboard.body.recentActivityPagination.page, 1);
+          assert.ok(
+            dashboard.body.recentActivity.every(
+              (attempt: any) =>
+                typeof attempt.sourceText === 'string' &&
+                Object.hasOwn(attempt, 'primaryTranslation'),
+            ),
+          );
           assert.ok(dashboard.body.gamification.totalXp >= 10);
           assert.ok(dashboard.body.gamification.todayXp >= 10);
           assert.equal(dashboard.body.gamification.dailyXpCap, 200);

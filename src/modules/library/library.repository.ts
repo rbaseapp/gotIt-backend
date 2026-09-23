@@ -23,10 +23,17 @@ const cursorSchema = z
     filterHash: z.string().length(64),
   })
   .strict();
+const projectedMastery = `CASE WHEN li.mastery_source='user' THEN li.overall_mastery_score ELSE COALESCE((
+  SELECT round(sum(progress.mastery_score * CASE progress.skill_type WHEN 'recall' THEN 1.5 ELSE 1 END) /
+    NULLIF(sum(CASE progress.skill_type WHEN 'recall' THEN 1.5 ELSE 1 END),0),2)
+  FROM product_gotit.item_skill_progress progress
+  WHERE progress.application_id=li.application_id AND progress.application_user_id=li.application_user_id
+    AND progress.learning_item_id=li.id AND progress.attempt_count>0
+),li.overall_mastery_score) END`;
 const fields = `li.id,li.source_text AS "sourceText",li.source_language_code AS "sourceLanguageCode",
   li.translation_language_code AS "translationLanguageCode",li.item_type AS "itemType",li.user_status AS "userStatus",
   li.learning_status AS "learningStatus",li.user_priority AS "userPriority",li.manual_hard AS "manualHard",
-  li.overall_mastery_score::float8 AS "overallMasteryScore",li.review_stage AS "reviewStage",
+  (${projectedMastery})::float8 AS "overallMasteryScore",li.review_stage AS "reviewStage",
   CASE WHEN li.learning_status='mastered' AND li.review_stage>=${ESTABLISHED_REVIEW_STAGE} THEN 'established' WHEN li.learning_status='mastered' THEN 'learned' ELSE 'acquiring' END AS "retentionLevel",
   li.next_review_at AS "nextReviewAt",li.created_at AS "createdAt",li.updated_at AS "updatedAt",
   (SELECT translation_text FROM product_gotit.item_translations t WHERE t.application_id=li.application_id
@@ -112,7 +119,7 @@ export class LibraryRepository {
     return withTransaction(
       this.pool,
       async (tx) => {
-        const { cursor, ...filters } = input,
+        const { cursor, page, ...filters } = input,
           filterHash = fingerprint(filters);
         const parameters: unknown[] = scopeValues(scope),
           where = ['li.application_id=$1', 'li.application_user_id=$2'];
@@ -148,6 +155,20 @@ export class LibraryRepository {
               ? 'li.next_review_at<=now()'
               : '(li.next_review_at IS NULL OR li.next_review_at>now())',
           );
+        if (input.practiced)
+          where.push(
+            input.practiced === 'true'
+              ? `EXISTS(SELECT 1 FROM product_gotit.practice_attempts practiced
+                  WHERE practiced.application_id=li.application_id
+                    AND practiced.application_user_id=li.application_user_id
+                    AND practiced.learning_item_id=li.id AND practiced.result<>'skipped'
+                    AND COALESCE(practiced.learning_revision,1)=li.learning_revision)`
+              : `NOT EXISTS(SELECT 1 FROM product_gotit.practice_attempts practiced
+                  WHERE practiced.application_id=li.application_id
+                    AND practiced.application_user_id=li.application_user_id
+                    AND practiced.learning_item_id=li.id AND practiced.result<>'skipped'
+                    AND COALESCE(practiced.learning_revision,1)=li.learning_revision)`,
+          );
         if (input.tagId)
           add(
             `EXISTS(SELECT 1 FROM product_gotit.learning_item_tags it WHERE it.application_id=li.application_id AND it.application_user_id=li.application_user_id AND it.learning_item_id=li.id AND it.tag_id=?)`,
@@ -169,8 +190,13 @@ export class LibraryRepository {
         const sorts = {
           recent: ['li.created_at', 'DESC', 'timestamptz'],
           alphabetical: ['li.normalized_source_text', 'ASC', 'text'],
-          weakest: ['li.overall_mastery_score', 'ASC', 'numeric'],
-          strongest: ['li.overall_mastery_score', 'DESC', 'numeric'],
+          learning_status: [
+            `CASE li.learning_status WHEN 'new' THEN 0 WHEN 'learning' THEN 1 WHEN 'reviewing' THEN 2 ELSE 3 END`,
+            'ASC',
+            'integer',
+          ],
+          weakest: [projectedMastery, 'ASC', 'numeric'],
+          strongest: [projectedMastery, 'DESC', 'numeric'],
           due_next: ["COALESCE(li.next_review_at,'infinity'::timestamptz)", 'ASC', 'timestamptz'],
           most_practiced: [
             `(SELECT count(*) FROM product_gotit.practice_attempts a WHERE a.application_id=li.application_id AND a.application_user_id=li.application_user_id AND a.learning_item_id=li.id)`,
@@ -179,6 +205,14 @@ export class LibraryRepository {
           ],
         } as const;
         const [metric, direction, cast] = sorts[input.sort];
+        const totalCount = Number(
+          (
+            await tx.query(
+              `SELECT count(*)::integer AS count FROM product_gotit.learning_items li WHERE ${where.join(' AND ')}`,
+              parameters,
+            )
+          ).rows[0]?.count ?? 0,
+        );
         if (cursor) {
           let claim: z.output<typeof cursorSchema>;
           try {
@@ -195,15 +229,17 @@ export class LibraryRepository {
             `(${metric},li.id) ${direction === 'ASC' ? '>' : '<'} ($${parameters.length - 1}::${cast},$${parameters.length}::uuid)`,
           );
         }
-        parameters.push(input.limit + 1);
+        parameters.push(page ? input.limit : input.limit + 1);
+        const limitParameter = parameters.length;
+        if (page) parameters.push((page - 1) * input.limit);
         const rows = (
           await tx.query(
             `SELECT ${fields},(${metric})::text AS cursor_value FROM product_gotit.learning_items li
-      WHERE ${where.join(' AND ')} ORDER BY ${metric} ${direction},li.id ${direction} LIMIT $${parameters.length}`,
+      WHERE ${where.join(' AND ')} ORDER BY ${metric} ${direction},li.id ${direction} LIMIT $${limitParameter}${page ? ` OFFSET $${parameters.length}` : ''}`,
             parameters,
           )
         ).rows;
-        const hasMore = rows.length > input.limit,
+        const hasMore = page ? page * input.limit < totalCount : rows.length > input.limit,
           selected = rows.slice(0, input.limit),
           last = selected.at(-1),
           requirements = await this.requirements(
@@ -217,11 +253,18 @@ export class LibraryRepository {
             masteryRequirements: requirements.get(row.id),
           })),
           nextCursor:
-            hasMore && last
+            !page && hasMore && last
               ? Buffer.from(
                   JSON.stringify({ id: last.id, value: last.cursor_value, filterHash }),
                 ).toString('base64url')
               : null,
+          totalCount,
+          ...(page
+            ? {
+                page,
+                pageCount: Math.max(1, Math.ceil(totalCount / input.limit)),
+              }
+            : {}),
         };
       },
       true,

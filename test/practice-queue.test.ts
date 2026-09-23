@@ -7,10 +7,10 @@ import {
   smartLearningSequence,
 } from '../src/modules/practice/practice.service.js';
 
-test('smart learning introduces words from recognition to active recall', () => {
+test('smart learning follows the staged path required for every word', () => {
   assert.deepEqual(
     smartLearningSequence(['recognition', 'recall', 'listening', 'spelling', 'pronunciation']),
-    ['matching', 'flashcards', 'pronunciation', 'listening_spelling', 'recall'],
+    ['matching', 'flashcards', 'pronunciation', 'recall', 'listening_spelling'],
   );
 });
 
@@ -26,7 +26,7 @@ test('smart learning skips unavailable activities without starting with recall',
   ]);
 });
 
-test('smart learning advances only after each earlier activity was actually attempted', () => {
+test('smart learning advances only after each earlier activity was mastered', () => {
   const skills = ['recognition', 'recall', 'listening', 'spelling', 'pronunciation'] as const;
 
   assert.equal(nextSmartLearningExercise([...skills], []), 'matching');
@@ -36,11 +36,12 @@ test('smart learning advances only after each earlier activity was actually atte
   );
   assert.equal(nextSmartLearningExercise([...skills], ['matching', 'flashcards']), 'pronunciation');
   assert.equal(
-    nextSmartLearningExercise(
-      [...skills],
-      ['matching', 'flashcards', 'pronunciation', 'listening_spelling'],
-    ),
+    nextSmartLearningExercise([...skills], ['matching', 'flashcards', 'pronunciation']),
     'recall',
+  );
+  assert.equal(
+    nextSmartLearningExercise([...skills], ['matching', 'flashcards', 'pronunciation', 'recall']),
+    'listening_spelling',
   );
 });
 
