@@ -5,7 +5,7 @@ services:
     dockerfilePath: ./Dockerfile
     healthCheckPath: /ready
     # Optional on a verified paid service: preDeployCommand: node scripts/preflight.js
-    autoDeployTrigger: off
+    autoDeployTrigger: commit
     maxShutdownDelaySeconds: 90
     envVars:
       - key: NODE_ENV
