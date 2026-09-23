@@ -30,15 +30,15 @@ jobs:
       - run: npm run build
       - name: Require a pinned read-only Core baseline for integration
         env:
-          CORE_REPOSITORY: ${{ vars.CORE_PLATFORM_REPOSITORY }}
-          CORE_REF: ${{ vars.CORE_PLATFORM_REF }}
+          CORE_REPOSITORY: ${{ vars.CORE_PLATFORM_REPOSITORY || 'rbaseapp/rbase-core-platforms' }}
+          CORE_REF: ${{ vars.CORE_PLATFORM_REF || '6547a2a2e745822fdbbb3b9c1d0384369e9051ad' }}
         run: |
           test -n "$CORE_REPOSITORY" || { echo 'Configure CORE_PLATFORM_REPOSITORY'; exit 1; }
           [[ "$CORE_REF" =~ ^[a-fA-F0-9]{40}$ ]] || { echo 'Configure CORE_PLATFORM_REF with the reviewed Core commit SHA'; exit 1; }
       - uses: actions/checkout@v7
         with:
-          repository: ${{ vars.CORE_PLATFORM_REPOSITORY }}
-          ref: ${{ vars.CORE_PLATFORM_REF }}
+          repository: ${{ vars.CORE_PLATFORM_REPOSITORY || 'rbaseapp/rbase-core-platforms' }}
+          ref: ${{ vars.CORE_PLATFORM_REF || '6547a2a2e745822fdbbb3b9c1d0384369e9051ad' }}
           token: ${{ secrets.CORE_PLATFORM_READ_TOKEN || github.token }}
           path: core-platform
           persist-credentials: false
