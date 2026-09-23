@@ -99,12 +99,12 @@ test(
       }
 
       await t.test(
-        'fresh bootstrap creates the 20 baseline tables plus two GotIt operational tables',
+        'fresh bootstrap creates the 20 baseline tables plus nine GotIt operational tables',
         async () => {
           const tables = await database.adminPool
             .query(`SELECT count(*)::integer AS count FROM information_schema.tables
           WHERE table_schema = 'product_gotit' AND table_type = 'BASE TABLE'`);
-          assert.equal(tables.rows[0].count, 22);
+          assert.equal(tables.rows[0].count, 29);
           await assert.rejects(
             () => database.runtimePool.query('SELECT id FROM core.application_users'),
             (error: unknown) => error instanceof Error && 'code' in error && error.code === '42501',

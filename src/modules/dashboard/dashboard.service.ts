@@ -105,7 +105,8 @@ export class DashboardService {
                 AND successful.user_answer_text IS NOT NULL AND COALESCE(successful.learning_revision,1)=learning_items.learning_revision
                 AND EXISTS(SELECT 1 FROM product_gotit.attempt_skill_effects effect
                   WHERE effect.practice_attempt_id=successful.id AND effect.skill_type='recall'))<$6))::integer AS "awaitingRecall"
-        FROM product_gotit.learning_items WHERE application_id=$1 AND application_user_id=$2 AND deleted_at IS NULL`,
+        FROM product_gotit.learning_items WHERE application_id=$1 AND application_user_id=$2
+          AND user_status='active' AND deleted_at IS NULL`,
             [
               ...scopeValues(scope),
               profile.timezone,
@@ -118,7 +119,7 @@ export class DashboardService {
         ).rows[0];
         const skills = (
           await tx.query(
-            `SELECT skill_type AS skill,round(avg(mastery_score),2)::float8 AS "masteryScore",sum(attempt_count)::integer AS "evidenceAttempts" FROM product_gotit.item_skill_progress p JOIN product_gotit.learning_items i ON i.id=p.learning_item_id AND i.application_id=p.application_id AND i.application_user_id=p.application_user_id WHERE p.application_id=$1 AND p.application_user_id=$2 AND i.deleted_at IS NULL GROUP BY skill_type ORDER BY skill_type`,
+            `SELECT skill_type AS skill,round(avg(mastery_score),2)::float8 AS "masteryScore",sum(attempt_count)::integer AS "evidenceAttempts" FROM product_gotit.item_skill_progress p JOIN product_gotit.learning_items i ON i.id=p.learning_item_id AND i.application_id=p.application_id AND i.application_user_id=p.application_user_id WHERE p.application_id=$1 AND p.application_user_id=$2 AND i.user_status='active' AND i.deleted_at IS NULL GROUP BY skill_type ORDER BY skill_type`,
             scopeValues(scope),
           )
         ).rows;

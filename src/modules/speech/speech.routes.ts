@@ -22,7 +22,10 @@ export function createSpeechItemRoutes(service: SpeechService, requireAudio: Req
   });
   return router;
 }
-export function createPronunciationRoutes(service: SpeechService, requirePronunciation: RequestHandler) {
+export function createPronunciationRoutes(
+  service: SpeechService,
+  requirePronunciation: RequestHandler,
+) {
   const router = Router();
   router.post('/assessments', requirePronunciation, async (req, res) => {
     const input = parseInput(assessmentSchema, req.body);

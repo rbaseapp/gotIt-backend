@@ -881,7 +881,7 @@ test(
             client.release();
           }
           const inspection = await inspectProduction(db.runtimePool.options.connectionString);
-          assert.equal(inspection.productTableCount, 22);
+          assert.equal(inspection.productTableCount, 29);
           assert.deepEqual(inspection.v1, {
             learningRevision: true,
             captureReceipts: true,
@@ -1264,6 +1264,15 @@ test(
           );
           await migrate(migratorUrl, 'down');
           await migrate(migratorUrl, 'up');
+          const migrator = new pg.Pool({
+            connectionString: migratorUrl,
+            connectionTimeoutMillis: 1000,
+          });
+          try {
+            await assert.rejects(() => migrator.query('SELECT * FROM core.application_users'));
+          } finally {
+            await migrator.end();
+          }
           const runtime = new pg.Pool({
             connectionString: adminUrl.replace('://postgres@', '://gotit_runtime@'),
             connectionTimeoutMillis: 1000,

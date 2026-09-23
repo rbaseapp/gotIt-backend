@@ -12,6 +12,10 @@ $gotit_admin_membership$;
 CREATE SCHEMA IF NOT EXISTS gotit_migrations AUTHORIZATION gotit_migrator;
 ALTER SCHEMA gotit_migrations OWNER TO gotit_migrator;
 GRANT USAGE,CREATE ON SCHEMA product_gotit TO gotit_migrator;
+-- New GotIt-owned tables may scope their rows to the trusted Core identity.
+-- The migrator can create those foreign keys without receiving any Core data access.
+GRANT USAGE ON SCHEMA core TO gotit_migrator;
+GRANT REFERENCES ON TABLE core.application_users TO gotit_migrator;
 
 DO $gotit_ownership$
 DECLARE object_record record;
@@ -54,5 +58,6 @@ RESET ROLE;
 
 ALTER DEFAULT PRIVILEGES FOR ROLE gotit_migrator IN SCHEMA product_gotit
   GRANT SELECT,INSERT,UPDATE,DELETE ON TABLES TO gotit_runtime;
--- gotit_migrator intentionally receives no Core-table privileges or database CREATE.
+-- gotit_migrator receives only Core schema usage and REFERENCES on application_users;
+-- it intentionally receives no Core data privileges or database CREATE.
 -- Keep its connection out of the running Web service's environment.

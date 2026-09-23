@@ -173,7 +173,7 @@ test(
           const metadata = await database.adminPool.query(
             'SELECT count(*)::integer AS count FROM gotit_migrations.pgmigrations',
           );
-          assert.equal(metadata.rows[0].count, 3);
+          assert.equal(metadata.rows[0].count, 8);
           const originalCore = await database.adminPool.query(
             'SELECT count(*)::integer AS count FROM public.pgmigrations',
           );
@@ -197,9 +197,7 @@ test(
               randomUUID(),
             ],
           );
-          await database.migrate('down');
-          await database.migrate('down');
-          await database.migrate('down');
+          for (let migration = 0; migration < 8; migration++) await database.migrate('down');
           const absent = await database.adminPool
             .query(`SELECT column_name FROM information_schema.columns WHERE table_schema='product_gotit'
           AND table_name='item_occurrences' AND column_name='capture_receipt'`);
