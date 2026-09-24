@@ -943,6 +943,41 @@ test(
           }
         },
       );
+      await t.test('focused repair round reissues the exact mistaken learning items', async () => {
+        const session = (
+            await call('post', '/practice/sessions', {
+              sessionType: 'recall',
+              learningItemIds: ids,
+            }).expect(201)
+          ).body.session,
+          initial = await call('post', `/practice/sessions/${session.id}/exercises`, {
+            count: 3,
+          }).expect(201),
+          mistakenIds = initial.body.exercises.map(
+            (exercise: { learningItemId: string }) => exercise.learningItemId,
+          );
+
+        for (const exercise of initial.body.exercises) {
+          await call('post', '/practice/attempts', {
+            exerciseId: exercise.id,
+            skipped: true,
+          }).expect(201);
+        }
+
+        const repair = await call('post', `/practice/sessions/${session.id}/exercises`, {
+          count: mistakenIds.length,
+          learningItemIds: mistakenIds,
+        }).expect(201);
+        assert.equal(repair.body.exercises.length, 3);
+        assert.deepEqual(
+          new Set(
+            repair.body.exercises.map(
+              (exercise: { learningItemId: string }) => exercise.learningItemId,
+            ),
+          ),
+          new Set(mistakenIds),
+        );
+      });
       await t.test(
         'matching issues one shared shuffled board and records each pair through the owned attempt engine',
         async () => {

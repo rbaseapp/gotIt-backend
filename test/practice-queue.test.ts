@@ -5,7 +5,13 @@ import {
   nextSmartLearningExercise,
   PracticeService,
   smartLearningSequence,
+  answerWordLengths,
 } from '../src/modules/practice/practice.service.js';
+
+test('typed answers expose word boundaries without exposing their letters', () => {
+  assert.deepEqual(answerWordLengths('take it easy'), [4, 2, 4]);
+  assert.deepEqual(answerWordLengths('  multiple   spaces  '), [8, 6]);
+});
 
 test('smart learning follows the staged path required for every word', () => {
   assert.deepEqual(

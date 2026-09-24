@@ -41,6 +41,14 @@ import {
   type GeneratedStudyImage,
   type StudyImageProvider,
 } from './study-image.provider.js';
+
+export function answerWordLengths(answer: string) {
+  return answer
+    .trim()
+    .split(/\s+/u)
+    .map((word) => [...word].length);
+}
+
 const missingSession = () => new AppError(404, 'NOT_FOUND', 'Practice session not found');
 type DbItem = Record<string, any>;
 type ExerciseType = 'flashcards' | 'recall' | 'listening_spelling' | 'matching' | 'pronunciation';
@@ -1036,6 +1044,7 @@ export class PracticeService {
                   ? { audioUrl: `/api/v1/learning-items/${row.id}/audio` }
                   : {}),
                 letterCount: [...accepted[0]!].length,
+                wordLengths: answerWordLengths(accepted[0]!),
               }
             : {}),
           ...(type === 'flashcards' ? { answer: accepted[0] } : {}),
