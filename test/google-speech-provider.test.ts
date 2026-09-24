@@ -191,3 +191,44 @@ test('Google speech assessment is deterministic for mismatch and no recognition'
   assert.match(mismatch.feedback, /זוהה/u);
   assert.equal(googleSpeechAssessment('hello', 'hello', undefined).score, 85);
 });
+
+test('Google speech accepts English homophones as equivalent pronunciation', () => {
+  const homophone = googleSpeechAssessment('where', 'wear', 0.9, 'en-US');
+  assert.equal(homophone.score, 99);
+  assert.match(homophone.feedback, /התאמה 100/u);
+
+  assert.ok(googleSpeechAssessment('where', 'wear', 0.9, 'fr-FR').score < 85);
+  assert.equal(googleSpeechAssessment("they're", 'their', undefined, 'en').score, 85);
+});
+
+test('Google speech sends homophones as hints and accepts a homophone alternative', async () => {
+  let requestInit: RequestInit | undefined;
+  const provider = new GoogleSpeechProvider(
+    'server-only-key',
+    undefined,
+    (async (_url, init) => {
+      requestInit = init;
+      return Response.json({
+        results: [
+          {
+            languageCode: 'en-US',
+            alternatives: [
+              { transcript: 'we are', confidence: 0.99 },
+              { transcript: 'where', confidence: 0.9 },
+            ],
+          },
+        ],
+      });
+    }) as typeof fetch,
+    async () => 'token',
+  );
+
+  const result = await provider.assess(
+    { audio: Buffer.from('wav'), text: 'wear', language: 'en', idempotencyKey: 'event' },
+    new AbortController().signal,
+  );
+  const body = JSON.parse(String(requestInit?.body));
+  assert.deepEqual(body.config.speechContexts, [{ phrases: ['wear', 'ware', 'where'], boost: 15 }]);
+  assert.equal(result.score, 99);
+  assert.match(result.feedback, /where/u);
+});

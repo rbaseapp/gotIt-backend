@@ -1,6 +1,10 @@
 import { z } from 'zod';
 import { AppError } from '../../shared/errors/app-error.js';
 import type { SpeechProvider } from './speech.service.js';
+import {
+  arePronunciationEquivalent,
+  pronunciationAlternatives,
+} from './pronunciation-equivalence.js';
 
 const languageConfigSchema = z
   .record(
@@ -152,13 +156,20 @@ function editSimilarity(actual: string, expected: string) {
   return Math.max(0, 1 - previous[right.length]! / Math.max(left.length, right.length));
 }
 
-function assessment(transcript: string, expected: string, confidence: number | undefined) {
+function assessment(
+  transcript: string,
+  expected: string,
+  confidence: number | undefined,
+  language = 'en',
+) {
   if (!transcript.trim())
     return {
       score: 0,
       feedback: 'לא הצלחנו לזהות את המילה. נסו שוב לאט יותר ובסביבה שקטה.',
     };
-  const similarity = editSimilarity(transcript, expected);
+  const similarity = arePronunciationEquivalent(transcript, expected, language)
+    ? 1
+    : editSimilarity(transcript, expected);
   const score = Math.round(Math.min(100, Math.max(0, similarity * 85 + (confidence ?? 0) * 15)));
   const feedback = `זוהה: “${transcript}” · התאמה ${Math.round(similarity * 100)} · ${confidence === undefined ? 'ביטחון זיהוי לא סופק' : `ביטחון זיהוי ${Math.round(confidence * 100)}`}.`;
   return { score, feedback };
@@ -299,7 +310,9 @@ export class GoogleSpeechProvider implements SpeechProvider {
           // Pronunciation exercises always have a trusted expected expression. Supplying
           // it as context improves recognition of short isolated words without changing
           // the language selected above.
-          speechContexts: [{ phrases: [input.text], boost: 15 }],
+          speechContexts: [
+            { phrases: pronunciationAlternatives(input.text, input.language), boost: 15 },
+          ],
         },
         audio: { content: input.audio.toString('base64') },
       }),
@@ -315,10 +328,11 @@ export class GoogleSpeechProvider implements SpeechProvider {
       ?.filter((candidate) => usesExpectedWritingSystem(candidate.transcript, input.text))
       .map((candidate) => ({
         candidate,
-        score: assessment(candidate.transcript, input.text, candidate.confidence).score,
+        score: assessment(candidate.transcript, input.text, candidate.confidence, input.language)
+          .score,
       }))
       .sort((left, right) => right.score - left.score)[0]?.candidate;
-    const result = assessment(best?.transcript ?? '', input.text, best?.confidence);
+    const result = assessment(best?.transcript ?? '', input.text, best?.confidence, input.language);
     return {
       ...result,
       model: `google-stt-confidence-v1:${config.recognitionLocale ?? config.locale}`,
