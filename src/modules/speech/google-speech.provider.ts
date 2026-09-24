@@ -165,13 +165,13 @@ function assessment(
   if (!transcript.trim())
     return {
       score: 0,
-      feedback: 'לא הצלחנו לזהות את המילה. נסו שוב לאט יותר ובסביבה שקטה.',
+      feedback: 'לא זוהתה מילה.',
     };
   const similarity = arePronunciationEquivalent(transcript, expected, language)
     ? 1
     : editSimilarity(transcript, expected);
   const score = Math.round(Math.min(100, Math.max(0, similarity * 85 + (confidence ?? 0) * 15)));
-  const feedback = `זוהה: “${transcript}” · התאמה ${Math.round(similarity * 100)} · ${confidence === undefined ? 'ביטחון זיהוי לא סופק' : `ביטחון זיהוי ${Math.round(confidence * 100)}`}.`;
+  const feedback = `זוהה: “${transcript}”`;
   return { score, feedback };
 }
 

@@ -70,8 +70,7 @@ test('Google speech recognition produces an explicit transcript-confidence asses
   assert.deepEqual(body.config.speechContexts, [{ phrases: ['good morning'], boost: 15 }]);
   assert.equal(body.audio.content, audio.toString('base64'));
   assert.equal(result.score, 99);
-  assert.match(result.feedback, /התאמה 100/u);
-  assert.match(result.feedback, /ביטחון זיהוי 90/u);
+  assert.equal(result.feedback, 'זוהה: “Good morning.”');
   assert.equal(result.model, 'google-stt-confidence-v1:en-US');
 });
 
@@ -184,7 +183,7 @@ test('Google speech exposes safe actionable authentication failures', async () =
 test('Google speech assessment is deterministic for mismatch and no recognition', () => {
   assert.deepEqual(googleSpeechAssessment('', 'hello', undefined), {
     score: 0,
-    feedback: 'לא הצלחנו לזהות את המילה. נסו שוב לאט יותר ובסביבה שקטה.',
+    feedback: 'לא זוהתה מילה.',
   });
   const mismatch = googleSpeechAssessment('yellow', 'hello', 0.95);
   assert.ok(mismatch.score < 85);
@@ -195,7 +194,7 @@ test('Google speech assessment is deterministic for mismatch and no recognition'
 test('Google speech accepts English homophones as equivalent pronunciation', () => {
   const homophone = googleSpeechAssessment('where', 'wear', 0.9, 'en-US');
   assert.equal(homophone.score, 99);
-  assert.match(homophone.feedback, /התאמה 100/u);
+  assert.equal(homophone.feedback, 'זוהה: “where”');
 
   assert.ok(googleSpeechAssessment('where', 'wear', 0.9, 'fr-FR').score < 85);
   assert.equal(googleSpeechAssessment("they're", 'their', undefined, 'en').score, 85);
