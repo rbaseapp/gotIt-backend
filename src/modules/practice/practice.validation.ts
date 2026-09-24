@@ -62,7 +62,7 @@ export const attemptSchema = z
     exerciseId: uuidSchema,
     answerText: textSchema(2000).optional(),
     choiceId: uuidSchema.optional(),
-    selfRating: z.enum(['again', 'hard', 'good', 'easy']).optional(),
+    selfRating: z.enum(['again', 'hard', 'good']).optional(),
     skipped: z.boolean().default(false),
     hintsUsed: z.number().int().min(0).max(10).default(0),
     responseTimeMs: z.number().int().min(0).max(3600000).optional(),

@@ -46,6 +46,16 @@ export class CaptureService {
     }
     const providerShouldDetectSource = sourceLanguageCode === null;
     const method = input.translationMethod ?? profile.translationMethodPreference ?? 'auto';
+    const knownSourceLanguageCode = sourceLanguageCode;
+    const existingSensesForKnownSource =
+      knownSourceLanguageCode && translationLanguageCode
+        ? this.repository
+            .findCandidates(scope, sourceText, knownSourceLanguageCode, translationLanguageCode)
+            .then(
+              (value) => ({ ok: true as const, value }),
+              (error: unknown) => ({ ok: false as const, error }),
+            )
+        : null;
     let runId: string | undefined;
     const enriched = translationLanguageCode
       ? await this.enrichment.enrich(
@@ -55,6 +65,7 @@ export class CaptureService {
             sourceLanguageCode,
             translationLanguageCode,
             sentenceText: input.context?.sentenceText ?? null,
+            maxCandidates: method === 'ai' && input.translationDetail === 'compact' ? 1 : 5,
           },
           async (trace) => {
             runId = await this.repository.recordEnrichment(scope, trace, translationLanguageCode);
@@ -107,15 +118,24 @@ export class CaptureService {
         });
       }
     }
-    const existingSenses =
-      sourceLanguageCode && translationLanguageCode
-        ? await this.repository.findCandidates(
-            scope,
-            sourceText,
-            sourceLanguageCode,
-            translationLanguageCode,
-          )
-        : { items: [], hasMore: false };
+    let existingSenses: Awaited<ReturnType<CaptureRepository['findCandidates']>> = {
+      items: [],
+      hasMore: false,
+    };
+    if (sourceLanguageCode && translationLanguageCode) {
+      if (existingSensesForKnownSource && sourceLanguageCode === knownSourceLanguageCode) {
+        const settled = await existingSensesForKnownSource;
+        if (!settled.ok) throw settled.error;
+        existingSenses = settled.value;
+      } else {
+        existingSenses = await this.repository.findCandidates(
+          scope,
+          sourceText,
+          sourceLanguageCode,
+          translationLanguageCode,
+        );
+      }
+    }
     return {
       sourceText,
       sourceLanguageCode,

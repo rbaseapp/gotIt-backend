@@ -30,7 +30,7 @@ export function scoreAnswer(spec: AnswerSpec, input: AttemptInput) {
   if (spec.kind === 'self_rating') {
     if (!input.selfRating || input.answerText || input.choiceId)
       throw new AppError(400, 'VALIDATION_ERROR', 'Flashcards require a self-rating');
-    score = { again: 0, hard: 60, good: 90, easy: 100 }[input.selfRating];
+    score = { again: 0, hard: 60, good: 100 }[input.selfRating];
     result = 'self_rated';
   } else if (spec.kind === 'multiple_choice') {
     if (!input.choiceId || input.answerText || input.selfRating)

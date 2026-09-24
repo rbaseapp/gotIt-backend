@@ -199,6 +199,45 @@ test('OpenAI Responses API uses Nano structured output without storing translati
   assert.equal(traces[0]?.provider.id, 'openai');
   assert.equal(traces[0]?.profile.model, 'gpt-5.4-nano-2026-03-17');
 });
+test('OpenAI compact previews request one meaning, lower the output budget and cache exact repeats', async () => {
+  let calls = 0;
+  const compactInput = { ...input, maxCandidates: 1 as const };
+  const adapter = new OpenAIProvider('openai-test-key', async (_url, init) => {
+    calls++;
+    const request = JSON.parse(String(init?.body));
+    assert.equal(request.max_output_tokens, 500);
+    assert.equal(request.text.format.schema.properties.candidates.maxItems, 1);
+    assert.match(request.instructions, /exactly one meaning/iu);
+    return Response.json({
+      model: 'gpt-5.4-nano-2026-03-17',
+      status: 'completed',
+      output: [
+        {
+          type: 'message',
+          content: [{ type: 'output_text', text: JSON.stringify(output) }],
+        },
+      ],
+    });
+  });
+  const registry = new EnrichmentRegistry(
+    [adapter],
+    [profile('chosen', 'openai', 'gpt-5.4-nano')],
+    { ai: { profiles: ['chosen'], timeoutMs: 1000 } },
+  );
+
+  const first = await registry.enrich('ai', compactInput, async () => {});
+  const repeated = await registry.enrich('ai', compactInput, async () => {});
+  const differentContext = await registry.enrich(
+    'ai',
+    { ...compactInput, sentenceText: 'They charged the battery.' },
+    async () => {},
+  );
+
+  assert.equal(first.status, 'succeeded');
+  assert.equal(repeated.status, 'succeeded');
+  assert.equal(differentContext.status, 'succeeded');
+  assert.equal(calls, 2);
+});
 test('OpenAI incomplete, refusal and authentication failures become safe unavailable results', async () => {
   const responses = [
     () =>

@@ -67,6 +67,7 @@ export const previewSchema = z
     translationLanguageCode: languageSchema.optional(),
     documentLanguageHint: languageSchema.optional(),
     translationMethod: z.enum(['auto', 'dictionary', 'ai']).optional(),
+    translationDetail: z.enum(['compact', 'expanded']).optional(),
     context: z.object(contextFields).strict().optional(),
   })
   .strict();

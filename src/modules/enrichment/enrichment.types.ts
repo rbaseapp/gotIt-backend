@@ -6,6 +6,8 @@ export type EnrichmentInput = {
   sourceLanguageCode: string | null;
   translationLanguageCode: string;
   sentenceText: string | null;
+  /** AI providers use one candidate for the fast path and up to five on demand. */
+  maxCandidates?: 1 | 5;
 };
 export type ProviderCapabilities = {
   detection: boolean;

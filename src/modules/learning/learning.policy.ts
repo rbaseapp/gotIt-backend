@@ -40,7 +40,7 @@ export const policySchema = z
 export type LearningPolicy = z.output<typeof policySchema>;
 export const DEFAULT_LEARNING_POLICY = policySchema.parse({});
 export const policyVersion = (policy: LearningPolicy) =>
-  `gotit-v1.1-${fingerprint(policy).slice(0, 12)}`;
+  `gotit-v1.2-${fingerprint(policy).slice(0, 12)}`;
 export function calendarDay(timestamp: Date, timezone: string) {
   const parts = new Intl.DateTimeFormat('en-CA', {
     timeZone: timezone,

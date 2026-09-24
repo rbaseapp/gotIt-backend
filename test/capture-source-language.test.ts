@@ -95,3 +95,80 @@ test('capture ignores page language metadata and auto-detects an equal source/ta
   assert.deepEqual(invalidDetection.enrichment.candidates, []);
   assert.equal(invalidDetection.requiresLanguageSelection, true);
 });
+
+test('capture starts the known-language existing-sense lookup while enrichment is running', async () => {
+  let lookupStarted = false;
+  let received: EnrichmentInput | undefined;
+  const provider: EnrichmentProvider = {
+    id: 'parallel_ai',
+    kind: 'ai',
+    capabilities: {
+      detection: true,
+      context: true,
+      phonetics: true,
+      examples: true,
+      models: true,
+    },
+    enrich: async (input) => {
+      received = input;
+      assert.equal(lookupStarted, true);
+      return {
+        sourceLanguageCode: 'en',
+        candidates: [{ text: 'שלום', contextUsed: true }],
+      };
+    },
+  };
+  const registry = new EnrichmentRegistry(
+    [provider],
+    [{ id: 'parallel', providerId: provider.id, model: 'test-model', timeoutMs: 1000 }],
+    { ai: { profiles: ['parallel'], timeoutMs: 1000, maxAttempts: 1 } },
+  );
+  const repository = {
+    recordEnrichment: async () => '11111111-1111-4111-8111-111111111111',
+    findCandidates: async () => {
+      lookupStarted = true;
+      return { items: [], hasMore: false };
+    },
+  } as unknown as CaptureRepository;
+  const profiles = {
+    getProfile: async () => ({
+      defaultSourceLanguage: 'en',
+      defaultTranslationLanguage: 'he',
+      timezone: 'UTC',
+      dailyGoal: { type: 'items' as const, value: 20 },
+      defaultNewItemsPerDay: 10,
+      translationMethodPreference: 'ai' as const,
+      languages: [],
+      interests: [],
+    }),
+    patchProfile: async () => {
+      throw new Error('not used');
+    },
+  } satisfies ProfileServiceContract;
+  const service = new CaptureService(
+    repository,
+    profiles,
+    registry,
+    new SelectionProofs('s'.repeat(32)),
+  );
+
+  await service.preview(
+    {
+      applicationId: '22222222-2222-4222-8222-222222222222',
+      applicationUserId: '33333333-3333-4333-8333-333333333333',
+    },
+    {
+      selectedText: 'hello',
+      translationMethod: 'ai',
+      translationDetail: 'compact',
+      context: {
+        sentenceText: 'They said hello.',
+        paragraphText: null,
+        pageTitle: null,
+        pageUrl: null,
+      },
+    },
+  );
+
+  assert.equal(received?.maxCandidates, 1);
+});

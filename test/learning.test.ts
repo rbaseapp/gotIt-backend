@@ -122,7 +122,20 @@ test('typed scoring normalizes Unicode, recognizes accepted variants, treats typ
   assert.equal(scoreAnswer(spec, attempt('helo')).score, 70);
   assert.equal(scoreAnswer(spec, attempt('hi')).score, 100);
   assert.equal(scoreAnswer(spec, attempt('hello', 1)).result, 'partially_correct');
-  assert.throws(() => scoreAnswer(spec, attemptSchema.parse({ exerciseId, selfRating: 'easy' })));
+  assert.throws(() => scoreAnswer(spec, attemptSchema.parse({ exerciseId, selfRating: 'good' })));
+});
+test('flashcard self-ratings use the three-level scoring scale and reject the legacy fourth rating', () => {
+  const spec: AnswerSpec = {
+    kind: 'self_rating',
+    accepted: ['Hello'],
+    skills: [{ skill: 'recognition', weight: 1 }],
+  };
+  const rating = (selfRating: 'again' | 'hard' | 'good') =>
+    scoreAnswer(spec, attemptSchema.parse({ exerciseId, selfRating })).score;
+  assert.equal(rating('again'), 0);
+  assert.equal(rating('hard'), 60);
+  assert.equal(rating('good'), 100);
+  assert.throws(() => attemptSchema.parse({ exerciseId, selfRating: 'easy' }));
 });
 test('remedial exercise requests accept a unique bounded item subset', () => {
   assert.deepEqual(

@@ -528,7 +528,7 @@ test(
             ).body.exercises[0],
             flashcard = await call('post', '/practice/attempts', {
               exerciseId: flashcardExercise.id,
-              selfRating: 'easy',
+              selfRating: 'good',
             }).expect(201),
             secondFlashcardExercise = (
               await call('post', `/practice/sessions/${flashcardSession.id}/exercises`, {
@@ -538,7 +538,7 @@ test(
             ).body.exercises[0],
             secondFlashcard = await call('post', '/practice/attempts', {
               exerciseId: secondFlashcardExercise.id,
-              selfRating: 'easy',
+              selfRating: 'good',
             }).expect(201);
           assert.equal(
             flashcard.body.progress.nextReviewAt,

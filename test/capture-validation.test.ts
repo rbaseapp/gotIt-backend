@@ -64,6 +64,14 @@ test('strict capture input rejects forged provenance, ambiguous duplicates, unsa
   assert.equal(preview.context?.sentenceText, 'a\nb');
   assert.equal(preview.context?.pageUrl, 'https://example.test/a');
   assert.equal(preview.context?.paragraphText, null);
+  assert.equal(
+    parseInput(previewSchema, { selectedText: 'charge', translationDetail: 'compact' })
+      .translationDetail,
+    'compact',
+  );
+  assert.throws(() =>
+    parseInput(previewSchema, { selectedText: 'charge', translationDetail: 'verbose' }),
+  );
 });
 test('selection proof binds scope, accepted fields and context; expiry/key rotation only permit receipt comparison', () => {
   const scope = { applicationId: randomUUID(), applicationUserId: randomUUID() };
