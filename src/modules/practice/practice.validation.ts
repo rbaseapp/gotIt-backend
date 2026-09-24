@@ -42,6 +42,7 @@ export const closeSessionSchema = z.object({ status: z.enum(['completed', 'aband
 export const exercisesSchema = z
   .object({
     count: z.number().int().min(1).max(100).default(5),
+    learningItemIds: itemIds.optional(),
     exerciseType: z
       .enum([
         'flashcards',

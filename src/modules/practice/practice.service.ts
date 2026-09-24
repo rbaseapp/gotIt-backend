@@ -766,7 +766,14 @@ export class PracticeService {
       );
       if (open.rows[0]!.count + input.count > 100)
         throw new AppError(409, 'EXERCISE_LIMIT', 'Finish outstanding exercises first');
-      const ids = session.selection.itemIds as string[];
+      const sessionIds = session.selection.itemIds as string[];
+      const ids = input.learningItemIds ?? sessionIds;
+      if (ids.some((itemId) => !sessionIds.includes(itemId)))
+        throw new AppError(
+          400,
+          'VALIDATION_ERROR',
+          'Requested exercise item is outside the session selection',
+        );
       const issuedCount = (
         await tx.query(
           'SELECT count(*)::integer count FROM product_gotit.practice_exercises WHERE application_id=$1 AND application_user_id=$2 AND practice_session_id=$3',

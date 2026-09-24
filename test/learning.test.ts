@@ -10,7 +10,7 @@ import {
   projectOverallMastery,
 } from '../src/modules/learning/learning.policy.js';
 import { scoreAnswer, type AnswerSpec } from '../src/modules/practice/practice.scoring.js';
-import { attemptSchema } from '../src/modules/practice/practice.validation.js';
+import { attemptSchema, exercisesSchema } from '../src/modules/practice/practice.validation.js';
 import { validateWav } from '../src/modules/speech/speech.service.js';
 const exerciseId = '11111111-1111-4111-8111-111111111111';
 test('learning uses active recall evidence, then promotes learned words to established retention', () => {
@@ -123,6 +123,15 @@ test('typed scoring normalizes Unicode, recognizes accepted variants, treats typ
   assert.equal(scoreAnswer(spec, attempt('hi')).score, 100);
   assert.equal(scoreAnswer(spec, attempt('hello', 1)).result, 'partially_correct');
   assert.throws(() => scoreAnswer(spec, attemptSchema.parse({ exerciseId, selfRating: 'easy' })));
+});
+test('remedial exercise requests accept a unique bounded item subset', () => {
+  assert.deepEqual(
+    exercisesSchema.parse({ count: 1, learningItemIds: [exerciseId] }).learningItemIds,
+    [exerciseId],
+  );
+  assert.throws(() =>
+    exercisesSchema.parse({ count: 1, learningItemIds: [exerciseId, exerciseId] }),
+  );
 });
 test('overall mastery reflects attempted skills without treating untried skills as failures', () => {
   const evidence = [
