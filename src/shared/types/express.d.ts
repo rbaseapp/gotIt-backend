@@ -11,6 +11,7 @@ declare global {
       gotitAuth?: {
         applicationId: string;
         applicationUserId: string;
+        role: 'user' | 'admin';
       };
       gotitCoreAccessToken?: string;
       gotitBillingStatus?: CoreBillingStatus;

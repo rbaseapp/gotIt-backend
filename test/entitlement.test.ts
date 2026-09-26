@@ -56,6 +56,32 @@ function appWithEnforcementDisabled() {
   return { app, billingRequests: () => billingRequests };
 }
 
+function appWithAdmin() {
+  let billingRequests = 0;
+  const core = {
+    async getBillingStatus() {
+      billingRequests++;
+      throw new Error('Admin access must not depend on billing');
+    },
+  } as unknown as CoreAuthClient;
+  const app = express();
+  app.use((req, _res, next) => {
+    req.id = 'request-id';
+    req.gotitCoreAccessToken = 'token';
+    req.gotitAuth = {
+      applicationId: '11111111-1111-4111-8111-111111111111',
+      applicationUserId: '22222222-2222-4222-8222-222222222222',
+      role: 'admin',
+    };
+    next();
+  });
+  app.get('/premium', createRequireEntitlementMiddleware(core, 'reading.ai'), (_req, res) =>
+    res.json({ ok: true }),
+  );
+  app.use(errorHandler);
+  return { app, billingRequests: () => billingRequests };
+}
+
 test('premium middleware allows an entitled subscriber', async () => {
   const response = await request(appWith(['reading.ai'])).get('/premium');
   assert.equal(response.status, 200);
@@ -70,6 +96,14 @@ test('premium middleware fails closed for a free account', async () => {
 
 test('disabled paid enforcement allows every authenticated account without a billing lookup', async () => {
   const fixture = appWithEnforcementDisabled();
+  const response = await request(fixture.app).get('/premium');
+  assert.equal(response.status, 200);
+  assert.deepEqual(response.body, { ok: true });
+  assert.equal(fixture.billingRequests(), 0);
+});
+
+test('admin bypasses subscription entitlements without a billing lookup', async () => {
+  const fixture = appWithAdmin();
   const response = await request(fixture.app).get('/premium');
   assert.equal(response.status, 200);
   assert.deepEqual(response.body, { ok: true });

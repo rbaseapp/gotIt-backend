@@ -93,6 +93,7 @@ export function createRoutes(dependencies: AppDependencies) {
   router.get('/api/v1/capabilities', async (req, res) => {
     const profile = await dependencies.profileService.getProfile(req.gotitAuth!);
     res.json({
+      role: req.gotitAuth!.role,
       configured: {
         library: Boolean(dependencies.libraryService),
         practice: Boolean(dependencies.practiceService),

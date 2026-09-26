@@ -10,6 +10,7 @@ const coreMeResponseSchema = z
         email: z.string().email().optional(),
         emailVerified: z.boolean().optional(),
         status: z.string().optional(),
+        role: z.enum(['user', 'admin']).default('user'),
       })
       .passthrough(),
   })
@@ -42,6 +43,7 @@ export type CoreBillingStatus = z.infer<typeof billingStatusSchema>;
 export type CoreAuthenticatedIdentity = {
   applicationId: string;
   applicationUserId: string;
+  role: 'user' | 'admin';
 };
 
 type FetchLike = typeof fetch;
@@ -117,6 +119,7 @@ export class CoreAuthClient {
     return {
       applicationId: parsed.data.user.applicationId,
       applicationUserId: parsed.data.user.id,
+      role: parsed.data.user.role,
     };
   }
 

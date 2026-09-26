@@ -17,6 +17,10 @@ export function createRequireEntitlementMiddleware(
       return;
     }
     try {
+      if (request.gotitAuth?.role === 'admin') {
+        next();
+        return;
+      }
       if (!request.gotitCoreAccessToken)
         throw new AppError(401, 'UNAUTHORIZED', 'Authentication is required');
       const billing =
@@ -48,6 +52,10 @@ export function createRequirePaidTierMiddleware(core: CoreAuthClient, enabled = 
       return;
     }
     try {
+      if (request.gotitAuth?.role === 'admin') {
+        next();
+        return;
+      }
       if (!request.gotitCoreAccessToken)
         throw new AppError(401, 'UNAUTHORIZED', 'Authentication is required');
       const billing =

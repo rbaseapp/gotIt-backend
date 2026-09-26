@@ -22,6 +22,7 @@ test('CoreAuthClient maps Core /auth/me user to trusted GotIt identity', async (
             email: 'user@example.test',
             emailVerified: true,
             status: 'active',
+            role: 'admin',
           },
         }),
         {
@@ -37,6 +38,7 @@ test('CoreAuthClient maps Core /auth/me user to trusted GotIt identity', async (
   assert.deepEqual(identity, {
     applicationId: '22222222-2222-4222-8222-222222222222',
     applicationUserId: '11111111-1111-4111-8111-111111111111',
+    role: 'admin',
   });
 
   assert.equal(seenHeaders?.get('authorization'), 'Bearer access-token');
@@ -143,6 +145,16 @@ for (const [description, body] of [
   [
     'invalid application ID',
     JSON.stringify({ user: { id: '11111111-1111-4111-8111-111111111111', applicationId: 'bad' } }),
+  ],
+  [
+    'invalid role',
+    JSON.stringify({
+      user: {
+        id: '11111111-1111-4111-8111-111111111111',
+        applicationId: '22222222-2222-4222-8222-222222222222',
+        role: 'owner',
+      },
+    }),
   ],
 ] as const) {
   test(`CoreAuthClient rejects ${description} with a fail-closed 503`, async () => {
