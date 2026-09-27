@@ -115,6 +115,7 @@ test('private lesson creates a bounded personalized Realtime session', async () 
   const result = await service.createSession(identity, {
     targetLanguageCode: 'en-US',
     supportLanguageCode: 'he',
+    requestedDurationMinutes: 10,
     teacherVoice: 'male',
     speechRate: 'slow',
     topic: 'job interviews',
@@ -122,8 +123,8 @@ test('private lesson creates a bounded personalized Realtime session', async () 
   });
 
   assert.equal(result.realtime.clientSecret, 'ek_demo');
-  assert.equal(result.lesson.durationSeconds, 300);
-  assert.equal(result.lesson.wrapUpAfterSeconds, 255);
+  assert.equal(result.lesson.durationSeconds, 600);
+  assert.equal(result.lesson.wrapUpAfterSeconds, 555);
   assert.equal(result.lesson.level, 'B1');
   assert.equal(result.lesson.teacherVoice, 'male');
   assert.equal(result.lesson.speechRate, 'slow');
@@ -199,6 +200,13 @@ test('private lesson route is authenticated and validates language choices', asy
     .expect(400);
   assert.equal(invalid.body.error.code, 'VALIDATION_ERROR');
 
+  const invalidDuration = await request(app)
+    .post('/api/v1/private-lessons/realtime-sessions')
+    .set('authorization', 'Bearer valid-token')
+    .send({ targetLanguageCode: 'en', requestedDurationMinutes: 2 })
+    .expect(400);
+  assert.equal(invalidDuration.body.error.code, 'VALIDATION_ERROR');
+
   const created = await request(app)
     .post('/api/v1/private-lessons/realtime-sessions')
     .set('authorization', 'Bearer valid-token')
@@ -206,6 +214,7 @@ test('private lesson route is authenticated and validates language choices', asy
     .expect(201);
   assert.equal(created.body.realtime.clientSecret, 'ek_demo');
   assert.equal(created.body.lesson.level, 'B1');
+  assert.equal(created.body.lesson.durationSeconds, 300);
   assert.equal(created.body.lesson.targetWords[0].sourceText, 'achieve');
 });
 

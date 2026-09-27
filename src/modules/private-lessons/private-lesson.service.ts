@@ -273,7 +273,9 @@ export class PrivateLessonService {
 
     return {
       id: randomUUID(),
-      durationSeconds: this.durationSeconds,
+      durationSeconds: input.requestedDurationMinutes
+        ? input.requestedDurationMinutes * 60
+        : this.durationSeconds,
       targetLanguageCode: input.targetLanguageCode,
       supportLanguageCode,
       level,
@@ -308,10 +310,11 @@ function publicStoredLesson(lesson: StoredPrivateLesson) {
 }
 
 function publicPlan(plan: PrivateLessonPlan) {
+  const wrapUpLeadSeconds = Math.min(45, Math.max(20, Math.floor(plan.durationSeconds * 0.15)));
   return {
     id: plan.id,
     durationSeconds: plan.durationSeconds,
-    wrapUpAfterSeconds: Math.max(0, plan.durationSeconds - 45),
+    wrapUpAfterSeconds: Math.max(0, plan.durationSeconds - wrapUpLeadSeconds),
     targetLanguageCode: plan.targetLanguageCode,
     supportLanguageCode: plan.supportLanguageCode,
     level: plan.level,
