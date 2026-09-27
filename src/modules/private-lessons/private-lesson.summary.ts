@@ -299,6 +299,7 @@ export class OpenAiPrivateLessonSummaryGenerator implements PrivateLessonSummary
                   focusAreas: plan.focusAreas,
                   customFocus: plan.customFocus,
                   correctionMode: plan.correctionMode,
+                  vocabularyMode: plan.vocabularyMode,
                   previousLesson: plan.continuity,
                   targetVocabulary: plan.targets,
                   transcript: turns,

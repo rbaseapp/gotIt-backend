@@ -2,10 +2,12 @@ import type { CefrLevel } from '../profile/profile.types.js';
 import type {
   privateLessonCorrectionModes,
   privateLessonFocusAreas,
+  privateLessonVocabularyModes,
 } from './private-lesson.validation.js';
 
 export type PrivateLessonFocusArea = (typeof privateLessonFocusAreas)[number];
 export type PrivateLessonCorrectionMode = (typeof privateLessonCorrectionModes)[number];
+export type PrivateLessonVocabularyMode = (typeof privateLessonVocabularyModes)[number];
 
 export type PrivateLessonTarget = {
   learningItemId: string;
@@ -24,6 +26,7 @@ export type PrivateLessonPlan = {
   focusAreas: PrivateLessonFocusArea[];
   customFocus: string | null;
   correctionMode: PrivateLessonCorrectionMode;
+  vocabularyMode: PrivateLessonVocabularyMode;
   teacherVoice: 'female' | 'male';
   speechRate: 'slow' | 'normal' | 'fast';
   interests: string[];
@@ -98,6 +101,7 @@ export function buildPrivateLessonPrompt(plan: PrivateLessonPlan) {
       focusAreas: plan.focusAreas,
       learnerRequestedFocus: plan.customFocus,
       correctionMode: plan.correctionMode,
+      vocabularyMode: plan.vocabularyMode,
       teacherVoice: plan.teacherVoice,
       speechRate: plan.speechRate,
       learnerInterests: plan.interests,

@@ -30,6 +30,42 @@ export interface PrivateLessonJournal {
   remove(scope: ProfileScope, id: string): Promise<boolean>;
 }
 
+export class PostgresPrivateLessonVocabularySource {
+  constructor(private readonly pool: Pool) {}
+
+  async learned(scope: ProfileScope, targetLanguageCode: string, count = 20) {
+    const targetBaseLanguage = new Intl.Locale(targetLanguageCode).language.toLowerCase();
+    const rows = (
+      await this.pool.query(
+        `SELECT li.id,li.source_text,li.source_language_code,
+          (SELECT translation_text FROM product_gotit.item_translations t
+           WHERE t.application_id=li.application_id
+             AND t.application_user_id=li.application_user_id
+             AND t.learning_item_id=li.id AND t.is_current AND t.is_primary
+           ORDER BY t.id LIMIT 1) AS primary_translation
+         FROM product_gotit.learning_items li
+         WHERE li.application_id=$1 AND li.application_user_id=$2
+           AND li.user_status='active' AND li.learning_status='mastered'
+           AND li.deleted_at IS NULL
+           AND split_part(replace(lower(li.source_language_code),'_','-'),'-',1)=$3
+         ORDER BY li.next_review_at ASC NULLS FIRST,li.updated_at ASC,li.id
+         LIMIT $4`,
+        [scope.applicationId, scope.applicationUserId, targetBaseLanguage, count],
+      )
+    ).rows;
+    return {
+      items: rows
+        .filter((row) => typeof row.primary_translation === 'string')
+        .map((row) => ({
+          id: String(row.id),
+          sourceText: String(row.source_text),
+          sourceLanguageCode: String(row.source_language_code),
+          primaryTranslation: String(row.primary_translation),
+        })),
+    };
+  }
+}
+
 export class PostgresPrivateLessonJournal implements PrivateLessonJournal {
   constructor(private readonly pool: Pool) {}
 
@@ -37,9 +73,9 @@ export class PostgresPrivateLessonJournal implements PrivateLessonJournal {
     await this.pool.query(
       `INSERT INTO product_gotit.private_lesson_sessions
        (id,application_id,application_user_id,target_language_code,support_language_code,level,topic,
-        grammar_focus,focus_areas,custom_focus,correction_mode,continuity,teacher_voice,speech_rate,
+        grammar_focus,focus_areas,custom_focus,correction_mode,vocabulary_mode,continuity,teacher_voice,speech_rate,
         planned_duration_seconds,target_words)
-       VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10,$11,$12::jsonb,$13,$14,$15,$16::jsonb)`,
+       VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10,$11,$12,$13::jsonb,$14,$15,$16,$17::jsonb)`,
       [
         plan.id,
         scope.applicationId,
@@ -52,6 +88,7 @@ export class PostgresPrivateLessonJournal implements PrivateLessonJournal {
         JSON.stringify(plan.focusAreas),
         plan.customFocus,
         plan.correctionMode,
+        plan.vocabularyMode,
         plan.continuity ? JSON.stringify(plan.continuity) : null,
         plan.teacherVoice,
         plan.speechRate,
@@ -133,7 +170,7 @@ export class PostgresPrivateLessonJournal implements PrivateLessonJournal {
 }
 
 const selectFields = `SELECT id,target_language_code,support_language_code,level,topic,grammar_focus,
- focus_areas,custom_focus,correction_mode,continuity,
+ focus_areas,custom_focus,correction_mode,vocabulary_mode,continuity,
  teacher_voice,speech_rate,planned_duration_seconds,target_words,status,started_at,ended_at,
  actual_duration_seconds,report FROM product_gotit.private_lesson_sessions`;
 
@@ -158,6 +195,7 @@ function storedLesson(row: Record<string, unknown>): StoredPrivateLesson {
       row.correction_mode === 'critical_only' || row.correction_mode === 'deep_explanation'
         ? row.correction_mode
         : 'recast',
+    vocabularyMode: row.vocabulary_mode === 'none' ? 'none' : 'learned',
     teacherVoice: row.teacher_voice as StoredPrivateLesson['teacherVoice'],
     speechRate: row.speech_rate as StoredPrivateLesson['speechRate'],
     interests: [],

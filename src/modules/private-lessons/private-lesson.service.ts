@@ -57,7 +57,11 @@ const speedByRate = {
 } as const;
 
 export interface PrivateLessonVocabularySource {
-  queue(scope: ProfileScope, count?: number): Promise<{ items: QueueItem[] }>;
+  learned(
+    scope: ProfileScope,
+    targetLanguageCode: string,
+    count?: number,
+  ): Promise<{ items: QueueItem[] }>;
 }
 
 export type PrivateLessonServiceOptions = {
@@ -97,9 +101,8 @@ export class PrivateLessonService {
         'Private voice lessons are unavailable',
       );
 
-    const [profile, queue, previousLessons] = await Promise.all([
+    const [profile, previousLessons] = await Promise.all([
       this.options.profiles.getProfile(scope),
-      this.options.vocabulary.queue(scope, 20),
       this.options.journal?.list(scope, 20) ?? Promise.resolve([]),
     ]);
     const targetBaseLanguage = new Intl.Locale(input.targetLanguageCode).language;
@@ -110,7 +113,12 @@ export class PrivateLessonService {
           lesson.report &&
           new Intl.Locale(lesson.targetLanguageCode).language === targetBaseLanguage,
       ) ?? null;
-    const plan = this.buildPlan(input, profile, queue.items, previousLesson);
+    const vocabularyMode = input.vocabularyMode ?? previousLesson?.vocabularyMode ?? 'learned';
+    const vocabulary =
+      vocabularyMode === 'learned'
+        ? await this.options.vocabulary.learned(scope, input.targetLanguageCode, 20)
+        : { items: [] };
+    const plan = this.buildPlan(input, profile, vocabulary.items, previousLesson, vocabularyMode);
     const instructions = buildPrivateLessonPrompt(plan);
     const targetLanguage = describeLessonLanguage(plan.targetLanguageCode);
     const supportLanguage = plan.supportLanguageCode
@@ -267,6 +275,7 @@ export class PrivateLessonService {
     profile: GotItProfile,
     queue: QueueItem[],
     previousLesson: StoredPrivateLesson | null,
+    vocabularyMode: PrivateLessonPlan['vocabularyMode'],
   ) {
     const languageProfile = profile.languages.find(
       (language) =>
@@ -336,6 +345,7 @@ export class PrivateLessonService {
       customFocus:
         input.customFocus === undefined ? (previousLesson?.customFocus ?? null) : input.customFocus,
       correctionMode: input.correctionMode ?? previousLesson?.correctionMode ?? 'recast',
+      vocabularyMode,
       teacherVoice: input.teacherVoice ?? 'female',
       speechRate: input.speechRate ?? 'normal',
       interests: profile.interests.slice(0, 10),
@@ -356,6 +366,7 @@ function publicStoredLesson(lesson: StoredPrivateLesson) {
     focusAreas: lesson.focusAreas,
     customFocus: lesson.customFocus,
     correctionMode: lesson.correctionMode,
+    vocabularyMode: lesson.vocabularyMode,
     continuesFromLessonId: lesson.continuity?.previousLessonId ?? null,
     teacherVoice: lesson.teacherVoice,
     speechRate: lesson.speechRate,
@@ -383,6 +394,7 @@ function publicPlan(plan: PrivateLessonPlan) {
     focusAreas: plan.focusAreas,
     customFocus: plan.customFocus,
     correctionMode: plan.correctionMode,
+    vocabularyMode: plan.vocabularyMode,
     continuesFromLessonId: plan.continuity?.previousLessonId ?? null,
     teacherVoice: plan.teacherVoice,
     speechRate: plan.speechRate,

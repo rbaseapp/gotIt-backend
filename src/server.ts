@@ -28,7 +28,10 @@ import { PixabayStudyImageProvider } from './modules/practice/pixabay-study-imag
 import { FallbackStudyImageProvider } from './modules/practice/study-image.provider.js';
 import { WordPackRepository } from './modules/word-packs/word-packs.repository.js';
 import { PrivateLessonService } from './modules/private-lessons/private-lesson.service.js';
-import { PostgresPrivateLessonJournal } from './modules/private-lessons/private-lesson.repository.js';
+import {
+  PostgresPrivateLessonJournal,
+  PostgresPrivateLessonVocabularySource,
+} from './modules/private-lessons/private-lesson.repository.js';
 import { OpenAiPrivateLessonSummaryGenerator } from './modules/private-lessons/private-lesson.summary.js';
 
 const logger = createLogger(env.LOG_LEVEL);
@@ -125,7 +128,7 @@ const privateLessonService = new PrivateLessonService({
   voice: env.OPENAI_REALTIME_VOICE,
   transcriptionModel: env.OPENAI_REALTIME_TRANSCRIPTION_MODEL,
   profiles: profileService,
-  vocabulary: practiceService,
+  vocabulary: new PostgresPrivateLessonVocabularySource(pool),
   fetchImpl: fetch,
   journal: new PostgresPrivateLessonJournal(pool),
   summaryGenerator:

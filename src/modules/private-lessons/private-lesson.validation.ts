@@ -18,6 +18,8 @@ export const privateLessonCorrectionModes = [
   'deep_explanation',
 ] as const;
 
+export const privateLessonVocabularyModes = ['learned', 'none'] as const;
+
 export const privateLessonInputSchema = z
   .object({
     targetLanguageCode: languageSchema,
@@ -38,6 +40,7 @@ export const privateLessonInputSchema = z
       .optional(),
     customFocus: textSchema(300).nullable().optional(),
     correctionMode: z.enum(privateLessonCorrectionModes).optional(),
+    vocabularyMode: z.enum(privateLessonVocabularyModes).optional(),
   })
   .strict()
   .superRefine((value, context) => {

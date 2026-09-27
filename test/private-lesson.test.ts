@@ -14,6 +14,7 @@ import type {
   PrivateLessonJournal,
   StoredPrivateLesson,
 } from '../src/modules/private-lessons/private-lesson.repository.js';
+import { PostgresPrivateLessonVocabularySource } from '../src/modules/private-lessons/private-lesson.repository.js';
 import {
   buildPrivateLessonPrompt,
   type PrivateLessonPlan,
@@ -70,7 +71,7 @@ const profiles: ProfileServiceContract = {
   },
 };
 const vocabulary: PrivateLessonVocabularySource = {
-  queue: async () => ({
+  learned: async () => ({
     items: [
       {
         id: '33333333-3333-4333-8333-333333333333',
@@ -153,6 +154,7 @@ test('private lesson creates a bounded personalized Realtime session', async () 
   assert.deepEqual(result.lesson.focusAreas, ['speaking', 'grammar', 'fluency']);
   assert.equal(result.lesson.customFocus, 'Answer interview questions with longer examples');
   assert.equal(result.lesson.correctionMode, 'deep_explanation');
+  assert.equal(result.lesson.vocabularyMode, 'learned');
   assert.equal(result.realtime.translationEvent?.type, 'response.create');
   assert.deepEqual(result.lesson.targetWords, [
     {
@@ -238,6 +240,44 @@ test('private lesson omits translation action when no support language is availa
   assert.equal(result.lesson.speechRate, 'fast');
 });
 
+test('private lesson can run without saved vocabulary and never loads acquiring words', async () => {
+  let vocabularyRequested = false;
+  let requestBody: Record<string, unknown> | undefined;
+  const service = new PrivateLessonService({
+    apiKey: 'server-secret',
+    model: 'gpt-realtime-test',
+    voice: 'marin',
+    transcriptionModel: 'gpt-transcribe-test',
+    profiles,
+    vocabulary: {
+      async learned() {
+        vocabularyRequested = true;
+        return { items: [] };
+      },
+    },
+    fetchImpl: async (_url, init) => {
+      requestBody = JSON.parse(String(init?.body)) as Record<string, unknown>;
+      return new Response(JSON.stringify({ value: 'ek_demo' }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    },
+  });
+
+  const result = await service.createSession(identity, {
+    targetLanguageCode: 'en',
+    vocabularyMode: 'none',
+  });
+
+  assert.equal(vocabularyRequested, false);
+  assert.equal(result.lesson.vocabularyMode, 'none');
+  assert.deepEqual(result.lesson.targetWords, []);
+  assert.match(
+    String((requestBody?.session as { instructions?: unknown }).instructions),
+    /"vocabularyMode": "none"/u,
+  );
+});
+
 test('private lesson route is authenticated and validates language choices', async () => {
   const service = makeService(
     async () =>
@@ -282,6 +322,13 @@ test('private lesson route is authenticated and validates language choices', asy
     .send({ targetLanguageCode: 'en', correctionMode: 'correct_every_word' })
     .expect(400);
   assert.equal(invalidCorrectionMode.body.error.code, 'VALIDATION_ERROR');
+
+  const invalidVocabularyMode = await request(app)
+    .post('/api/v1/private-lessons/realtime-sessions')
+    .set('authorization', 'Bearer valid-token')
+    .send({ targetLanguageCode: 'en', vocabularyMode: 'acquiring' })
+    .expect(400);
+  assert.equal(invalidVocabularyMode.body.error.code, 'VALIDATION_ERROR');
 
   const created = await request(app)
     .post('/api/v1/private-lessons/realtime-sessions')
@@ -458,6 +505,7 @@ test('private lesson persists one structured report and never stores the transcr
   assert.equal(rows.get(continued.lesson.id)?.continuity?.nextLessonPlan, report.nextLessonPlan);
   assert.deepEqual(rows.get(continued.lesson.id)?.continuity?.vocabularyToReview, ['achieve']);
   assert.equal(continued.lesson.correctionMode, 'deep_explanation');
+  assert.equal(continued.lesson.vocabularyMode, 'learned');
   assert.deepEqual(await service.removeSession(identity, created.lesson.id), { deleted: true });
   await assert.rejects(service.getSession(identity, created.lesson.id), {
     code: 'PRIVATE_LESSON_NOT_FOUND',
@@ -516,6 +564,7 @@ test('private lesson report generation is structured, transient and limited to l
     focusAreas: ['speaking', 'vocabulary'],
     customFocus: null,
     correctionMode: 'recast',
+    vocabularyMode: 'learned',
     teacherVoice: 'female',
     speechRate: 'normal',
     interests: [],
@@ -567,6 +616,7 @@ test('private lesson correction modes produce distinct tutoring behavior', () =>
     focusAreas: ['speaking'],
     customFocus: null,
     correctionMode: 'recast',
+    vocabularyMode: 'learned',
     teacherVoice: 'female',
     speechRate: 'normal',
     interests: [],
@@ -584,4 +634,40 @@ test('private lesson correction modes produce distinct tutoring behavior', () =>
   assert.match(recast, /natural, correct version of the sentence/u);
   assert.match(deep, /DEEP CORRECTION AND EXPLANATION/u);
   assert.match(deep, /why the original form was wrong/u);
+});
+
+test('private lesson vocabulary source selects only active mastered words in the target language', async () => {
+  let sql = '';
+  let parameters: unknown[] = [];
+  const source = new PostgresPrivateLessonVocabularySource({
+    async query(statement: string, values: unknown[]) {
+      sql = statement;
+      parameters = values;
+      return {
+        rows: [
+          {
+            id: '88888888-8888-4888-8888-888888888888',
+            source_text: 'achieve',
+            source_language_code: 'en-US',
+            primary_translation: 'להשיג',
+          },
+        ],
+      };
+    },
+  } as never);
+
+  const result = await source.learned(identity, 'en-US', 5);
+
+  assert.match(sql, /user_status='active'/u);
+  assert.match(sql, /learning_status='mastered'/u);
+  assert.match(sql, /deleted_at IS NULL/u);
+  assert.deepEqual(parameters, [identity.applicationId, identity.applicationUserId, 'en', 5]);
+  assert.deepEqual(result.items, [
+    {
+      id: '88888888-8888-4888-8888-888888888888',
+      sourceText: 'achieve',
+      sourceLanguageCode: 'en-US',
+      primaryTranslation: 'להשיג',
+    },
+  ]);
 });
