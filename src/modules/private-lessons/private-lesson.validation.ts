@@ -7,6 +7,8 @@ export const privateLessonInputSchema = z
     targetLanguageCode: languageSchema,
     supportLanguageCode: languageSchema.optional(),
     requestedLevel: z.enum(CEFR_LEVELS).optional(),
+    teacherVoice: z.enum(['female', 'male']).optional(),
+    speechRate: z.enum(['slow', 'normal', 'fast']).optional(),
     topic: textSchema(120).optional(),
     grammarFocus: textSchema(160).optional(),
   })

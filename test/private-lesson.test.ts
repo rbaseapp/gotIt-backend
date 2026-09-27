@@ -105,6 +105,8 @@ test('private lesson creates a bounded personalized Realtime session', async () 
   const result = await service.createSession(identity, {
     targetLanguageCode: 'en-US',
     supportLanguageCode: 'he',
+    teacherVoice: 'male',
+    speechRate: 'slow',
     topic: 'job interviews',
     grammarFocus: 'past simple',
   });
@@ -113,6 +115,9 @@ test('private lesson creates a bounded personalized Realtime session', async () 
   assert.equal(result.lesson.durationSeconds, 300);
   assert.equal(result.lesson.wrapUpAfterSeconds, 255);
   assert.equal(result.lesson.level, 'B1');
+  assert.equal(result.lesson.teacherVoice, 'male');
+  assert.equal(result.lesson.speechRate, 'slow');
+  assert.equal(result.realtime.translationEvent?.type, 'response.create');
   assert.deepEqual(result.lesson.targetWords, [
     {
       learningItemId: '33333333-3333-4333-8333-333333333333',
@@ -125,9 +130,32 @@ test('private lesson creates a bounded personalized Realtime session', async () 
 
   const session = requestBody?.session as Record<string, unknown>;
   assert.equal(session.model, 'gpt-realtime-test');
+  assert.deepEqual((session.audio as { output: unknown }).output, {
+    voice: 'cedar',
+    speed: 0.85,
+  });
   assert.match(String(session.instructions), /job interviews/u);
   assert.match(String(session.instructions), /achieve/u);
   assert.doesNotMatch(JSON.stringify(result), /server-secret/u);
+});
+
+test('private lesson omits translation action when no support language is available', async () => {
+  const service = makeService(
+    async () =>
+      new Response(JSON.stringify({ value: 'ek_demo' }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      }),
+  );
+  const result = await service.createSession(identity, {
+    targetLanguageCode: 'he',
+    teacherVoice: 'female',
+    speechRate: 'fast',
+  });
+
+  assert.equal(result.realtime.translationEvent, null);
+  assert.equal(result.lesson.teacherVoice, 'female');
+  assert.equal(result.lesson.speechRate, 'fast');
 });
 
 test('private lesson route is authenticated and validates language choices', async () => {

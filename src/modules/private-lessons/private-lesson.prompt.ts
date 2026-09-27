@@ -14,6 +14,8 @@ export type PrivateLessonPlan = {
   level: CefrLevel;
   topic: string;
   grammarFocus: string | null;
+  teacherVoice: 'female' | 'male';
+  speechRate: 'slow' | 'normal' | 'fast';
   interests: string[];
   targets: PrivateLessonTarget[];
 };
@@ -28,6 +30,8 @@ export function buildPrivateLessonPrompt(plan: PrivateLessonPlan) {
       cefrLevel: plan.level,
       topic: plan.topic,
       grammarFocus: plan.grammarFocus,
+      teacherVoice: plan.teacherVoice,
+      speechRate: plan.speechRate,
       learnerInterests: plan.interests,
       targetVocabulary: plan.targets.map((target) => ({
         text: target.sourceText,
@@ -66,11 +70,15 @@ ${lessonData}
 - Do not interrupt a learner mid-sentence to correct them.
 - Praise specifically and sparingly.
 
+# Speaking pace and translation help
+- Keep your spoken pacing ${plan.speechRate}. For slow pacing, speak deliberately with clear pauses. For normal pacing, sound natural and unhurried. For fast pacing, be lively and concise without sacrificing pronunciation.
+- When the learner asks for a translation, translate your most recent relevant sentence into the support language, add at most one short clarification, and then continue practice in the target language.
+
 # Five-minute flow
 - Opening: greet briefly and ask an easy question about the topic.
 - Guided practice: build a natural conversation and elicit the target vocabulary across several turns.
 - Grammar: address the configured focus when relevant; otherwise use one high-value error that arises naturally.
-- Closing: when the application asks you to wrap up, give a concise recap with one success, one correction, and the target words still worth reviewing.
+- Closing: when the application asks you to wrap up, stop asking questions. Give a concise recap with one specific success, one correction with its correct form, and the target words still worth reviewing. End with a warm, encouraging goodbye.
 
 # Audio handling
 - If audio is unclear, ask the learner to repeat it; never guess the missing words.

@@ -30,6 +30,21 @@ export const privateLessonDemoHtml = `<!doctype html>
             <input id="supportLanguage" value="he" maxlength="64" />
           </label>
           <label>
+            קול המורה
+            <select id="teacherVoice">
+              <option value="female">קול נשי</option>
+              <option value="male">קול גברי</option>
+            </select>
+          </label>
+          <label>
+            מהירות דיבור
+            <select id="speechRate">
+              <option value="slow">איטית</option>
+              <option value="normal" selected>רגילה</option>
+              <option value="fast">מהירה</option>
+            </select>
+          </label>
+          <label>
             נושא
             <input id="topic" value="everyday conversation" maxlength="120" />
           </label>
@@ -52,6 +67,7 @@ export const privateLessonDemoHtml = `<!doctype html>
         <div class="words" id="targetWords"></div>
         <p class="status" id="status" aria-live="polite">מתחבר למיקרופון…</p>
         <div class="transcript" id="transcript" aria-live="polite"></div>
+        <button id="translateButton" class="secondary" type="button">תרגום המשפט האחרון</button>
         <button id="stopButton" class="secondary" type="button">סיום שיעור</button>
       </section>
 
@@ -75,8 +91,9 @@ form { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
 label { display: grid; gap: 8px; font-weight: 700; }
 label small { color: #8f9cbd; font-weight: 400; }
 .wide { grid-column: 1 / -1; }
-input { width: 100%; border: 1px solid #3b496b; border-radius: 12px; padding: 13px 14px; color: #fff; background: #0a1123; font: inherit; direction: ltr; }
-input:focus { outline: 2px solid #70dfbe; outline-offset: 2px; }
+input, select { width: 100%; border: 1px solid #3b496b; border-radius: 12px; padding: 13px 14px; color: #fff; background: #0a1123; font: inherit; }
+input { direction: ltr; }
+input:focus, select:focus { outline: 2px solid #70dfbe; outline-offset: 2px; }
 button { border: 0; border-radius: 14px; padding: 14px 20px; font: inherit; font-weight: 800; cursor: pointer; }
 button:disabled { opacity: .55; cursor: wait; }
 .primary { color: #07130f; background: #77e7c4; }
@@ -105,6 +122,7 @@ const setupPanel = document.getElementById('setupPanel');
 const sessionPanel = document.getElementById('sessionPanel');
 const startButton = document.getElementById('startButton');
 const stopButton = document.getElementById('stopButton');
+const translateButton = document.getElementById('translateButton');
 const statusElement = document.getElementById('status');
 const timerElement = document.getElementById('timer');
 const transcriptElement = document.getElementById('transcript');
@@ -116,9 +134,14 @@ let dataChannel;
 let intervalId;
 let wrapTimeoutId;
 let stopTimeoutId;
+let hardStopTimeoutId;
 let activeResponse = false;
 let wrapPending = false;
 let wrapSent = false;
+let closingPrepared = false;
+let closingResponse = false;
+let closingStartedAt = 0;
+let closingTranscript = '';
 let assistantBuffer = '';
 let activeSession;
 
@@ -148,6 +171,12 @@ function sendEvent(event) {
 
 function requestWrapUp() {
   if (wrapSent || !activeSession) return;
+  stopButton.disabled = true;
+  translateButton.disabled = true;
+  if (!closingPrepared) {
+    closingPrepared = true;
+    sendEvent({ type: 'session.update', session: { type: 'realtime', audio: { input: { turn_detection: null } } } });
+  }
   if (activeResponse) {
     wrapPending = true;
     setStatus('הזמן כמעט הסתיים — הסיכום יתחיל בסיום התשובה הנוכחית.');
@@ -159,10 +188,28 @@ function requestWrapUp() {
 }
 
 function handleRealtimeEvent(event) {
-  if (event.type === 'response.created') activeResponse = true;
+  if (event.type === 'response.created') {
+    activeResponse = true;
+    if (wrapSent && !closingResponse) {
+      closingResponse = true;
+      closingStartedAt = Date.now();
+    }
+  }
   if (event.type === 'response.done') {
     activeResponse = false;
     if (wrapPending) requestWrapUp();
+    else if (closingResponse) {
+      const words = closingTranscript.trim().split(/\\s+/).filter(Boolean).length;
+      const multiplier = { slow: .85, normal: 1, fast: 1.2 }[activeSession.lesson.speechRate];
+      const estimate = Math.min(20000, Math.max(3000, words / (2.4 * multiplier) * 1000 + 1500));
+      setStatus('הסיכום והפרידה מתנגנים…');
+      stopTimeoutId = window.setTimeout(function () {
+        addTurn('system', 'השיעור הושלם.');
+        stopLesson('השיעור הסתיים.');
+      }, Math.max(1000, estimate - (Date.now() - closingStartedAt)));
+    } else {
+      translateButton.disabled = !activeSession.realtime.translationEvent;
+    }
   }
   if (event.type === 'conversation.item.input_audio_transcription.completed') {
     addTurn('user', event.transcript || '');
@@ -171,7 +218,9 @@ function handleRealtimeEvent(event) {
     assistantBuffer += event.delta || '';
   }
   if (event.type === 'response.output_audio_transcript.done') {
-    addTurn('tutor', event.transcript || assistantBuffer);
+    const transcript = event.transcript || assistantBuffer;
+    addTurn('tutor', transcript);
+    if (closingResponse) closingTranscript = transcript;
     assistantBuffer = '';
   }
   if (event.type === 'error') {
@@ -187,16 +236,17 @@ function startTimer(durationSeconds, wrapUpAfterSeconds) {
     timerElement.textContent = formatTime(durationSeconds - elapsed);
   }, 250);
   wrapTimeoutId = window.setTimeout(requestWrapUp, wrapUpAfterSeconds * 1000);
-  stopTimeoutId = window.setTimeout(function () {
-    addTurn('system', 'חמש הדקות הסתיימו.');
-    stopLesson('השיעור הסתיים.');
-  }, durationSeconds * 1000);
+  stopTimeoutId = window.setTimeout(requestWrapUp, durationSeconds * 1000);
+  hardStopTimeoutId = window.setTimeout(function () {
+    if (peerConnection) stopLesson('השיעור הסתיים.');
+  }, (durationSeconds + 30) * 1000);
 }
 
 function stopLesson(message) {
   window.clearInterval(intervalId);
   window.clearTimeout(wrapTimeoutId);
   window.clearTimeout(stopTimeoutId);
+  window.clearTimeout(hardStopTimeoutId);
   if (dataChannel) dataChannel.close();
   if (peerConnection) peerConnection.close();
   if (localStream) localStream.getTracks().forEach(function (track) { track.stop(); });
@@ -204,6 +254,8 @@ function stopLesson(message) {
   peerConnection = undefined;
   localStream = undefined;
   activeResponse = false;
+  closingResponse = false;
+  translateButton.disabled = true;
   setStatus(message || 'השיעור נעצר.');
   stopButton.disabled = true;
 }
@@ -268,11 +320,17 @@ form.addEventListener('submit', async function (event) {
   transcriptElement.replaceChildren();
   wrapPending = false;
   wrapSent = false;
+  closingPrepared = false;
+  closingResponse = false;
+  closingStartedAt = 0;
+  closingTranscript = '';
   assistantBuffer = '';
   try {
     const tokenInput = document.getElementById('accessToken');
     const body = {
       targetLanguageCode: document.getElementById('targetLanguage').value.trim(),
+      teacherVoice: document.getElementById('teacherVoice').value,
+      speechRate: document.getElementById('speechRate').value,
     };
     const supportLanguage = document.getElementById('supportLanguage').value.trim();
     const topic = document.getElementById('topic').value.trim();
@@ -295,6 +353,7 @@ form.addEventListener('submit', async function (event) {
     setupPanel.hidden = true;
     sessionPanel.hidden = false;
     stopButton.disabled = false;
+    translateButton.disabled = !payload.realtime.translationEvent;
     setStatus('מבקש הרשאת מיקרופון…');
     await connectRealtime(payload);
   } catch (error) {
@@ -306,6 +365,14 @@ form.addEventListener('submit', async function (event) {
   }
 });
 
-stopButton.addEventListener('click', function () { stopLesson('השיעור הסתיים על ידך.'); });
+translateButton.addEventListener('click', function () {
+  if (!activeSession || !activeSession.realtime.translationEvent || activeResponse) return;
+  if (sendEvent(activeSession.realtime.translationEvent)) {
+    activeResponse = true;
+    translateButton.disabled = true;
+    setStatus('מתרגמים לשפת העזרה…');
+  }
+});
+stopButton.addEventListener('click', requestWrapUp);
 window.addEventListener('beforeunload', function () { stopLesson(); });
 `;

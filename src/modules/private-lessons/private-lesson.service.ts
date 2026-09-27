@@ -29,6 +29,17 @@ type QueueItem = {
   primaryTranslation: string;
 };
 
+const voiceByGender = {
+  female: 'marin',
+  male: 'cedar',
+} as const;
+
+const speedByRate = {
+  slow: 0.85,
+  normal: 1,
+  fast: 1.2,
+} as const;
+
 export interface PrivateLessonVocabularySource {
   queue(scope: ProfileScope, count?: number): Promise<{ items: QueueItem[] }>;
 }
@@ -74,6 +85,7 @@ export class PrivateLessonService {
     ]);
     const plan = this.buildPlan(input, profile, queue.items);
     const instructions = buildPrivateLessonPrompt(plan);
+    const voice = input.teacherVoice ? voiceByGender[input.teacherVoice] : this.options.voice;
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), this.requestTimeoutMs);
 
@@ -101,7 +113,7 @@ export class PrivateLessonService {
                   interrupt_response: true,
                 },
               },
-              output: { voice: this.options.voice },
+              output: { voice, speed: speedByRate[plan.speechRate] },
             },
           },
         }),
@@ -130,9 +142,17 @@ export class PrivateLessonService {
             type: 'response.create',
             response: {
               instructions:
-                'The lesson is ending. Give the promised concise recap now, then say goodbye in the target language.',
+                'The lesson is ending now. Do not ask another question. In three short parts, give one specific success, one correction with the correct form, and the target words worth reviewing. Then say a warm, encouraging goodbye in the target language. Keep the entire closing under 20 seconds.',
             },
           },
+          translationEvent: plan.supportLanguageCode
+            ? {
+                type: 'response.create',
+                response: {
+                  instructions: `Translate the most recent tutor sentence into the learner's support language (${plan.supportLanguageCode}). Give only the translation and at most one brief clarification. Do not advance the lesson or ask a new question.`,
+                },
+              }
+            : null,
         },
       };
     } catch (error) {
@@ -182,6 +202,8 @@ export class PrivateLessonService {
       level,
       topic: input.topic ?? profile.interests[0] ?? 'everyday conversation',
       grammarFocus: input.grammarFocus ?? null,
+      teacherVoice: input.teacherVoice ?? 'female',
+      speechRate: input.speechRate ?? 'normal',
       interests: profile.interests.slice(0, 10),
       targets,
     } satisfies PrivateLessonPlan;
@@ -198,6 +220,8 @@ function publicPlan(plan: PrivateLessonPlan) {
     level: plan.level,
     topic: plan.topic,
     grammarFocus: plan.grammarFocus,
+    teacherVoice: plan.teacherVoice,
+    speechRate: plan.speechRate,
     targetWords: plan.targets,
   };
 }
