@@ -4,6 +4,7 @@ import pino from 'pino';
 import request from 'supertest';
 import { createApp } from '../src/app.js';
 import { CoreAuthClient } from '../src/shared/core/core-auth.client.js';
+import { ProviderHttpError } from '../src/modules/enrichment/providers/http.js';
 import type { GotItProfile, ProfileServiceContract } from '../src/modules/profile/profile.types.js';
 import {
   PrivateLessonService,
@@ -29,6 +30,7 @@ import {
   privateLessonCurriculum,
 } from '../src/modules/private-lessons/private-lesson.curriculum.js';
 import { privateLessonRoadmapInputSchema } from '../src/modules/private-lessons/private-lesson.validation.js';
+import { PostgresPrivateLessonRoadmapStore } from '../src/modules/private-lessons/private-lesson.roadmap.js';
 
 const assessment = {
   overallLevel: 'B1' as const,
@@ -92,6 +94,32 @@ const vocabulary: PrivateLessonVocabularySource = {
       },
     ],
   }),
+};
+
+const reportPlan: PrivateLessonPlan = {
+  id: '66666666-6666-4666-8666-666666666666',
+  durationSeconds: 300,
+  targetLanguageCode: 'en',
+  supportLanguageCode: 'he',
+  level: 'B1',
+  topic: 'interviews',
+  grammarFocus: null,
+  focusAreas: ['speaking', 'vocabulary'],
+  customFocus: null,
+  correctionMode: 'recast',
+  vocabularyMode: 'learned',
+  teacherVoice: 'female',
+  speechRate: 'normal',
+  interests: [],
+  targets: [
+    {
+      learningItemId: '33333333-3333-4333-8333-333333333333',
+      sourceText: 'achieve',
+      translationText: 'להשיג',
+    },
+  ],
+  continuity: null,
+  roadmap: null,
 };
 
 function makeCoreAuthClient() {
@@ -173,6 +201,10 @@ test('private lesson creates a bounded personalized Realtime session', async () 
 
   const session = requestBody?.session as Record<string, unknown>;
   assert.equal(session.model, 'gpt-realtime-test');
+  assert.deepEqual(
+    (session.audio as { input: { noise_reduction: unknown } }).input.noise_reduction,
+    { type: 'far_field' },
+  );
   assert.deepEqual((session.audio as { output: unknown }).output, {
     voice: 'cedar',
     speed: 0.7,
@@ -450,6 +482,7 @@ test('private lesson persists one structured report and never stores the transcr
   const report: PrivateLessonReport = {
     summary: 'A useful lesson about interviews.',
     assessment,
+    roadmapProgress: null,
     strengths: ['Clear short answers'],
     corrections: [],
     grammarPoints: [],
@@ -534,6 +567,7 @@ test('private lesson report generation is structured, transient and limited to l
   const generated: PrivateLessonReport = {
     summary: 'סיכום שימושי.',
     assessment,
+    roadmapProgress: null,
     strengths: ['דיברתם במשפטים ברורים.'],
     corrections: [],
     grammarPoints: [],
@@ -570,44 +604,203 @@ test('private lesson report generation is structured, transient and limited to l
       );
     },
   );
-  const plan: PrivateLessonPlan = {
-    id: '66666666-6666-4666-8666-666666666666',
-    durationSeconds: 300,
-    targetLanguageCode: 'en',
-    supportLanguageCode: 'he',
-    level: 'B1',
-    topic: 'interviews',
-    grammarFocus: null,
-    focusAreas: ['speaking', 'vocabulary'],
-    customFocus: null,
-    correctionMode: 'recast',
-    vocabularyMode: 'learned',
-    teacherVoice: 'female',
-    speechRate: 'normal',
-    interests: [],
-    targets: [
-      {
-        learningItemId: '33333333-3333-4333-8333-333333333333',
-        sourceText: 'achieve',
-        translationText: 'להשיג',
-      },
-    ],
-    continuity: null,
-  };
   const report = await generator.generate(
-    plan,
+    reportPlan,
     [{ role: 'learner', text: 'I want to achieve my goal.' }],
     'safe-user-id',
   );
 
   assert.equal(requestBody?.store, false);
   assert.equal((requestBody?.text as { format: { strict: boolean } }).format.strict, true);
+  assert.match(String(requestBody?.instructions), /holistically across every learner turn/u);
   assert.deepEqual(report.recommendedReviewItemIds, ['33333333-3333-4333-8333-333333333333']);
   assert.equal(report.vocabulary[0]?.sourceText, 'achieve');
   assert.deepEqual(
     report.newWordSuggestions.map((word) => word.sourceText),
     ['confident'],
   );
+});
+
+test('private lesson assessment stabilizes a short imperfect answer instead of turning it into zero', async () => {
+  const zeroAssessment = {
+    overallLevel: 'A1' as const,
+    confidence: 'low' as const,
+    skills: Object.fromEntries(
+      ['speaking', 'vocabulary', 'grammar', 'fluency', 'comprehension'].map((skill) => [
+        skill,
+        { score: 0, level: 'A1' as const, feedback: 'The sentence was incomplete.' },
+      ]),
+    ) as PrivateLessonReport['assessment']['skills'],
+  };
+  const generated: PrivateLessonReport = {
+    summary: 'Short attempt.',
+    assessment: zeroAssessment,
+    roadmapProgress: null,
+    strengths: [],
+    corrections: [],
+    grammarPoints: [],
+    vocabulary: [],
+    newWordSuggestions: [],
+    nextLessonPlan: 'Try another answer.',
+    recommendedReviewItemIds: [],
+  };
+  const generator = new OpenAiPrivateLessonSummaryGenerator(
+    'summary-secret',
+    'gpt-summary-test',
+    async () =>
+      new Response(
+        JSON.stringify({
+          status: 'completed',
+          output: [{ content: [{ type: 'output_text', text: JSON.stringify(generated) }] }],
+        }),
+        { status: 200, headers: { 'content-type': 'application/json' } },
+      ),
+  );
+
+  const report = await generator.generate(
+    reportPlan,
+    [{ role: 'learner', text: 'Yesterday I go work, very tired.' }],
+    'safe-user-id',
+  );
+
+  assert.ok(report.assessment.skills.speaking.score > 0);
+  assert.ok(report.assessment.skills.grammar.score > 0);
+  assert.equal(report.assessment.confidence, 'low');
+});
+
+test('private lesson computes roadmap completion separately from holistic level', async () => {
+  const roadmapPlan: PrivateLessonPlan = {
+    ...reportPlan,
+    roadmap: {
+      roadmapId: '77777777-7777-4777-8777-777777777777',
+      milestoneId: '88888888-8888-4888-8888-888888888888',
+      milestoneKey: 'foundation',
+      goalTitle: 'Articles',
+      communicationObjective: 'Choose a, an, or the in a short description',
+      grammarTopics: ['articles'],
+      successCriteria: { minimumLessons: 2, targetScore: 75 },
+      evidenceLessonCount: 0,
+      isFirstMilestoneLesson: true,
+    },
+  };
+  const generated: PrivateLessonReport = {
+    summary: 'Roadmap practice.',
+    assessment,
+    roadmapProgress: {
+      objectiveCompletionScore: 80,
+      targetFormControlScore: 70,
+      score: 0,
+      taskCompleted: false,
+      confidence: 'medium',
+      evidence: 'The learner described three objects with the target forms.',
+    },
+    strengths: [],
+    corrections: [],
+    grammarPoints: [],
+    vocabulary: [],
+    newWordSuggestions: [],
+    nextLessonPlan: 'Recall the article choices.',
+    recommendedReviewItemIds: [],
+  };
+  let requestBody: Record<string, unknown> | undefined;
+  const generator = new OpenAiPrivateLessonSummaryGenerator(
+    'summary-secret',
+    'gpt-summary-test',
+    async (_url, init) => {
+      requestBody = JSON.parse(String(init?.body)) as Record<string, unknown>;
+      return new Response(
+        JSON.stringify({
+          status: 'completed',
+          output: [{ content: [{ type: 'output_text', text: JSON.stringify(generated) }] }],
+        }),
+        { status: 200, headers: { 'content-type': 'application/json' } },
+      );
+    },
+  );
+
+  const report = await generator.generate(
+    roadmapPlan,
+    [{ role: 'learner', text: 'I see a book, an apple, and the teacher.' }],
+    'safe-user-id',
+  );
+
+  assert.equal(report.roadmapProgress?.score, 77);
+  assert.equal(report.roadmapProgress?.taskCompleted, true);
+  const input = requestBody?.input as Array<{ content: string }>;
+  assert.match(input[0]!.content, /"grammarTopics":\["articles"\]/u);
+});
+
+test('private lesson report timeout is categorized safely for retry diagnostics', async () => {
+  const generator = new OpenAiPrivateLessonSummaryGenerator(
+    'summary-secret',
+    'gpt-summary-test',
+    async (_url, init) =>
+      await new Promise<Response>((_resolve, reject) => {
+        init?.signal?.addEventListener('abort', () => reject(init.signal?.reason), { once: true });
+      }),
+    5,
+  );
+
+  await assert.rejects(
+    generator.generate(
+      reportPlan,
+      [{ role: 'learner', text: 'I want to achieve my goal.' }],
+      'safe-user-id',
+    ),
+    (error: unknown) => {
+      assert.ok(error instanceof ProviderHttpError);
+      assert.equal(error.failureCode, 'timeout');
+      return true;
+    },
+  );
+
+  let savedFailureCode: string | undefined;
+  const failedLesson = stored(reportPlan);
+  const journal: PrivateLessonJournal = {
+    async create() {},
+    async get() {
+      return failedLesson;
+    },
+    async list() {
+      return [];
+    },
+    async claim() {
+      return { ...failedLesson, status: 'summarizing' };
+    },
+    async complete() {
+      throw new Error('must not complete');
+    },
+    async fail(_scope, _id, errorCode) {
+      savedFailureCode = errorCode;
+    },
+    async remove() {
+      return false;
+    },
+  };
+  const service = new PrivateLessonService({
+    apiKey: 'server-secret',
+    model: 'gpt-realtime-test',
+    voice: 'marin',
+    transcriptionModel: 'gpt-transcribe-test',
+    profiles,
+    vocabulary,
+    journal,
+    summaryGenerator: {
+      async generate() {
+        throw new ProviderHttpError(504, 'timeout');
+      },
+    },
+  });
+
+  await assert.rejects(
+    service.completeSession(identity, reportPlan.id, {
+      actualDurationSeconds: 300,
+      completionReason: 'completed',
+      turns: [{ role: 'learner', text: 'I want to achieve my goal.' }],
+    }),
+    { code: 'PRIVATE_LESSON_REPORT_FAILED' },
+  );
+  assert.equal(savedFailureCode, 'provider_timeout');
 });
 
 function stored(plan: PrivateLessonPlan): StoredPrivateLesson {
@@ -655,6 +848,7 @@ test('private lesson correction modes produce distinct tutoring behavior', () =>
 
 test('private lesson curriculum exposes progressive grammar and communication paths', () => {
   const curriculum = privateLessonCurriculum('B1');
+  assert.ok(curriculum.grammarTopics.some((topic) => topic.key === 'articles'));
   assert.ok(curriculum.grammarTopics.some((topic) => topic.key === 'modal-verbs'));
   assert.ok(curriculum.grammarTopics.some((topic) => topic.key === 'passive-voice'));
   assert.ok(curriculum.grammarTopics.some((topic) => topic.key === 'advanced-sentence-structure'));
@@ -676,6 +870,74 @@ test('private lesson curriculum exposes progressive grammar and communication pa
     roadmap.milestones.every((milestone) => milestone.successCriteria.minimumLessons === 2),
   );
   assert.ok(roadmap.milestones.every((milestone) => milestone.successCriteria.targetScore === 75));
+});
+
+test('first roadmap milestone lesson teaches the topic before conversation', () => {
+  const prompt = buildPrivateLessonPrompt({
+    ...reportPlan,
+    level: 'A1',
+    roadmap: {
+      roadmapId: '77777777-7777-4777-8777-777777777777',
+      milestoneId: '88888888-8888-4888-8888-888888888888',
+      milestoneKey: 'foundation',
+      goalTitle: 'Articles',
+      communicationObjective: 'Use a, an, and the to identify familiar objects',
+      grammarTopics: ['articles'],
+      successCriteria: { minimumLessons: 2, targetScore: 75 },
+      evidenceLessonCount: 0,
+      isFirstMilestoneLesson: true,
+    },
+  });
+
+  assert.match(prompt, /teach before starting the conversation/u);
+  assert.match(prompt, /Do not assume the learner already knows the name of the topic/u);
+  assert.match(prompt, /"isFirstMilestoneLesson": true/u);
+});
+
+test('roadmap records only explicit completed-task evidence', async () => {
+  let connected = false;
+  const store = new PostgresPrivateLessonRoadmapStore({
+    async connect() {
+      connected = true;
+      throw new Error('Incomplete tasks must not touch roadmap progress');
+    },
+  } as never);
+  const lesson: PrivateLessonPlan = {
+    ...reportPlan,
+    roadmap: {
+      roadmapId: '77777777-7777-4777-8777-777777777777',
+      milestoneId: '88888888-8888-4888-8888-888888888888',
+      milestoneKey: 'foundation',
+      goalTitle: 'Articles',
+      communicationObjective: 'Use articles to identify objects',
+      grammarTopics: ['articles'],
+      successCriteria: { minimumLessons: 2, targetScore: 75 },
+      evidenceLessonCount: 0,
+      isFirstMilestoneLesson: true,
+    },
+  };
+  const report: PrivateLessonReport = {
+    summary: 'The learner spoke well generally but did not complete the target task.',
+    assessment,
+    roadmapProgress: {
+      objectiveCompletionScore: 60,
+      targetFormControlScore: 90,
+      score: 69,
+      taskCompleted: false,
+      confidence: 'high',
+      evidence: 'The answer did not satisfy the communication objective.',
+    },
+    strengths: [],
+    corrections: [],
+    grammarPoints: [],
+    vocabulary: [],
+    newWordSuggestions: [],
+    nextLessonPlan: 'Retry the task.',
+    recommendedReviewItemIds: [],
+  };
+
+  await store.recordEvidence(identity, lesson, report);
+  assert.equal(connected, false);
 });
 
 test('private lesson roadmap input rejects goals from the wrong catalog', () => {

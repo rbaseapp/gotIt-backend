@@ -33,6 +33,7 @@ export type PrivateLessonMilestone = {
   status: 'locked' | 'current' | 'completed';
   progressScore: number;
   evidenceLessonCount: number;
+  lessonSessionCount: number;
 };
 
 export type PrivateLessonRoadmap = {
@@ -127,7 +128,14 @@ export class PostgresPrivateLessonRoadmapStore implements PrivateLessonRoadmapSt
     if (!roadmap) return null;
     const milestones = (
       await this.pool.query(
-        `SELECT * FROM product_gotit.private_lesson_milestones WHERE application_id=$1 AND application_user_id=$2 AND roadmap_id=$3 ORDER BY position`,
+        `SELECT milestone.*,
+          (SELECT count(*)::int FROM product_gotit.private_lesson_sessions lesson_session
+           WHERE lesson_session.application_id=milestone.application_id
+             AND lesson_session.application_user_id=milestone.application_user_id
+             AND lesson_session.milestone_id=milestone.id AND lesson_session.deleted_at IS NULL) AS lesson_session_count
+         FROM product_gotit.private_lesson_milestones milestone
+         WHERE milestone.application_id=$1 AND milestone.application_user_id=$2 AND milestone.roadmap_id=$3
+         ORDER BY milestone.position`,
         [scope.applicationId, scope.applicationUserId, roadmap.id],
       )
     ).rows;
@@ -216,28 +224,25 @@ export class PostgresPrivateLessonRoadmapStore implements PrivateLessonRoadmapSt
     report: PrivateLessonReport,
   ) {
     if (!lesson.roadmap) return;
-    const grammar = report.assessment.skills.grammar.score;
-    const speaking = report.assessment.skills.speaking.score;
-    const fluency = report.assessment.skills.fluency.score;
-    const vocabulary = report.assessment.skills.vocabulary.score;
-    const score = Math.round(grammar * 0.4 + speaking * 0.25 + fluency * 0.2 + vocabulary * 0.15);
+    const progress = report.roadmapProgress;
+    if (!progress?.taskCompleted || progress.confidence === 'low') return;
     const client = await this.pool.connect();
     try {
       await client.query('BEGIN');
       await client.query(
-        `INSERT INTO product_gotit.private_lesson_milestone_evidence(application_id,application_user_id,milestone_id,lesson_session_id,score,confidence) VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT DO NOTHING`,
+        `INSERT INTO product_gotit.private_lesson_milestone_evidence(application_id,application_user_id,milestone_id,lesson_session_id,score,confidence,task_completed) VALUES($1,$2,$3,$4,$5,$6,true) ON CONFLICT DO NOTHING`,
         [
           scope.applicationId,
           scope.applicationUserId,
           lesson.roadmap.milestoneId,
           lesson.id,
-          score,
-          report.assessment.confidence,
+          progress.score,
+          progress.confidence,
         ],
       );
       const stats = (
         await client.query(
-          `SELECT round(avg(score))::int average_score,count(*)::int lesson_count FROM product_gotit.private_lesson_milestone_evidence WHERE application_id=$1 AND application_user_id=$2 AND milestone_id=$3`,
+          `SELECT round(avg(score))::int average_score,count(*)::int lesson_count FROM product_gotit.private_lesson_milestone_evidence WHERE application_id=$1 AND application_user_id=$2 AND milestone_id=$3 AND task_completed=true`,
           [scope.applicationId, scope.applicationUserId, lesson.roadmap.milestoneId],
         )
       ).rows[0];
@@ -259,8 +264,7 @@ export class PostgresPrivateLessonRoadmapStore implements PrivateLessonRoadmapSt
       };
       if (
         stats.lesson_count >= criteria.minimumLessons &&
-        stats.average_score >= criteria.targetScore &&
-        report.assessment.confidence !== 'low'
+        stats.average_score >= criteria.targetScore
       ) {
         await advance(client, scope, lesson.roadmap.roadmapId, milestone.position);
       }
@@ -327,6 +331,7 @@ function mapRoadmap(
       status: item.status as PrivateLessonMilestone['status'],
       progressScore: Number(item.progress_score),
       evidenceLessonCount: Number(item.evidence_lesson_count),
+      lessonSessionCount: Number(item.lesson_session_count ?? 0),
     })),
   };
 }

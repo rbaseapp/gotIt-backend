@@ -16,6 +16,20 @@ export type StoredPrivateLesson = PrivateLessonPlan & {
   report: PrivateLessonReport | null;
 };
 
+export type PrivateLessonReportFailureCode =
+  | 'provider_authentication'
+  | 'provider_billing'
+  | 'provider_permission'
+  | 'provider_workspace'
+  | 'provider_model_access'
+  | 'provider_rate_limit'
+  | 'provider_invalid_request'
+  | 'provider_timeout'
+  | 'provider_invalid_response'
+  | 'provider_upstream'
+  | 'invalid_report'
+  | 'generation_failed';
+
 export interface PrivateLessonJournal {
   create(scope: ProfileScope, plan: PrivateLessonPlan): Promise<void>;
   get(scope: ProfileScope, id: string): Promise<StoredPrivateLesson | null>;
@@ -26,7 +40,7 @@ export interface PrivateLessonJournal {
     id: string,
     report: PrivateLessonReport,
   ): Promise<StoredPrivateLesson>;
-  fail(scope: ProfileScope, id: string): Promise<void>;
+  fail(scope: ProfileScope, id: string, errorCode: PrivateLessonReportFailureCode): Promise<void>;
   remove(scope: ProfileScope, id: string): Promise<boolean>;
 }
 
@@ -103,7 +117,7 @@ export class PostgresPrivateLessonJournal implements PrivateLessonJournal {
   async get(scope: ProfileScope, id: string) {
     const row = (
       await this.pool.query(
-        `${selectFields} WHERE application_id=$1 AND application_user_id=$2 AND id=$3 AND deleted_at IS NULL`,
+        `${selectFields} WHERE s.application_id=$1 AND s.application_user_id=$2 AND s.id=$3 AND s.deleted_at IS NULL`,
         [scope.applicationId, scope.applicationUserId, id],
       )
     ).rows[0];
@@ -113,9 +127,9 @@ export class PostgresPrivateLessonJournal implements PrivateLessonJournal {
   async list(scope: ProfileScope, limit: number) {
     const rows = (
       await this.pool.query(
-        `${selectFields} WHERE application_id=$1 AND application_user_id=$2 AND deleted_at IS NULL
-           AND status<>'active'
-         ORDER BY started_at DESC,id DESC LIMIT $3`,
+        `${selectFields} WHERE s.application_id=$1 AND s.application_user_id=$2 AND s.deleted_at IS NULL
+           AND s.status<>'active'
+         ORDER BY s.started_at DESC,s.id DESC LIMIT $3`,
         [scope.applicationId, scope.applicationUserId, limit],
       )
     ).rows;
@@ -123,38 +137,40 @@ export class PostgresPrivateLessonJournal implements PrivateLessonJournal {
   }
 
   async claim(scope: ProfileScope, id: string, duration: number) {
-    const row = (
+    const updated = (
       await this.pool.query(
         `UPDATE product_gotit.private_lesson_sessions SET status='summarizing',ended_at=COALESCE(ended_at,now()),
          actual_duration_seconds=$4,updated_at=now()
          WHERE application_id=$1 AND application_user_id=$2 AND id=$3 AND deleted_at IS NULL
            AND (status IN('active','report_failed') OR
-             (status='summarizing' AND updated_at < now()-interval '2 minutes')) RETURNING *`,
+             (status='summarizing' AND updated_at < now()-interval '2 minutes')) RETURNING id`,
         [scope.applicationId, scope.applicationUserId, id, duration],
       )
     ).rows[0];
-    return row ? storedLesson(row) : null;
+    return updated ? await this.get(scope, id) : null;
   }
 
   async complete(scope: ProfileScope, id: string, report: PrivateLessonReport) {
-    const row = (
+    const updated = (
       await this.pool.query(
         `UPDATE product_gotit.private_lesson_sessions SET status='completed',report=$4::jsonb,
          report_generated_at=now(),report_error_code=NULL,updated_at=now()
          WHERE application_id=$1 AND application_user_id=$2 AND id=$3 AND deleted_at IS NULL
-         RETURNING *`,
+         RETURNING id`,
         [scope.applicationId, scope.applicationUserId, id, JSON.stringify(report)],
       )
     ).rows[0];
-    if (!row) throw notFound();
-    return storedLesson(row);
+    if (!updated) throw notFound();
+    const lesson = await this.get(scope, id);
+    if (!lesson) throw notFound();
+    return lesson;
   }
 
-  async fail(scope: ProfileScope, id: string) {
+  async fail(scope: ProfileScope, id: string, errorCode: PrivateLessonReportFailureCode) {
     await this.pool.query(
-      `UPDATE product_gotit.private_lesson_sessions SET status='report_failed',report_error_code='generation_failed',updated_at=now()
+      `UPDATE product_gotit.private_lesson_sessions SET status='report_failed',report_error_code=$4,updated_at=now()
        WHERE application_id=$1 AND application_user_id=$2 AND id=$3 AND deleted_at IS NULL`,
-      [scope.applicationId, scope.applicationUserId, id],
+      [scope.applicationId, scope.applicationUserId, id, errorCode],
     );
   }
 
@@ -171,10 +187,16 @@ export class PostgresPrivateLessonJournal implements PrivateLessonJournal {
   }
 }
 
-const selectFields = `SELECT id,target_language_code,support_language_code,level,topic,grammar_focus,
- focus_areas,custom_focus,correction_mode,vocabulary_mode,continuity,roadmap_id,milestone_id,
- teacher_voice,speech_rate,planned_duration_seconds,target_words,status,started_at,ended_at,
- actual_duration_seconds,report FROM product_gotit.private_lesson_sessions`;
+const selectFields = `SELECT s.id,s.target_language_code,s.support_language_code,s.level,s.topic,s.grammar_focus,
+ s.focus_areas,s.custom_focus,s.correction_mode,s.vocabulary_mode,s.continuity,s.roadmap_id,s.milestone_id,
+ s.teacher_voice,s.speech_rate,s.planned_duration_seconds,s.target_words,s.status,s.started_at,s.ended_at,
+ s.actual_duration_seconds,s.report,r.goal_title,m.milestone_key,m.communication_objective,m.grammar_topics,
+ m.success_criteria,m.evidence_lesson_count
+ FROM product_gotit.private_lesson_sessions s
+ LEFT JOIN product_gotit.private_lesson_roadmaps r
+   ON r.application_id=s.application_id AND r.application_user_id=s.application_user_id AND r.id=s.roadmap_id
+ LEFT JOIN product_gotit.private_lesson_milestones m
+   ON m.application_id=s.application_id AND m.application_user_id=s.application_user_id AND m.id=s.milestone_id`;
 
 function storedLesson(row: Record<string, unknown>): StoredPrivateLesson {
   const level = row.level as StoredPrivateLesson['level'];
@@ -213,11 +235,21 @@ function storedLesson(row: Record<string, unknown>): StoredPrivateLesson {
         ? {
             roadmapId: row.roadmap_id,
             milestoneId: row.milestone_id,
-            milestoneKey: '',
-            goalTitle: '',
-            communicationObjective: '',
-            grammarTopics: [],
-            successCriteria: { minimumLessons: 2, targetScore: 75 },
+            milestoneKey: typeof row.milestone_key === 'string' ? row.milestone_key : '',
+            goalTitle: typeof row.goal_title === 'string' ? row.goal_title : '',
+            communicationObjective:
+              typeof row.communication_objective === 'string' ? row.communication_objective : '',
+            grammarTopics: Array.isArray(row.grammar_topics)
+              ? (row.grammar_topics as string[])
+              : [],
+            successCriteria:
+              row.success_criteria && typeof row.success_criteria === 'object'
+                ? (row.success_criteria as NonNullable<
+                    PrivateLessonPlan['roadmap']
+                  >['successCriteria'])
+                : { minimumLessons: 2, targetScore: 75 },
+            evidenceLessonCount: Number(row.evidence_lesson_count ?? 0),
+            isFirstMilestoneLesson: Number(row.evidence_lesson_count ?? 0) === 0,
           }
         : null,
     status: row.status as StoredPrivateLesson['status'],

@@ -20,6 +20,7 @@ import {
 import {
   privateLessonNotFound,
   type PrivateLessonJournal,
+  type PrivateLessonReportFailureCode,
   type StoredPrivateLesson,
 } from './private-lesson.repository.js';
 import {
@@ -176,6 +177,7 @@ export class PrivateLessonService {
             instructions,
             audio: {
               input: {
+                noise_reduction: { type: 'far_field' },
                 transcription: { model: this.options.transcriptionModel },
                 turn_detection: {
                   type: 'semantic_vad',
@@ -207,7 +209,7 @@ export class PrivateLessonService {
           openingEvent: {
             type: 'response.create',
             response: {
-              instructions: `Begin the lesson now. Speak only in ${targetLanguage.promptName}. The very first spoken word must be in this language. Give a brief greeting, then follow the lesson flow in the session instructions, including the short previous-lesson review when continuity data is present. Ask only one short question. Do not use any other language.`,
+              instructions: `Begin the lesson now. Speak only in ${targetLanguage.promptName}. The very first spoken word must be in this language. Give a brief greeting, then follow the lesson flow in the session instructions. If this is the first lesson of the current roadmap milestone, teach the named topic with simple examples before conversation; otherwise include the short previous-lesson review when continuity data is present. Ask only one short question. Do not use any other language.`,
             },
           },
           wrapUpEvent: {
@@ -269,8 +271,8 @@ export class PrivateLessonService {
         })
         .catch(() => undefined);
       return publicStoredLesson(completed);
-    } catch {
-      await journal.fail(scope, id);
+    } catch (error) {
+      await journal.fail(scope, id, privateLessonReportFailureCode(error));
       throw new AppError(
         503,
         'PRIVATE_LESSON_REPORT_FAILED',
@@ -447,6 +449,8 @@ export class PrivateLessonService {
               communicationObjective: currentMilestone.communicationObjective,
               grammarTopics: currentMilestone.grammarTopics,
               successCriteria: currentMilestone.successCriteria,
+              evidenceLessonCount: currentMilestone.evidenceLessonCount,
+              isFirstMilestoneLesson: currentMilestone.lessonSessionCount === 0,
             }
           : null,
     } satisfies PrivateLessonPlan;
@@ -514,6 +518,13 @@ function safetyIdentifier(scope: ProfileScope) {
   return createHash('sha256')
     .update(`gotit-private-lesson:${scope.applicationId}:${scope.applicationUserId}`)
     .digest('hex');
+}
+
+function privateLessonReportFailureCode(error: unknown): PrivateLessonReportFailureCode {
+  const providerFailure = providerFailureCode(error);
+  if (providerFailure) return `provider_${providerFailure}`;
+  if (error instanceof z.ZodError || error instanceof SyntaxError) return 'invalid_report';
+  return 'generation_failed';
 }
 
 function privateLessonProviderError(error: unknown, timedOut: boolean) {

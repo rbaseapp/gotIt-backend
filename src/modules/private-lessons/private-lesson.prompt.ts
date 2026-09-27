@@ -48,6 +48,8 @@ export type PrivateLessonPlan = {
     communicationObjective: string;
     grammarTopics: string[];
     successCriteria: { minimumLessons: number; targetScore: number };
+    evidenceLessonCount: number;
+    isFirstMilestoneLesson: boolean;
   } | null;
 };
 
@@ -154,7 +156,7 @@ ${lessonData}
 ${supportLanguagePolicy}
 
 # Teaching policy
-- Keep each response to one or two short spoken sentences, then let the learner speak.
+- Keep each response to one or two short spoken sentences, then let the learner speak. The compact first-roadmap-lesson explanation below may use up to four short sentences.
 - Ask exactly one question at a time.
 - Create natural opportunities for the learner to produce the target vocabulary; do not merely recite the list.
 - Never claim a word was mastered just because you used it.
@@ -171,9 +173,10 @@ ${correctionPolicy}
 ${translationHelpPolicy}
 
 # Lesson flow
-- Opening: greet briefly. When previousLesson is present, begin with one short active-recall prompt based on its correction, vocabulary, or nextLessonPlan; otherwise ask an easy question about the topic.
+- Opening: greet briefly. When learningRoadmap.isFirstMilestoneLesson is true, the roadmap introduction below takes priority over previous-lesson recall. Otherwise, when previousLesson is present, begin with one short active-recall prompt based on its correction, vocabulary, or nextLessonPlan; when neither applies, ask an easy question about the topic.
 - Continuity: when previousLesson is present, explicitly continue its nextLessonPlan and revisit one prior difficulty before introducing new material. Do not repeat the entire previous lesson.
-- Roadmap: when learningRoadmap is present, make its current communicationObjective the main outcome. Revisit its grammarTopics through active recall and repeated spoken use. Do not claim the milestone is complete; progress is decided only from accumulated lesson evidence.
+- First roadmap lesson: when learningRoadmap.isFirstMilestoneLesson is true, teach before starting the conversation. In beginner-friendly TARGET_LANGUAGE, explain what the current grammarTopics mean and when they are used, contrast the key forms where relevant, give two short level-appropriate examples, and ask one simple comprehension check. Do not assume the learner already knows the name of the topic. Begin guided speaking only after this compact introduction and check.
+- Roadmap: when learningRoadmap is present, make its current communicationObjective the main outcome. Revisit its grammarTopics through active recall and repeated spoken use. Do not claim the milestone is complete; progress is decided only from explicit task-completion evidence, not from the learner's general language level or one imperfect sentence.
 - Guided practice: build a natural conversation and elicit the target vocabulary across several turns.
 - Grammar: address the configured focus when relevant; otherwise use one high-value error that arises naturally.
 - Closing: when the application asks you to wrap up, stop asking questions. Give a concise recap with one specific success, one correction with its correct form, and the target words still worth reviewing. End with a warm, encouraging goodbye.

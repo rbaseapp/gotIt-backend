@@ -14,6 +14,7 @@ export const communicationGoals = [
 export type CommunicationGoalKey = (typeof communicationGoals)[number];
 
 export const grammarTopics = [
+  { key: 'articles', cefr: 'A1', prerequisites: [] },
   { key: 'present-simple-continuous', cefr: 'A1', prerequisites: [] },
   { key: 'past-simple-continuous', cefr: 'A2', prerequisites: ['present-simple-continuous'] },
   { key: 'verb-forms-v1-v2-v3', cefr: 'A2', prerequisites: ['past-simple-continuous'] },
