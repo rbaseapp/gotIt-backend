@@ -6,7 +6,7 @@ import { privateLessonTurnSchema } from './private-lesson.summary.js';
 export const privateLessonInputSchema = z
   .object({
     targetLanguageCode: languageSchema,
-    supportLanguageCode: languageSchema.optional(),
+    supportLanguageCode: languageSchema.nullable().optional(),
     requestedLevel: z.enum(CEFR_LEVELS).optional(),
     requestedDurationMinutes: z
       .union([z.literal(1), z.literal(5), z.literal(10), z.literal(15)])

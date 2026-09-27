@@ -150,21 +150,63 @@ test('private lesson creates a bounded personalized Realtime session', async () 
   assert.doesNotMatch(JSON.stringify(result), /server-secret/u);
 });
 
-test('private lesson omits translation action when no support language is available', async () => {
-  const service = makeService(
-    async () =>
-      new Response(JSON.stringify({ value: 'ek_demo' }), {
-        status: 200,
-        headers: { 'content-type': 'application/json' },
-      }),
-  );
+test('private lesson pins every spoken response to the selected target language', async () => {
+  let requestBody: Record<string, unknown> | undefined;
+  const service = makeService(async (_url, init) => {
+    requestBody = JSON.parse(String(init?.body)) as Record<string, unknown>;
+    return new Response(JSON.stringify({ value: 'ek_demo' }), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    });
+  });
+
   const result = await service.createSession(identity, {
-    targetLanguageCode: 'he',
+    targetLanguageCode: 'ar',
+    supportLanguageCode: 'he',
+  });
+
+  const session = requestBody?.session as { instructions?: unknown };
+  const sessionInstructions = String(session.instructions);
+  const openingInstructions = result.realtime.openingEvent.response.instructions;
+  const closingInstructions = result.realtime.wrapUpEvent.response.instructions;
+  const translationInstructions = result.realtime.translationEvent?.response.instructions ?? '';
+
+  assert.match(sessionInstructions, /TARGET_LANGUAGE is Arabic \(العربية; language code: ar\)/u);
+  assert.match(sessionInstructions, /from the very first spoken word through the final goodbye/u);
+  assert.match(sessionInstructions, /Every greeting, question, example, hint, correction/u);
+  assert.match(openingInstructions, /Speak only in Arabic \(العربية; language code: ar\)/u);
+  assert.match(openingInstructions, /very first spoken word/u);
+  assert.match(closingInstructions, /Speak only in Arabic \(العربية; language code: ar\)/u);
+  assert.match(translationInstructions, /translate .* into Hebrew \(עברית; language code: he\)/u);
+  assert.match(translationInstructions, /resume speaking only in Arabic/u);
+});
+
+test('private lesson omits translation action when no support language is available', async () => {
+  let requestBody: Record<string, unknown> | undefined;
+  const service = makeService(async (_url, init) => {
+    requestBody = JSON.parse(String(init?.body)) as Record<string, unknown>;
+    return new Response(JSON.stringify({ value: 'ek_demo' }), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    });
+  });
+  const result = await service.createSession(identity, {
+    targetLanguageCode: 'es',
+    supportLanguageCode: null,
     teacherVoice: 'female',
     speechRate: 'fast',
   });
 
   assert.equal(result.realtime.translationEvent, null);
+  assert.equal(result.lesson.supportLanguageCode, null);
+  assert.match(
+    String((requestBody?.session as { instructions?: unknown }).instructions),
+    /No support language is configured.*Never speak in a language other than TARGET_LANGUAGE/su,
+  );
+  assert.match(
+    String((requestBody?.session as { instructions?: unknown }).instructions),
+    /explain more simply in TARGET_LANGUAGE without switching languages/u,
+  );
   assert.equal(result.lesson.teacherVoice, 'female');
   assert.equal(result.lesson.speechRate, 'fast');
 });

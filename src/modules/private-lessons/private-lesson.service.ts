@@ -12,7 +12,11 @@ import type {
   ProfileScope,
   ProfileServiceContract,
 } from '../profile/profile.types.js';
-import { buildPrivateLessonPrompt, type PrivateLessonPlan } from './private-lesson.prompt.js';
+import {
+  buildPrivateLessonPrompt,
+  describeLessonLanguage,
+  type PrivateLessonPlan,
+} from './private-lesson.prompt.js';
 import {
   privateLessonNotFound,
   type PrivateLessonJournal,
@@ -99,6 +103,10 @@ export class PrivateLessonService {
     ]);
     const plan = this.buildPlan(input, profile, queue.items);
     const instructions = buildPrivateLessonPrompt(plan);
+    const targetLanguage = describeLessonLanguage(plan.targetLanguageCode);
+    const supportLanguage = plan.supportLanguageCode
+      ? describeLessonLanguage(plan.supportLanguageCode)
+      : null;
     const voice = input.teacherVoice ? voiceByGender[input.teacherVoice] : this.options.voice;
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), this.requestTimeoutMs);
@@ -149,22 +157,20 @@ export class PrivateLessonService {
           openingEvent: {
             type: 'response.create',
             response: {
-              instructions:
-                'Begin the lesson now with a brief greeting in the target language and one easy question about the lesson topic.',
+              instructions: `Begin the lesson now. Speak only in ${targetLanguage.promptName}. The very first spoken word must be in this language. Give a brief greeting and ask one easy question about the lesson topic. Do not use any other language.`,
             },
           },
           wrapUpEvent: {
             type: 'response.create',
             response: {
-              instructions:
-                'The lesson is ending now. Do not ask another question. In three short parts, give one specific success, one correction with the correct form, and the target words worth reviewing. Then say a warm, encouraging goodbye in the target language. Keep the entire closing under 20 seconds.',
+              instructions: `The lesson is ending now. Speak only in ${targetLanguage.promptName}. Do not ask another question. In three short parts, give one specific success, one correction with the correct form, and the target words worth reviewing. Then say a warm, encouraging goodbye in the same language. Do not use any other language. Keep the entire closing under 20 seconds.`,
             },
           },
-          translationEvent: plan.supportLanguageCode
+          translationEvent: supportLanguage
             ? {
                 type: 'response.create',
                 response: {
-                  instructions: `Translate the most recent tutor sentence into the learner's support language (${plan.supportLanguageCode}). Give only the translation and at most one brief clarification. Do not advance the lesson or ask a new question.`,
+                  instructions: `For this response only, translate the most recent tutor sentence into ${supportLanguage.promptName}. Give only the translation and at most one brief clarification. Do not advance the lesson or ask a new question. After this response, resume speaking only in ${targetLanguage.promptName}.`,
                 },
               }
             : null,
@@ -252,12 +258,13 @@ export class PrivateLessonService {
       ('A2' satisfies CefrLevel);
     const profileSupportLanguage = profile.defaultTranslationLanguage;
     const supportLanguageCode =
-      input.supportLanguageCode ??
-      (profileSupportLanguage &&
-      new Intl.Locale(profileSupportLanguage).language !==
-        new Intl.Locale(input.targetLanguageCode).language
-        ? profileSupportLanguage
-        : null);
+      input.supportLanguageCode === undefined
+        ? profileSupportLanguage &&
+          new Intl.Locale(profileSupportLanguage).language !==
+            new Intl.Locale(input.targetLanguageCode).language
+          ? profileSupportLanguage
+          : null
+        : input.supportLanguageCode;
     const targets = queue
       .filter(
         (item) =>
