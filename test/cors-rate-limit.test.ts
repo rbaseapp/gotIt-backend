@@ -91,6 +91,17 @@ test('exact CORS origins permit authenticated requests and preflight; foreign/nu
   ])
     assert.throws(() => validateOrigins([origin]));
 });
+test('same-origin browser requests are allowed without duplicating the backend URL in CORS_ORIGINS', async () => {
+  const f = fixture();
+  const response = await request(f.app)
+    .get('/api/v1/profile')
+    .set('Host', 'backend.example.test')
+    .set('Origin', 'https://backend.example.test')
+    .set('Authorization', 'Bearer fake')
+    .expect(200);
+  assert.equal(response.headers['access-control-allow-origin'], 'https://backend.example.test');
+  assert.equal(f.authCalls(), 1);
+});
 test('rate limit rejection has retry guidance and correlation before auth; liveness stays reachable', async () => {
   const f = fixture(false);
   const response = await request(f.app)

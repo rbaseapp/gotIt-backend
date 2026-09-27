@@ -27,7 +27,16 @@ export function createCors(origins: string[] = []): RequestHandler {
       return;
     }
     res.vary('Origin');
-    if (!allowed.has(origin)) {
+    let isSameOrigin = false;
+    try {
+      const parsedOrigin = new URL(origin);
+      isSameOrigin =
+        ['https:', 'http:'].includes(parsedOrigin.protocol) &&
+        parsedOrigin.host.toLowerCase() === req.get('host')?.toLowerCase();
+    } catch {
+      // Invalid origins are rejected by the allowlist check below.
+    }
+    if (!allowed.has(origin) && !isSameOrigin) {
       next(new AppError(403, 'ORIGIN_NOT_ALLOWED', 'Request origin is not allowed'));
       return;
     }

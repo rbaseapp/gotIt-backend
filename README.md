@@ -180,7 +180,9 @@ Paid entitlement enforcement is enabled by default. A new account receives the C
 
 ## HTTP, deployment and verification
 
-Browser clients require exact `CORS_ORIGINS` for the Web site and Chrome extension.
+Cross-origin browser clients require exact `CORS_ORIGINS` for the Web site and Chrome
+extension. Same-origin requests, including the backend-hosted private-lesson demo, are
+accepted automatically.
 An empty list securely denies cross-origin browser requests while allowing
 server-to-server requests without an Origin header.
 The backend's Render URL is not their origin. Set `TRUST_PROXY_HOPS` only after
