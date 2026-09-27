@@ -21,6 +21,18 @@ import type {
 } from '../src/modules/private-lessons/private-lesson.summary.js';
 import { OpenAiPrivateLessonSummaryGenerator } from '../src/modules/private-lessons/private-lesson.summary.js';
 
+const assessment = {
+  overallLevel: 'B1' as const,
+  confidence: 'medium' as const,
+  skills: {
+    speaking: { score: 58, level: 'B1' as const, feedback: 'Clear spoken answers.' },
+    vocabulary: { score: 55, level: 'B1' as const, feedback: 'Useful word choices.' },
+    grammar: { score: 52, level: 'B1' as const, feedback: 'Mostly clear grammar.' },
+    fluency: { score: 54, level: 'B1' as const, feedback: 'Keep extending answers.' },
+    comprehension: { score: 60, level: 'B1' as const, feedback: 'Relevant responses.' },
+  },
+};
+
 const logger = pino({ enabled: false });
 const identity = {
   applicationId: '22222222-2222-4222-8222-222222222222',
@@ -46,9 +58,13 @@ const profile: GotItProfile = {
   ],
   interests: ['technology', 'travel'],
 };
+let recordedAssessment: { languageCode: string; level: string; confidence: number } | undefined;
 const profiles: ProfileServiceContract = {
   getProfile: async () => profile,
   patchProfile: async () => profile,
+  recordSystemAssessment: async (_scope, input) => {
+    recordedAssessment = input;
+  },
 };
 const vocabulary: PrivateLessonVocabularySource = {
   queue: async () => ({
@@ -120,14 +136,18 @@ test('private lesson creates a bounded personalized Realtime session', async () 
     speechRate: 'slow',
     topic: 'job interviews',
     grammarFocus: 'past simple',
+    focusAreas: ['speaking', 'grammar', 'fluency'],
+    customFocus: 'Answer interview questions with longer examples',
   });
 
   assert.equal(result.realtime.clientSecret, 'ek_demo');
   assert.equal(result.lesson.durationSeconds, 600);
-  assert.equal(result.lesson.wrapUpAfterSeconds, 555);
+  assert.equal(result.lesson.wrapUpAfterSeconds, 595);
   assert.equal(result.lesson.level, 'B1');
   assert.equal(result.lesson.teacherVoice, 'male');
   assert.equal(result.lesson.speechRate, 'slow');
+  assert.deepEqual(result.lesson.focusAreas, ['speaking', 'grammar', 'fluency']);
+  assert.equal(result.lesson.customFocus, 'Answer interview questions with longer examples');
   assert.equal(result.realtime.translationEvent?.type, 'response.create');
   assert.deepEqual(result.lesson.targetWords, [
     {
@@ -310,6 +330,7 @@ test('private lesson hides provider authentication details', async () => {
 });
 
 test('private lesson persists one structured report and never stores the transcript', async () => {
+  recordedAssessment = undefined;
   const rows = new Map<string, StoredPrivateLesson>();
   const journal: PrivateLessonJournal = {
     async create(_scope, plan) {
@@ -350,6 +371,7 @@ test('private lesson persists one structured report and never stores the transcr
   let generationCount = 0;
   const report: PrivateLessonReport = {
     summary: 'A useful lesson about interviews.',
+    assessment,
     strengths: ['Clear short answers'],
     corrections: [],
     grammarPoints: [],
@@ -401,11 +423,23 @@ test('private lesson persists one structured report and never stores the transcr
   assert.deepEqual(first.report, report);
   assert.deepEqual(replay.report, report);
   assert.equal(first.actualDurationSeconds, 142);
+  assert.deepEqual(recordedAssessment, {
+    languageCode: 'en',
+    level: 'B1',
+    confidence: 0.7,
+  });
   assert.equal(
     'turns' in (rows.get(created.lesson.id) as unknown as Record<string, unknown>),
     false,
   );
   assert.equal((await service.listSessions(identity, 20)).lessons.length, 1);
+  const continued = await service.createSession(identity, {
+    targetLanguageCode: 'en',
+    focusAreas: ['grammar'],
+  });
+  assert.equal(continued.lesson.continuesFromLessonId, created.lesson.id);
+  assert.equal(rows.get(continued.lesson.id)?.continuity?.nextLessonPlan, report.nextLessonPlan);
+  assert.deepEqual(rows.get(continued.lesson.id)?.continuity?.vocabularyToReview, ['achieve']);
   assert.deepEqual(await service.removeSession(identity, created.lesson.id), { deleted: true });
   await assert.rejects(service.getSession(identity, created.lesson.id), {
     code: 'PRIVATE_LESSON_NOT_FOUND',
@@ -416,6 +450,7 @@ test('private lesson report generation is structured, transient and limited to l
   let requestBody: Record<string, unknown> | undefined;
   const generated: PrivateLessonReport = {
     summary: 'סיכום שימושי.',
+    assessment,
     strengths: ['דיברתם במשפטים ברורים.'],
     corrections: [],
     grammarPoints: [],
@@ -460,6 +495,8 @@ test('private lesson report generation is structured, transient and limited to l
     level: 'B1',
     topic: 'interviews',
     grammarFocus: null,
+    focusAreas: ['speaking', 'vocabulary'],
+    customFocus: null,
     teacherVoice: 'female',
     speechRate: 'normal',
     interests: [],
@@ -470,6 +507,7 @@ test('private lesson report generation is structured, transient and limited to l
         translationText: 'להשיג',
       },
     ],
+    continuity: null,
   };
   const report = await generator.generate(
     plan,

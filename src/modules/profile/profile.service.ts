@@ -18,6 +18,20 @@ export class ProfileService implements ProfileServiceContract {
     const normalized = normalizePatch(input);
     return this.repository.patch(scope, PROFILE_DEFAULTS, normalized);
   }
+
+  async recordSystemAssessment(
+    scope: ProfileScope,
+    input: {
+      languageCode: string;
+      level: import('./profile.types.js').CefrLevel;
+      confidence: number;
+    },
+  ) {
+    await this.repository.recordSystemAssessment(scope, {
+      ...input,
+      languageCode: canonicalizeLanguageCode(input.languageCode),
+    });
+  }
 }
 
 function normalizePatch(input: ProfilePatchInput): ProfilePatchInput {

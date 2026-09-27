@@ -1,4 +1,7 @@
 import type { CefrLevel } from '../profile/profile.types.js';
+import type { privateLessonFocusAreas } from './private-lesson.validation.js';
+
+export type PrivateLessonFocusArea = (typeof privateLessonFocusAreas)[number];
 
 export type PrivateLessonTarget = {
   learningItemId: string;
@@ -14,10 +17,19 @@ export type PrivateLessonPlan = {
   level: CefrLevel;
   topic: string;
   grammarFocus: string | null;
+  focusAreas: PrivateLessonFocusArea[];
+  customFocus: string | null;
   teacherVoice: 'female' | 'male';
   speechRate: 'slow' | 'normal' | 'fast';
   interests: string[];
   targets: PrivateLessonTarget[];
+  continuity: {
+    previousLessonId: string;
+    previousSummary: string;
+    nextLessonPlan: string;
+    correctionsToRevisit: string[];
+    vocabularyToReview: string[];
+  } | null;
 };
 
 export type LessonLanguage = {
@@ -66,6 +78,8 @@ export function buildPrivateLessonPrompt(plan: PrivateLessonPlan) {
       cefrLevel: plan.level,
       topic: plan.topic,
       grammarFocus: plan.grammarFocus,
+      focusAreas: plan.focusAreas,
+      learnerRequestedFocus: plan.customFocus,
       teacherVoice: plan.teacherVoice,
       speechRate: plan.speechRate,
       learnerInterests: plan.interests,
@@ -73,6 +87,7 @@ export function buildPrivateLessonPrompt(plan: PrivateLessonPlan) {
         text: target.sourceText,
         meaning: target.translationText,
       })),
+      previousLesson: plan.continuity,
     },
     null,
     2,
@@ -107,13 +122,16 @@ ${supportLanguagePolicy}
 - For a correction: briefly recast the sentence, explain only if needed, then invite one retry.
 - Do not interrupt a learner mid-sentence to correct them.
 - Praise specifically and sparingly.
+- Give extra practice time to the selected focus areas and the learner's custom focus.
+- Treat the CEFR level as a working estimate. Adapt difficulty from the learner's actual responses.
 
 # Speaking pace and translation help
 - Keep your spoken pacing ${plan.speechRate}. For slow pacing, speak deliberately with clear pauses. For normal pacing, sound natural and unhurried. For fast pacing, be lively and concise without sacrificing pronunciation.
 ${translationHelpPolicy}
 
 # Lesson flow
-- Opening: greet briefly and ask an easy question about the topic.
+- Opening: greet briefly. When previousLesson is present, begin with one short active-recall prompt based on its correction, vocabulary, or nextLessonPlan; otherwise ask an easy question about the topic.
+- Continuity: when previousLesson is present, explicitly continue its nextLessonPlan and revisit one prior difficulty before introducing new material. Do not repeat the entire previous lesson.
 - Guided practice: build a natural conversation and elicit the target vocabulary across several turns.
 - Grammar: address the configured focus when relevant; otherwise use one high-value error that arises naturally.
 - Closing: when the application asks you to wrap up, stop asking questions. Give a concise recap with one specific success, one correction with its correct form, and the target words still worth reviewing. End with a warm, encouraging goodbye.

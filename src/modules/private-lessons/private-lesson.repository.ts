@@ -2,7 +2,11 @@ import type { Pool } from 'pg';
 import { AppError } from '../../shared/errors/app-error.js';
 import type { ProfileScope } from '../profile/profile.types.js';
 import type { PrivateLessonPlan } from './private-lesson.prompt.js';
-import { privateLessonReportSchema, type PrivateLessonReport } from './private-lesson.summary.js';
+import {
+  lowConfidenceAssessment,
+  privateLessonReportSchema,
+  type PrivateLessonReport,
+} from './private-lesson.summary.js';
 
 export type StoredPrivateLesson = PrivateLessonPlan & {
   status: 'active' | 'summarizing' | 'completed' | 'report_failed';
@@ -33,8 +37,9 @@ export class PostgresPrivateLessonJournal implements PrivateLessonJournal {
     await this.pool.query(
       `INSERT INTO product_gotit.private_lesson_sessions
        (id,application_id,application_user_id,target_language_code,support_language_code,level,topic,
-        grammar_focus,teacher_voice,speech_rate,planned_duration_seconds,target_words)
-       VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12::jsonb)`,
+        grammar_focus,focus_areas,custom_focus,continuity,teacher_voice,speech_rate,
+        planned_duration_seconds,target_words)
+       VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10,$11::jsonb,$12,$13,$14,$15::jsonb)`,
       [
         plan.id,
         scope.applicationId,
@@ -44,6 +49,9 @@ export class PostgresPrivateLessonJournal implements PrivateLessonJournal {
         plan.level,
         plan.topic,
         plan.grammarFocus,
+        JSON.stringify(plan.focusAreas),
+        plan.customFocus,
+        plan.continuity ? JSON.stringify(plan.continuity) : null,
         plan.teacherVoice,
         plan.speechRate,
         plan.durationSeconds,
@@ -124,31 +132,48 @@ export class PostgresPrivateLessonJournal implements PrivateLessonJournal {
 }
 
 const selectFields = `SELECT id,target_language_code,support_language_code,level,topic,grammar_focus,
+ focus_areas,custom_focus,continuity,
  teacher_voice,speech_rate,planned_duration_seconds,target_words,status,started_at,ended_at,
  actual_duration_seconds,report FROM product_gotit.private_lesson_sessions`;
 
 function storedLesson(row: Record<string, unknown>): StoredPrivateLesson {
+  const level = row.level as StoredPrivateLesson['level'];
+  const rawReport =
+    row.report && typeof row.report === 'object' ? (row.report as Record<string, unknown>) : null;
   return {
     id: String(row.id),
     durationSeconds: Number(row.planned_duration_seconds),
     targetLanguageCode: String(row.target_language_code),
     supportLanguageCode:
       typeof row.support_language_code === 'string' ? row.support_language_code : null,
-    level: row.level as StoredPrivateLesson['level'],
+    level,
     topic: String(row.topic),
     grammarFocus: typeof row.grammar_focus === 'string' ? row.grammar_focus : null,
+    focusAreas: Array.isArray(row.focus_areas)
+      ? (row.focus_areas as PrivateLessonPlan['focusAreas'])
+      : ['speaking', 'vocabulary'],
+    customFocus: typeof row.custom_focus === 'string' ? row.custom_focus : null,
     teacherVoice: row.teacher_voice as StoredPrivateLesson['teacherVoice'],
     speechRate: row.speech_rate as StoredPrivateLesson['speechRate'],
     interests: [],
     targets: Array.isArray(row.target_words)
       ? (row.target_words as PrivateLessonPlan['targets'])
       : [],
+    continuity:
+      row.continuity && typeof row.continuity === 'object'
+        ? (row.continuity as PrivateLessonPlan['continuity'])
+        : null,
     status: row.status as StoredPrivateLesson['status'],
     startedAt: new Date(row.started_at as string | Date).toISOString(),
     endedAt: row.ended_at ? new Date(row.ended_at as string | Date).toISOString() : null,
     actualDurationSeconds:
       typeof row.actual_duration_seconds === 'number' ? row.actual_duration_seconds : null,
-    report: row.report ? privateLessonReportSchema.parse(row.report) : null,
+    report: rawReport
+      ? privateLessonReportSchema.parse({
+          ...rawReport,
+          assessment: rawReport.assessment ?? lowConfidenceAssessment(level),
+        })
+      : null,
   };
 }
 

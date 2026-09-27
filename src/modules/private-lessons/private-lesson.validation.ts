@@ -3,6 +3,15 @@ import { languageSchema, sameBaseLanguage, textSchema } from '../capture/capture
 import { CEFR_LEVELS } from '../profile/profile.types.js';
 import { privateLessonTurnSchema } from './private-lesson.summary.js';
 
+export const privateLessonFocusAreas = [
+  'speaking',
+  'vocabulary',
+  'grammar',
+  'fluency',
+  'pronunciation',
+  'listening',
+] as const;
+
 export const privateLessonInputSchema = z
   .object({
     targetLanguageCode: languageSchema,
@@ -15,6 +24,13 @@ export const privateLessonInputSchema = z
     speechRate: z.enum(['slow', 'normal', 'fast']).optional(),
     topic: textSchema(120).optional(),
     grammarFocus: textSchema(160).optional(),
+    focusAreas: z
+      .array(z.enum(privateLessonFocusAreas))
+      .min(1)
+      .max(6)
+      .refine((areas) => new Set(areas).size === areas.length, 'Duplicate focus area')
+      .optional(),
+    customFocus: textSchema(300).nullable().optional(),
   })
   .strict()
   .superRefine((value, context) => {

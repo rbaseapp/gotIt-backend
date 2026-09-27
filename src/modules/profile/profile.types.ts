@@ -69,4 +69,12 @@ export type ProfileDefaults = Pick<
 export interface ProfileServiceContract {
   getProfile(scope: ProfileScope): Promise<GotItProfile>;
   patchProfile(scope: ProfileScope, input: ProfilePatchInput): Promise<GotItProfile>;
+  recordSystemAssessment?(
+    scope: ProfileScope,
+    input: {
+      languageCode: string;
+      level: CefrLevel;
+      confidence: number;
+    },
+  ): Promise<void>;
 }

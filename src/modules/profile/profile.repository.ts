@@ -132,6 +132,53 @@ export class ProfileRepository {
     });
   }
 
+  async recordSystemAssessment(
+    scope: ProfileScope,
+    input: { languageCode: string; level: CefrLevel; confidence: number },
+  ) {
+    const confidence = Math.max(0, Math.min(1, input.confidence));
+    await this.pool.query(
+      `
+        INSERT INTO product_gotit.user_language_proficiencies (
+          id,
+          application_id,
+          application_user_id,
+          language_code,
+          system_estimated_level,
+          effective_level,
+          system_confidence,
+          last_evaluated_at,
+          created_at,
+          updated_at
+        )
+        VALUES ($1, $2, $3, $4, $5, $5, $6, NOW(), NOW(), NOW())
+        ON CONFLICT (application_id, application_user_id, language_code)
+        DO UPDATE SET
+          system_estimated_level = EXCLUDED.system_estimated_level,
+          system_confidence = EXCLUDED.system_confidence,
+          last_evaluated_at = NOW(),
+          effective_level = CASE
+            WHEN EXCLUDED.system_confidence >= 0.6
+              THEN EXCLUDED.system_estimated_level
+            ELSE COALESCE(
+              product_gotit.user_language_proficiencies.effective_level,
+              product_gotit.user_language_proficiencies.self_assessed_level,
+              EXCLUDED.system_estimated_level
+            )
+          END,
+          updated_at = NOW()
+      `,
+      [
+        randomUUID(),
+        scope.applicationId,
+        scope.applicationUserId,
+        input.languageCode,
+        input.level,
+        confidence,
+      ],
+    );
+  }
+
   private async ensureProfile(
     client: DatabaseTransaction,
     scope: ProfileScope,

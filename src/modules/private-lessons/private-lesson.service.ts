@@ -97,11 +97,20 @@ export class PrivateLessonService {
         'Private voice lessons are unavailable',
       );
 
-    const [profile, queue] = await Promise.all([
+    const [profile, queue, previousLessons] = await Promise.all([
       this.options.profiles.getProfile(scope),
       this.options.vocabulary.queue(scope, 20),
+      this.options.journal?.list(scope, 20) ?? Promise.resolve([]),
     ]);
-    const plan = this.buildPlan(input, profile, queue.items);
+    const targetBaseLanguage = new Intl.Locale(input.targetLanguageCode).language;
+    const previousLesson =
+      previousLessons.find(
+        (lesson) =>
+          lesson.status === 'completed' &&
+          lesson.report &&
+          new Intl.Locale(lesson.targetLanguageCode).language === targetBaseLanguage,
+      ) ?? null;
+    const plan = this.buildPlan(input, profile, queue.items, previousLesson);
     const instructions = buildPrivateLessonPrompt(plan);
     const targetLanguage = describeLessonLanguage(plan.targetLanguageCode);
     const supportLanguage = plan.supportLanguageCode
@@ -157,7 +166,7 @@ export class PrivateLessonService {
           openingEvent: {
             type: 'response.create',
             response: {
-              instructions: `Begin the lesson now. Speak only in ${targetLanguage.promptName}. The very first spoken word must be in this language. Give a brief greeting and ask one easy question about the lesson topic. Do not use any other language.`,
+              instructions: `Begin the lesson now. Speak only in ${targetLanguage.promptName}. The very first spoken word must be in this language. Give a brief greeting, then follow the lesson flow in the session instructions, including the short previous-lesson review when continuity data is present. Ask only one short question. Do not use any other language.`,
             },
           },
           wrapUpEvent: {
@@ -209,7 +218,15 @@ export class PrivateLessonService {
             safetyIdentifier(scope),
           )
         : basicPrivateLessonReport(claimed);
-      return publicStoredLesson(await journal.complete(scope, id, report));
+      const completed = await journal.complete(scope, id, report);
+      await this.options.profiles
+        .recordSystemAssessment?.(scope, {
+          languageCode: claimed.targetLanguageCode,
+          level: report.assessment.overallLevel,
+          confidence: { low: 0.35, medium: 0.7, high: 0.9 }[report.assessment.confidence],
+        })
+        .catch(() => undefined);
+      return publicStoredLesson(completed);
     } catch {
       await journal.fail(scope, id);
       throw new AppError(
@@ -245,7 +262,12 @@ export class PrivateLessonService {
     return this.options.journal;
   }
 
-  private buildPlan(input: PrivateLessonInput, profile: GotItProfile, queue: QueueItem[]) {
+  private buildPlan(
+    input: PrivateLessonInput,
+    profile: GotItProfile,
+    queue: QueueItem[],
+    previousLesson: StoredPrivateLesson | null,
+  ) {
     const languageProfile = profile.languages.find(
       (language) =>
         new Intl.Locale(language.languageCode).language ===
@@ -277,6 +299,28 @@ export class PrivateLessonService {
         sourceText: item.sourceText,
         translationText: item.primaryTranslation,
       }));
+    const focusAreas = [
+      ...new Set([
+        ...(input.focusAreas ?? previousLesson?.focusAreas ?? ['speaking', 'vocabulary']),
+        ...(input.grammarFocus ? (['grammar'] as const) : []),
+      ]),
+    ];
+    const previousReport = previousLesson?.status === 'completed' ? previousLesson.report : null;
+    const continuity =
+      previousLesson && previousReport
+        ? {
+            previousLessonId: previousLesson.id,
+            previousSummary: previousReport.summary,
+            nextLessonPlan: previousReport.nextLessonPlan,
+            correctionsToRevisit: previousReport.corrections
+              .slice(0, 3)
+              .map((item) => `${item.original} -> ${item.corrected}`),
+            vocabularyToReview: previousReport.vocabulary
+              .filter((item) => item.outcome !== 'practiced')
+              .slice(0, 5)
+              .map((item) => item.sourceText),
+          }
+        : null;
 
     return {
       id: randomUUID(),
@@ -288,10 +332,14 @@ export class PrivateLessonService {
       level,
       topic: input.topic ?? profile.interests[0] ?? 'everyday conversation',
       grammarFocus: input.grammarFocus ?? null,
+      focusAreas,
+      customFocus:
+        input.customFocus === undefined ? (previousLesson?.customFocus ?? null) : input.customFocus,
       teacherVoice: input.teacherVoice ?? 'female',
       speechRate: input.speechRate ?? 'normal',
       interests: profile.interests.slice(0, 10),
       targets,
+      continuity,
     } satisfies PrivateLessonPlan;
   }
 }
@@ -304,6 +352,9 @@ function publicStoredLesson(lesson: StoredPrivateLesson) {
     level: lesson.level,
     topic: lesson.topic,
     grammarFocus: lesson.grammarFocus,
+    focusAreas: lesson.focusAreas,
+    customFocus: lesson.customFocus,
+    continuesFromLessonId: lesson.continuity?.previousLessonId ?? null,
     teacherVoice: lesson.teacherVoice,
     speechRate: lesson.speechRate,
     plannedDurationSeconds: lesson.durationSeconds,
@@ -317,7 +368,7 @@ function publicStoredLesson(lesson: StoredPrivateLesson) {
 }
 
 function publicPlan(plan: PrivateLessonPlan) {
-  const wrapUpLeadSeconds = Math.min(45, Math.max(20, Math.floor(plan.durationSeconds * 0.15)));
+  const wrapUpLeadSeconds = Math.min(5, Math.max(3, Math.floor(plan.durationSeconds * 0.02)));
   return {
     id: plan.id,
     durationSeconds: plan.durationSeconds,
@@ -327,6 +378,9 @@ function publicPlan(plan: PrivateLessonPlan) {
     level: plan.level,
     topic: plan.topic,
     grammarFocus: plan.grammarFocus,
+    focusAreas: plan.focusAreas,
+    customFocus: plan.customFocus,
+    continuesFromLessonId: plan.continuity?.previousLessonId ?? null,
     teacherVoice: plan.teacherVoice,
     speechRate: plan.speechRate,
     targetWords: plan.targets,

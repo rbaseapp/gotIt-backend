@@ -65,10 +65,11 @@ test(
         },
       });
       const repository = new ProfileRepository(database.runtimePool);
+      const profileService = new ProfileService(repository);
       const app = createApp({
         logger: createLogger('silent'),
         coreAuthClient,
-        profileService: new ProfileService(repository),
+        profileService,
         checkDatabase: async () => {
           await database.runtimePool.query('SELECT 1');
         },
@@ -99,12 +100,12 @@ test(
       }
 
       await t.test(
-        'fresh bootstrap creates the 20 baseline tables plus ten GotIt operational tables',
+        'fresh bootstrap creates the 20 baseline tables plus eleven GotIt operational tables',
         async () => {
           const tables = await database.adminPool
             .query(`SELECT count(*)::integer AS count FROM information_schema.tables
           WHERE table_schema = 'product_gotit' AND table_type = 'BASE TABLE'`);
-          assert.equal(tables.rows[0].count, 30);
+          assert.equal(tables.rows[0].count, 31);
           await assert.rejects(
             () => database.runtimePool.query('SELECT id FROM core.application_users'),
             (error: unknown) => error instanceof Error && 'code' in error && error.code === '42501',
@@ -173,6 +174,38 @@ test(
           assert.equal(rows.languages.length, 2);
           assert.equal(rows.interests.length, 2);
           assert.ok(rows.interests.some((interest) => interest.normalized_name === 'technology'));
+        },
+      );
+
+      await t.test(
+        'lesson assessments update the system and effective language level',
+        async () => {
+          await profileService.recordSystemAssessment(userA, {
+            languageCode: 'EN',
+            level: 'B1',
+            confidence: 0.7,
+          });
+          let assessed = await get('test-user-a').expect(200);
+          let english = assessed.body.profile.languages.find(
+            (language: { languageCode: string }) => language.languageCode === 'en',
+          );
+          assert.equal(english.systemEstimatedLevel, 'B1');
+          assert.equal(english.effectiveLevel, 'B1');
+          assert.equal(english.systemConfidence, 0.7);
+          assert.ok(english.lastEvaluatedAt);
+
+          await profileService.recordSystemAssessment(userA, {
+            languageCode: 'en',
+            level: 'A2',
+            confidence: 0.35,
+          });
+          assessed = await get('test-user-a').expect(200);
+          english = assessed.body.profile.languages.find(
+            (language: { languageCode: string }) => language.languageCode === 'en',
+          );
+          assert.equal(english.systemEstimatedLevel, 'A2');
+          assert.equal(english.effectiveLevel, 'B1');
+          assert.equal(english.systemConfidence, 0.35);
         },
       );
 
