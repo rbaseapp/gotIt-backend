@@ -24,6 +24,11 @@ import type {
   PrivateLessonSummaryGenerator,
 } from '../src/modules/private-lessons/private-lesson.summary.js';
 import { OpenAiPrivateLessonSummaryGenerator } from '../src/modules/private-lessons/private-lesson.summary.js';
+import {
+  buildRoadmapBlueprint,
+  privateLessonCurriculum,
+} from '../src/modules/private-lessons/private-lesson.curriculum.js';
+import { privateLessonRoadmapInputSchema } from '../src/modules/private-lessons/private-lesson.validation.js';
 
 const assessment = {
   overallLevel: 'B1' as const,
@@ -137,7 +142,7 @@ test('private lesson creates a bounded personalized Realtime session', async () 
     supportLanguageCode: 'he',
     requestedDurationMinutes: 10,
     teacherVoice: 'male',
-    speechRate: 'slow',
+    speechRate: 'very_slow',
     topic: 'job interviews',
     grammarFocus: 'past simple',
     focusAreas: ['speaking', 'grammar', 'fluency'],
@@ -150,7 +155,7 @@ test('private lesson creates a bounded personalized Realtime session', async () 
   assert.equal(result.lesson.wrapUpAfterSeconds, 595);
   assert.equal(result.lesson.level, 'B1');
   assert.equal(result.lesson.teacherVoice, 'male');
-  assert.equal(result.lesson.speechRate, 'slow');
+  assert.equal(result.lesson.speechRate, 'very_slow');
   assert.deepEqual(result.lesson.focusAreas, ['speaking', 'grammar', 'fluency']);
   assert.equal(result.lesson.customFocus, 'Answer interview questions with longer examples');
   assert.equal(result.lesson.correctionMode, 'deep_explanation');
@@ -170,7 +175,7 @@ test('private lesson creates a bounded personalized Realtime session', async () 
   assert.equal(session.model, 'gpt-realtime-test');
   assert.deepEqual((session.audio as { output: unknown }).output, {
     voice: 'cedar',
-    speed: 0.85,
+    speed: 0.7,
   });
   assert.match(String(session.instructions), /job interviews/u);
   assert.match(String(session.instructions), /achieve/u);
@@ -223,7 +228,7 @@ test('private lesson omits translation action when no support language is availa
     targetLanguageCode: 'es',
     supportLanguageCode: null,
     teacherVoice: 'female',
-    speechRate: 'fast',
+    speechRate: 'very_fast',
   });
 
   assert.equal(result.realtime.translationEvent, null);
@@ -237,7 +242,11 @@ test('private lesson omits translation action when no support language is availa
     /explain more simply in TARGET_LANGUAGE without switching languages/u,
   );
   assert.equal(result.lesson.teacherVoice, 'female');
-  assert.equal(result.lesson.speechRate, 'fast');
+  assert.equal(result.lesson.speechRate, 'very_fast');
+  assert.deepEqual((requestBody?.session as { audio?: { output?: unknown } }).audio?.output, {
+    voice: 'marin',
+    speed: 1.4,
+  });
 });
 
 test('private lesson can run without saved vocabulary and never loads acquiring words', async () => {
@@ -330,14 +339,22 @@ test('private lesson route is authenticated and validates language choices', asy
     .expect(400);
   assert.equal(invalidVocabularyMode.body.error.code, 'VALIDATION_ERROR');
 
+  const invalidSpeechRate = await request(app)
+    .post('/api/v1/private-lessons/realtime-sessions')
+    .set('authorization', 'Bearer valid-token')
+    .send({ targetLanguageCode: 'en', speechRate: 'extreme' })
+    .expect(400);
+  assert.equal(invalidSpeechRate.body.error.code, 'VALIDATION_ERROR');
+
   const created = await request(app)
     .post('/api/v1/private-lessons/realtime-sessions')
     .set('authorization', 'Bearer valid-token')
-    .send({ targetLanguageCode: 'en', topic: 'travel' })
+    .send({ targetLanguageCode: 'en', topic: 'travel', speechRate: 'very_fast' })
     .expect(201);
   assert.equal(created.body.realtime.clientSecret, 'ek_demo');
   assert.equal(created.body.lesson.level, 'B1');
   assert.equal(created.body.lesson.durationSeconds, 300);
+  assert.equal(created.body.lesson.speechRate, 'very_fast');
   assert.equal(created.body.lesson.targetWords[0].sourceText, 'achieve');
 });
 
@@ -634,6 +651,50 @@ test('private lesson correction modes produce distinct tutoring behavior', () =>
   assert.match(recast, /natural, correct version of the sentence/u);
   assert.match(deep, /DEEP CORRECTION AND EXPLANATION/u);
   assert.match(deep, /why the original form was wrong/u);
+});
+
+test('private lesson curriculum exposes progressive grammar and communication paths', () => {
+  const curriculum = privateLessonCurriculum('B1');
+  assert.ok(curriculum.grammarTopics.some((topic) => topic.key === 'modal-verbs'));
+  assert.ok(curriculum.grammarTopics.some((topic) => topic.key === 'passive-voice'));
+  assert.ok(curriculum.grammarTopics.some((topic) => topic.key === 'advanced-sentence-structure'));
+  assert.ok(curriculum.communicationGoals.some((goal) => goal.key === 'everyday-conversation'));
+
+  const roadmap = buildRoadmapBlueprint('grammar', 'conditionals', 'B1');
+  assert.equal(roadmap.milestones.length, 5);
+  assert.deepEqual(
+    roadmap.milestones.map((milestone) => milestone.key),
+    [
+      'foundation',
+      'guided-use',
+      'controlled-conversation',
+      'free-conversation',
+      'independent-mastery',
+    ],
+  );
+  assert.ok(
+    roadmap.milestones.every((milestone) => milestone.successCriteria.minimumLessons === 2),
+  );
+  assert.ok(roadmap.milestones.every((milestone) => milestone.successCriteria.targetScore === 75));
+});
+
+test('private lesson roadmap input rejects goals from the wrong catalog', () => {
+  assert.equal(
+    privateLessonRoadmapInputSchema.safeParse({
+      targetLanguageCode: 'en',
+      goalKind: 'grammar',
+      goalKey: 'job-interviews',
+    }).success,
+    false,
+  );
+  assert.equal(
+    privateLessonRoadmapInputSchema.safeParse({
+      targetLanguageCode: 'en',
+      goalKind: 'grammar',
+      goalKey: 'gerund-infinitive',
+    }).success,
+    true,
+  );
 });
 
 test('private lesson vocabulary source selects only active mastered words in the target language', async () => {

@@ -173,7 +173,7 @@ test(
           const metadata = await database.adminPool.query(
             'SELECT count(*)::integer AS count FROM gotit_migrations.pgmigrations',
           );
-          assert.equal(metadata.rows[0].count, 12);
+          assert.equal(metadata.rows[0].count, 16);
           const catalog = await database.adminPool.query(`
             SELECT tp.slug,
               count(DISTINCT tr.id)::integer AS tracks,
@@ -247,7 +247,8 @@ test(
               randomUUID(),
             ],
           );
-          for (let migration = 0; migration < 10; migration++) await database.migrate('down');
+          for (let migration = 0; migration < metadata.rows[0].count; migration++)
+            await database.migrate('down');
           const absent = await database.adminPool
             .query(`SELECT column_name FROM information_schema.columns WHERE table_schema='product_gotit'
           AND table_name='item_occurrences' AND column_name='capture_receipt'`);

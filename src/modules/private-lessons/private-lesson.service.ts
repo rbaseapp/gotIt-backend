@@ -30,6 +30,9 @@ import type {
   PrivateLessonCompletionInput,
   PrivateLessonInput,
 } from './private-lesson.validation.js';
+import type { PrivateLessonRoadmapStore } from './private-lesson.roadmap.js';
+import { setupPayload } from './private-lesson.roadmap.js';
+import type { PrivateLessonGoalKind } from './private-lesson.curriculum.js';
 
 const clientSecretSchema = z
   .object({
@@ -51,9 +54,11 @@ const voiceByGender = {
 } as const;
 
 const speedByRate = {
+  very_slow: 0.7,
   slow: 0.85,
   normal: 1,
   fast: 1.2,
+  very_fast: 1.4,
 } as const;
 
 export interface PrivateLessonVocabularySource {
@@ -74,6 +79,7 @@ export type PrivateLessonServiceOptions = {
   fetchImpl?: typeof fetch;
   journal?: PrivateLessonJournal;
   summaryGenerator?: PrivateLessonSummaryGenerator;
+  roadmaps?: PrivateLessonRoadmapStore;
   durationSeconds?: number;
   requestTimeoutMs?: number;
 };
@@ -101,9 +107,12 @@ export class PrivateLessonService {
         'Private voice lessons are unavailable',
       );
 
-    const [profile, previousLessons] = await Promise.all([
+    const [profile, previousLessons, preferences, loadedRoadmap] = await Promise.all([
       this.options.profiles.getProfile(scope),
       this.options.journal?.list(scope, 20) ?? Promise.resolve([]),
+      this.options.roadmaps?.getPreferences(scope, input.targetLanguageCode) ??
+        Promise.resolve(null),
+      this.options.roadmaps?.getActive(scope, input.targetLanguageCode) ?? Promise.resolve(null),
     ]);
     const targetBaseLanguage = new Intl.Locale(input.targetLanguageCode).language;
     const previousLesson =
@@ -113,12 +122,35 @@ export class PrivateLessonService {
           lesson.report &&
           new Intl.Locale(lesson.targetLanguageCode).language === targetBaseLanguage,
       ) ?? null;
-    const vocabularyMode = input.vocabularyMode ?? previousLesson?.vocabularyMode ?? 'learned';
+    const activeRoadmap =
+      loadedRoadmap ??
+      (this.options.roadmaps
+        ? await this.options.roadmaps.create(
+            scope,
+            input.targetLanguageCode,
+            'recommended',
+            'recommended-foundation',
+            profileLevel(profile, input.targetLanguageCode),
+          )
+        : null);
+    const vocabularyMode =
+      input.vocabularyMode ??
+      preferences?.vocabularyMode ??
+      previousLesson?.vocabularyMode ??
+      'learned';
     const vocabulary =
       vocabularyMode === 'learned'
         ? await this.options.vocabulary.learned(scope, input.targetLanguageCode, 20)
         : { items: [] };
-    const plan = this.buildPlan(input, profile, vocabulary.items, previousLesson, vocabularyMode);
+    const plan = this.buildPlan(
+      input,
+      profile,
+      vocabulary.items,
+      previousLesson,
+      vocabularyMode,
+      preferences,
+      activeRoadmap,
+    );
     const instructions = buildPrivateLessonPrompt(plan);
     const targetLanguage = describeLessonLanguage(plan.targetLanguageCode);
     const supportLanguage = plan.supportLanguageCode
@@ -160,6 +192,7 @@ export class PrivateLessonService {
       });
       const secret = clientSecretSchema.parse(await readProviderJson(response, controller.signal));
 
+      await this.options.roadmaps?.savePreferences(scope, input, plan);
       await this.options.journal?.create(scope, plan);
       return {
         lesson: publicPlan(plan),
@@ -227,6 +260,7 @@ export class PrivateLessonService {
           )
         : basicPrivateLessonReport(claimed);
       const completed = await journal.complete(scope, id, report);
+      await this.options.roadmaps?.recordEvidence(scope, claimed, report).catch(() => undefined);
       await this.options.profiles
         .recordSystemAssessment?.(scope, {
           languageCode: claimed.targetLanguageCode,
@@ -260,6 +294,37 @@ export class PrivateLessonService {
     return { deleted: true };
   }
 
+  async getSetup(scope: ProfileScope, targetLanguageCode: string) {
+    const [profile, preferences, roadmap] = await Promise.all([
+      this.options.profiles.getProfile(scope),
+      this.options.roadmaps?.getPreferences(scope, targetLanguageCode) ?? Promise.resolve(null),
+      this.options.roadmaps?.getActive(scope, targetLanguageCode) ?? Promise.resolve(null),
+    ]);
+    return setupPayload(profileLevel(profile, targetLanguageCode), preferences, roadmap);
+  }
+
+  async createRoadmap(
+    scope: ProfileScope,
+    input: { targetLanguageCode: string; goalKind: PrivateLessonGoalKind; goalKey: string },
+  ) {
+    if (!this.options.roadmaps)
+      throw new AppError(
+        503,
+        'PRIVATE_LESSON_ROADMAPS_NOT_CONFIGURED',
+        'Learning roadmaps are unavailable',
+      );
+    const profile = await this.options.profiles.getProfile(scope);
+    return {
+      roadmap: await this.options.roadmaps.create(
+        scope,
+        input.targetLanguageCode,
+        input.goalKind,
+        input.goalKey,
+        profileLevel(profile, input.targetLanguageCode),
+      ),
+    };
+  }
+
   private requireJournal() {
     if (!this.options.journal)
       throw new AppError(
@@ -276,6 +341,8 @@ export class PrivateLessonService {
     queue: QueueItem[],
     previousLesson: StoredPrivateLesson | null,
     vocabularyMode: PrivateLessonPlan['vocabularyMode'],
+    preferences: Awaited<ReturnType<PrivateLessonRoadmapStore['getPreferences']>>,
+    activeRoadmap: Awaited<ReturnType<PrivateLessonRoadmapStore['getActive']>>,
   ) {
     const languageProfile = profile.languages.find(
       (language) =>
@@ -289,13 +356,15 @@ export class PrivateLessonService {
       ('A2' satisfies CefrLevel);
     const profileSupportLanguage = profile.defaultTranslationLanguage;
     const supportLanguageCode =
-      input.supportLanguageCode === undefined
-        ? profileSupportLanguage &&
-          new Intl.Locale(profileSupportLanguage).language !==
-            new Intl.Locale(input.targetLanguageCode).language
-          ? profileSupportLanguage
-          : null
-        : input.supportLanguageCode;
+      input.supportLanguageCode === undefined && preferences
+        ? preferences.supportLanguageCode
+        : input.supportLanguageCode === undefined
+          ? profileSupportLanguage &&
+            new Intl.Locale(profileSupportLanguage).language !==
+              new Intl.Locale(input.targetLanguageCode).language
+            ? profileSupportLanguage
+            : null
+          : input.supportLanguageCode;
     const targets = queue
       .filter(
         (item) =>
@@ -308,10 +377,16 @@ export class PrivateLessonService {
         sourceText: item.sourceText,
         translationText: item.primaryTranslation,
       }));
+    const currentMilestone =
+      activeRoadmap?.milestones.find((item) => item.status === 'current') ?? null;
     const focusAreas = [
       ...new Set([
-        ...(input.focusAreas ?? previousLesson?.focusAreas ?? ['speaking', 'vocabulary']),
-        ...(input.grammarFocus ? (['grammar'] as const) : []),
+        ...(input.focusAreas ??
+          preferences?.focusAreas ??
+          previousLesson?.focusAreas ?? ['speaking', 'vocabulary']),
+        ...(input.grammarFocus || currentMilestone?.grammarTopics.length
+          ? (['grammar'] as const)
+          : []),
       ]),
     ];
     const previousReport = previousLesson?.status === 'completed' ? previousLesson.report : null;
@@ -333,24 +408,47 @@ export class PrivateLessonService {
 
     return {
       id: randomUUID(),
-      durationSeconds: input.requestedDurationMinutes
-        ? input.requestedDurationMinutes * 60
-        : this.durationSeconds,
+      durationSeconds:
+        (input.requestedDurationMinutes ?? preferences?.requestedDurationMinutes)
+          ? (input.requestedDurationMinutes ?? preferences!.requestedDurationMinutes) * 60
+          : this.durationSeconds,
       targetLanguageCode: input.targetLanguageCode,
       supportLanguageCode,
       level,
-      topic: input.topic ?? profile.interests[0] ?? 'everyday conversation',
-      grammarFocus: input.grammarFocus ?? null,
+      topic:
+        input.topic ??
+        currentMilestone?.communicationObjective ??
+        profile.interests[0] ??
+        'everyday conversation',
+      grammarFocus: input.grammarFocus ?? (currentMilestone?.grammarTopics.join(', ') || null),
       focusAreas,
       customFocus:
-        input.customFocus === undefined ? (previousLesson?.customFocus ?? null) : input.customFocus,
-      correctionMode: input.correctionMode ?? previousLesson?.correctionMode ?? 'recast',
+        input.customFocus === undefined
+          ? (preferences?.customFocus ?? previousLesson?.customFocus ?? null)
+          : input.customFocus,
+      correctionMode:
+        input.correctionMode ??
+        preferences?.correctionMode ??
+        previousLesson?.correctionMode ??
+        'recast',
       vocabularyMode,
-      teacherVoice: input.teacherVoice ?? 'female',
-      speechRate: input.speechRate ?? 'normal',
+      teacherVoice: input.teacherVoice ?? preferences?.teacherVoice ?? 'female',
+      speechRate: input.speechRate ?? preferences?.speechRate ?? 'normal',
       interests: profile.interests.slice(0, 10),
       targets,
       continuity,
+      roadmap:
+        activeRoadmap && currentMilestone
+          ? {
+              roadmapId: activeRoadmap.id,
+              milestoneId: currentMilestone.id,
+              milestoneKey: currentMilestone.key,
+              goalTitle: activeRoadmap.goalTitle,
+              communicationObjective: currentMilestone.communicationObjective,
+              grammarTopics: currentMilestone.grammarTopics,
+              successCriteria: currentMilestone.successCriteria,
+            }
+          : null,
     } satisfies PrivateLessonPlan;
   }
 }
@@ -373,6 +471,7 @@ function publicStoredLesson(lesson: StoredPrivateLesson) {
     plannedDurationSeconds: lesson.durationSeconds,
     actualDurationSeconds: lesson.actualDurationSeconds,
     targetWords: lesson.targets,
+    roadmap: lesson.roadmap,
     status: lesson.status,
     startedAt: lesson.startedAt,
     endedAt: lesson.endedAt,
@@ -399,7 +498,16 @@ function publicPlan(plan: PrivateLessonPlan) {
     teacherVoice: plan.teacherVoice,
     speechRate: plan.speechRate,
     targetWords: plan.targets,
+    roadmap: plan.roadmap,
   };
+}
+
+function profileLevel(profile: GotItProfile, targetLanguageCode: string): CefrLevel {
+  const base = new Intl.Locale(targetLanguageCode).language;
+  const language = profile.languages.find(
+    (item) => new Intl.Locale(item.languageCode).language === base,
+  );
+  return language?.effectiveLevel ?? language?.selfAssessedLevel ?? 'A2';
 }
 
 function safetyIdentifier(scope: ProfileScope) {

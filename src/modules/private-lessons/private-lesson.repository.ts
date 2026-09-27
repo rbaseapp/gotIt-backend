@@ -74,8 +74,8 @@ export class PostgresPrivateLessonJournal implements PrivateLessonJournal {
       `INSERT INTO product_gotit.private_lesson_sessions
        (id,application_id,application_user_id,target_language_code,support_language_code,level,topic,
         grammar_focus,focus_areas,custom_focus,correction_mode,vocabulary_mode,continuity,teacher_voice,speech_rate,
-        planned_duration_seconds,target_words)
-       VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10,$11,$12,$13::jsonb,$14,$15,$16,$17::jsonb)`,
+        planned_duration_seconds,target_words,roadmap_id,milestone_id)
+       VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10,$11,$12,$13::jsonb,$14,$15,$16,$17::jsonb,$18,$19)`,
       [
         plan.id,
         scope.applicationId,
@@ -94,6 +94,8 @@ export class PostgresPrivateLessonJournal implements PrivateLessonJournal {
         plan.speechRate,
         plan.durationSeconds,
         JSON.stringify(plan.targets),
+        plan.roadmap?.roadmapId ?? null,
+        plan.roadmap?.milestoneId ?? null,
       ],
     );
   }
@@ -170,7 +172,7 @@ export class PostgresPrivateLessonJournal implements PrivateLessonJournal {
 }
 
 const selectFields = `SELECT id,target_language_code,support_language_code,level,topic,grammar_focus,
- focus_areas,custom_focus,correction_mode,vocabulary_mode,continuity,
+ focus_areas,custom_focus,correction_mode,vocabulary_mode,continuity,roadmap_id,milestone_id,
  teacher_voice,speech_rate,planned_duration_seconds,target_words,status,started_at,ended_at,
  actual_duration_seconds,report FROM product_gotit.private_lesson_sessions`;
 
@@ -205,6 +207,18 @@ function storedLesson(row: Record<string, unknown>): StoredPrivateLesson {
     continuity:
       row.continuity && typeof row.continuity === 'object'
         ? (row.continuity as PrivateLessonPlan['continuity'])
+        : null,
+    roadmap:
+      typeof row.roadmap_id === 'string' && typeof row.milestone_id === 'string'
+        ? {
+            roadmapId: row.roadmap_id,
+            milestoneId: row.milestone_id,
+            milestoneKey: '',
+            goalTitle: '',
+            communicationObjective: '',
+            grammarTopics: [],
+            successCriteria: { minimumLessons: 2, targetScore: 75 },
+          }
         : null,
     status: row.status as StoredPrivateLesson['status'],
     startedAt: new Date(row.started_at as string | Date).toISOString(),

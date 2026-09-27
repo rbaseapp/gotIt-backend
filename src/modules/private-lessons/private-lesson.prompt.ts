@@ -2,12 +2,14 @@ import type { CefrLevel } from '../profile/profile.types.js';
 import type {
   privateLessonCorrectionModes,
   privateLessonFocusAreas,
+  privateLessonSpeechRates,
   privateLessonVocabularyModes,
 } from './private-lesson.validation.js';
 
 export type PrivateLessonFocusArea = (typeof privateLessonFocusAreas)[number];
 export type PrivateLessonCorrectionMode = (typeof privateLessonCorrectionModes)[number];
 export type PrivateLessonVocabularyMode = (typeof privateLessonVocabularyModes)[number];
+export type PrivateLessonSpeechRate = (typeof privateLessonSpeechRates)[number];
 
 export type PrivateLessonTarget = {
   learningItemId: string;
@@ -28,7 +30,7 @@ export type PrivateLessonPlan = {
   correctionMode: PrivateLessonCorrectionMode;
   vocabularyMode: PrivateLessonVocabularyMode;
   teacherVoice: 'female' | 'male';
-  speechRate: 'slow' | 'normal' | 'fast';
+  speechRate: PrivateLessonSpeechRate;
   interests: string[];
   targets: PrivateLessonTarget[];
   continuity: {
@@ -37,6 +39,15 @@ export type PrivateLessonPlan = {
     nextLessonPlan: string;
     correctionsToRevisit: string[];
     vocabularyToReview: string[];
+  } | null;
+  roadmap?: {
+    roadmapId: string;
+    milestoneId: string;
+    milestoneKey: string;
+    goalTitle: string;
+    communicationObjective: string;
+    grammarTopics: string[];
+    successCriteria: { minimumLessons: number; targetScore: number };
   } | null;
 };
 
@@ -85,6 +96,13 @@ export function buildPrivateLessonPrompt(plan: PrivateLessonPlan) {
 - State the corrected sentence, identify the exact error, explain the relevant grammar rule and why the original form was wrong, add one short contrast example when useful, and invite the learner to say the corrected sentence once.
 - Keep the explanation focused and accurate, but do not omit the grammatical reason.`,
   }[plan.correctionMode];
+  const speechPaceInstruction = {
+    very_slow: 'Speak exceptionally slowly, with clear pauses between short phrases.',
+    slow: 'Speak deliberately and slowly, with clear pauses.',
+    normal: 'Speak at a natural, unhurried pace.',
+    fast: 'Speak quickly and energetically without sacrificing pronunciation.',
+    very_fast: 'Speak very quickly and concisely while keeping every word intelligible.',
+  }[plan.speechRate];
   const lessonData = JSON.stringify(
     {
       lessonId: plan.id,
@@ -110,6 +128,7 @@ export function buildPrivateLessonPrompt(plan: PrivateLessonPlan) {
         meaning: target.translationText,
       })),
       previousLesson: plan.continuity,
+      learningRoadmap: plan.roadmap,
     },
     null,
     2,
@@ -148,12 +167,13 @@ ${correctionPolicy}
 - Treat the CEFR level as a working estimate. Adapt difficulty from the learner's actual responses.
 
 # Speaking pace and translation help
-- Keep your spoken pacing ${plan.speechRate}. For slow pacing, speak deliberately with clear pauses. For normal pacing, sound natural and unhurried. For fast pacing, be lively and concise without sacrificing pronunciation.
+- The selected speaking pace is ${plan.speechRate}. ${speechPaceInstruction}
 ${translationHelpPolicy}
 
 # Lesson flow
 - Opening: greet briefly. When previousLesson is present, begin with one short active-recall prompt based on its correction, vocabulary, or nextLessonPlan; otherwise ask an easy question about the topic.
 - Continuity: when previousLesson is present, explicitly continue its nextLessonPlan and revisit one prior difficulty before introducing new material. Do not repeat the entire previous lesson.
+- Roadmap: when learningRoadmap is present, make its current communicationObjective the main outcome. Revisit its grammarTopics through active recall and repeated spoken use. Do not claim the milestone is complete; progress is decided only from accumulated lesson evidence.
 - Guided practice: build a natural conversation and elicit the target vocabulary across several turns.
 - Grammar: address the configured focus when relevant; otherwise use one high-value error that arises naturally.
 - Closing: when the application asks you to wrap up, stop asking questions. Give a concise recap with one specific success, one correction with its correct form, and the target words still worth reviewing. End with a warm, encouraging goodbye.

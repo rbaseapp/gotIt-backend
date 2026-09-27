@@ -6,6 +6,8 @@ import {
   privateLessonCompletionSchema,
   privateLessonInputSchema,
   privateLessonListSchema,
+  privateLessonRoadmapInputSchema,
+  privateLessonSetupSchema,
 } from './private-lesson.validation.js';
 
 export function createPrivateLessonRoutes(
@@ -13,6 +15,24 @@ export function createPrivateLessonRoutes(
   requireLessonAccess: RequestHandler,
 ) {
   const router = Router();
+
+  router.get('/setup', requireLessonAccess, async (request, response) => {
+    const input = parseInput(privateLessonSetupSchema, request.query);
+    response.json({
+      ...(await service.getSetup(request.gotitAuth!, input.targetLanguageCode)),
+      requestId: request.id,
+    });
+  });
+
+  router.post('/roadmaps', requireLessonAccess, async (request, response) => {
+    response.status(201).json({
+      ...(await service.createRoadmap(
+        request.gotitAuth!,
+        parseInput(privateLessonRoadmapInputSchema, request.body),
+      )),
+      requestId: request.id,
+    });
+  });
 
   router.post('/realtime-sessions', requireLessonAccess, async (request, response) => {
     response.status(201).json({

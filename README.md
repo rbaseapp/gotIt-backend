@@ -131,8 +131,8 @@ OpenAI Realtime powers the optional five-minute private-lesson POC. Configure
 `OPENAI_REALTIME_VOICE`, and `OPENAI_REALTIME_TRANSCRIPTION_MODEL`. The authenticated
 `POST /api/v1/private-lessons/realtime-sessions` route selects up to five smart-queue
 words, builds a profile-aware lesson prompt, and returns a short-lived browser client
-secret. Callers may choose a male or female tutor voice and a slow, normal, or fast
-speaking rate. The client owns the five-minute timer, offers an on-demand translation
+secret. Callers may choose a male or female tutor voice and one of five speaking rates,
+from very slow to very fast. The client owns the five-minute timer, offers an on-demand translation
 of the latest tutor sentence into the profile's support language, and sends the
 returned opening and wrap-up events over the WebRTC data channel. At the time limit it
 waits for the recap and warm goodbye to finish playing before disconnecting, with a

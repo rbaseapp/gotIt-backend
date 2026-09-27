@@ -54,11 +54,22 @@ export async function verifyRuntimeSchema(client, { strictRole = true } = {}) {
       'custom_focus',
       'correction_mode',
       'vocabulary_mode',
+      'roadmap_id',
+      'milestone_id',
       'continuity',
       'report',
       'started_at',
       'deleted_at',
     ],
+    private_lesson_preferences: ['target_language_code', 'correction_mode', 'vocabulary_mode'],
+    private_lesson_roadmaps: ['goal_kind', 'goal_key', 'current_milestone_position'],
+    private_lesson_milestones: [
+      'roadmap_id',
+      'milestone_key',
+      'progress_score',
+      'evidence_lesson_count',
+    ],
+    private_lesson_milestone_evidence: ['milestone_id', 'lesson_session_id', 'score', 'confidence'],
     word_topics: ['id', 'slug', 'title', 'is_active'],
     word_tracks: ['id', 'topic_id', 'level_code', 'cefr_from', 'cefr_to'],
     word_packs: ['id', 'track_id', 'module_number', 'version', 'is_active'],
@@ -182,7 +193,7 @@ export async function verifyRuntimeSchema(client, { strictRole = true } = {}) {
     schema: 'ok',
     privileges: 'ok',
     role: strictRole ? 'product-only' : 'not-enforced',
-    operationalTables: 10,
+    operationalTables: 14,
   };
 }
 

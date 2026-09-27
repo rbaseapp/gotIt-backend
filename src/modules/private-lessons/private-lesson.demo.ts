@@ -39,9 +39,11 @@ export const privateLessonDemoHtml = `<!doctype html>
           <label>
             מהירות דיבור
             <select id="speechRate">
+              <option value="very_slow">איטית מאוד</option>
               <option value="slow">איטית</option>
               <option value="normal" selected>רגילה</option>
               <option value="fast">מהירה</option>
+              <option value="very_fast">מהירה מאוד</option>
             </select>
           </label>
           <label>
@@ -200,7 +202,7 @@ function handleRealtimeEvent(event) {
     if (wrapPending) requestWrapUp();
     else if (closingResponse) {
       const words = closingTranscript.trim().split(/\\s+/).filter(Boolean).length;
-      const multiplier = { slow: .85, normal: 1, fast: 1.2 }[activeSession.lesson.speechRate];
+      const multiplier = { very_slow: .7, slow: .85, normal: 1, fast: 1.2, very_fast: 1.4 }[activeSession.lesson.speechRate];
       const estimate = Math.min(20000, Math.max(3000, words / (2.4 * multiplier) * 1000 + 1500));
       setStatus('הסיכום והפרידה מתנגנים…');
       stopTimeoutId = window.setTimeout(function () {

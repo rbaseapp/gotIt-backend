@@ -28,6 +28,7 @@ import { PixabayStudyImageProvider } from './modules/practice/pixabay-study-imag
 import { FallbackStudyImageProvider } from './modules/practice/study-image.provider.js';
 import { WordPackRepository } from './modules/word-packs/word-packs.repository.js';
 import { PrivateLessonService } from './modules/private-lessons/private-lesson.service.js';
+import { PostgresPrivateLessonRoadmapStore } from './modules/private-lessons/private-lesson.roadmap.js';
 import {
   PostgresPrivateLessonJournal,
   PostgresPrivateLessonVocabularySource,
@@ -131,6 +132,7 @@ const privateLessonService = new PrivateLessonService({
   vocabulary: new PostgresPrivateLessonVocabularySource(pool),
   fetchImpl: fetch,
   journal: new PostgresPrivateLessonJournal(pool),
+  roadmaps: new PostgresPrivateLessonRoadmapStore(pool),
   summaryGenerator:
     env.OPENAI_API_KEY && env.OPENAI_TRANSLATION_MODEL
       ? new OpenAiPrivateLessonSummaryGenerator(

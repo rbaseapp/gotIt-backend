@@ -2,6 +2,11 @@ import { z } from 'zod';
 import { languageSchema, sameBaseLanguage, textSchema } from '../capture/capture.validation.js';
 import { CEFR_LEVELS } from '../profile/profile.types.js';
 import { privateLessonTurnSchema } from './private-lesson.summary.js';
+import {
+  communicationGoals,
+  grammarTopics,
+  privateLessonGoalKinds,
+} from './private-lesson.curriculum.js';
 
 export const privateLessonFocusAreas = [
   'speaking',
@@ -20,6 +25,14 @@ export const privateLessonCorrectionModes = [
 
 export const privateLessonVocabularyModes = ['learned', 'none'] as const;
 
+export const privateLessonSpeechRates = [
+  'very_slow',
+  'slow',
+  'normal',
+  'fast',
+  'very_fast',
+] as const;
+
 export const privateLessonInputSchema = z
   .object({
     targetLanguageCode: languageSchema,
@@ -29,7 +42,7 @@ export const privateLessonInputSchema = z
       .union([z.literal(1), z.literal(5), z.literal(10), z.literal(15)])
       .optional(),
     teacherVoice: z.enum(['female', 'male']).optional(),
-    speechRate: z.enum(['slow', 'normal', 'fast']).optional(),
+    speechRate: z.enum(privateLessonSpeechRates).optional(),
     topic: textSchema(120).optional(),
     grammarFocus: textSchema(160).optional(),
     focusAreas: z
@@ -56,6 +69,27 @@ export const privateLessonInputSchema = z
   });
 
 export type PrivateLessonInput = z.output<typeof privateLessonInputSchema>;
+
+export const privateLessonSetupSchema = z.object({ targetLanguageCode: languageSchema }).strict();
+export const privateLessonRoadmapInputSchema = z
+  .object({
+    targetLanguageCode: languageSchema,
+    goalKind: z.enum(privateLessonGoalKinds),
+    goalKey: z.string().trim().min(1).max(80),
+  })
+  .strict()
+  .superRefine((value, context) => {
+    const valid =
+      value.goalKind === 'recommended' ||
+      (value.goalKind === 'communication' && communicationGoals.includes(value.goalKey as never)) ||
+      (value.goalKind === 'grammar' && grammarTopics.some((topic) => topic.key === value.goalKey));
+    if (!valid)
+      context.addIssue({
+        code: 'custom',
+        path: ['goalKey'],
+        message: 'Goal does not belong to the selected category',
+      });
+  });
 
 export const privateLessonCompletionSchema = z
   .object({
