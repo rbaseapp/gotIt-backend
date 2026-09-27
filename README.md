@@ -9,7 +9,7 @@ remain unchanged.
 
 `src/server.ts` constructs the services, `src/app.ts` creates Express and
 [src/routes.ts](src/routes.ts) mounts all module routers. The old root-level
-`app.ts` is excluded from the build. Public `GET /api/v1` lists **48 product
+`app.ts` is excluded from the build. Public `GET /api/v1` lists **49 product
 routes** from [api-catalog.ts](src/shared/http/api-catalog.ts).
 
 | Prefix under /api/v1                      | Behavior                                                                                           |
@@ -23,6 +23,7 @@ routes** from [api-catalog.ts](src/shared/http/api-catalog.ts).
 | /dashboard, /gamification                 | Progress, daily activity, XP, levels and streaks                                                   |
 | /reading                                  | Generated preview, encrypted publication, opened-content persistence and article quizzes           |
 | /pronunciation, /learning-items/:id/audio | Transient validated WAV, Google speech recognition and reference audio interfaces                  |
+| /private-lessons                          | Five-minute personalized OpenAI Realtime voice lesson sessions                                     |
 | /export, /import                          | Paginated library/progress export and idempotent capture-request import                            |
 
 Product routes authenticate once through Core. `GET /health` checks liveness;
@@ -124,6 +125,18 @@ Generation requests use a 90-second deadline, low quality, a valid 1024px square
 WebP and automatic moderation. Validated stock or generated results are stored on
 `learning_items` for the current `learning_revision`, so later sessions reuse the
 image and semantic edits generate a fresh one.
+
+OpenAI Realtime powers the optional five-minute private-lesson POC. Configure
+`OPENAI_REALTIME_API_KEY` (or reuse `OPENAI_API_KEY`), `OPENAI_REALTIME_MODEL`,
+`OPENAI_REALTIME_VOICE`, and `OPENAI_REALTIME_TRANSCRIPTION_MODEL`. The authenticated
+`POST /api/v1/private-lessons/realtime-sessions` route selects up to five smart-queue
+words, builds a profile-aware lesson prompt, and returns a short-lived browser client
+secret. The client owns the five-minute timer, sends the returned opening and wrap-up
+events over the WebRTC data channel, and disconnects at `durationSeconds`. No lesson
+transcript or learning evidence is persisted in this POC.
+Open `/demo/private-lesson` on the running backend for the standalone demo UI; it
+keeps the supplied Core bearer token in memory only and still enforces authentication
+when it creates the short-lived Realtime session.
 
 OpenAI contextual translation uses the Responses API with strict structured output.
 Set `OPENAI_API_KEY`, `OPENAI_TRANSLATION_MODEL` (the deployment default is

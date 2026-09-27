@@ -26,6 +26,14 @@ const envSchema = z
     OPENAI_API_KEY: z.string().min(1).optional(),
     OPENAI_TRANSLATION_MODEL: z.string().min(1).max(200).optional(),
     OPENAI_IMAGE_MODEL: z.string().min(1).max(200).optional(),
+    OPENAI_REALTIME_API_KEY: z.string().min(1).optional(),
+    OPENAI_REALTIME_MODEL: z.string().min(1).max(200).default('gpt-realtime-2.1'),
+    OPENAI_REALTIME_VOICE: z.string().min(1).max(100).default('marin'),
+    OPENAI_REALTIME_TRANSCRIPTION_MODEL: z
+      .string()
+      .min(1)
+      .max(200)
+      .default('gpt-4o-mini-transcribe'),
     PIXABAY_API_KEY: z.string().min(1).max(500).optional(),
     AI_READING_MODEL: z.string().min(1).max(200).optional(),
     CLAUDE_STRUCTURED_OUTPUT: z

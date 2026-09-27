@@ -40,6 +40,12 @@ services:
         value: gpt-5.4-nano
       - key: OPENAI_IMAGE_MODEL
         value: gpt-image-2.5-flare
+      - key: OPENAI_REALTIME_MODEL
+        value: gpt-realtime-2.1
+      - key: OPENAI_REALTIME_VOICE
+        value: marin
+      - key: OPENAI_REALTIME_TRANSCRIPTION_MODEL
+        value: gpt-4o-mini-transcribe
       - key: PIXABAY_API_KEY
         sync: false
       - key: GOOGLE_TRANSLATION_API

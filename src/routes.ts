@@ -23,6 +23,12 @@ import {
   createRequirePaidTierMiddleware,
 } from './shared/middleware/require-entitlement.js';
 import { createWordPackRoutes } from './modules/word-packs/word-packs.routes.js';
+import { createPrivateLessonRoutes } from './modules/private-lessons/private-lesson.routes.js';
+import {
+  privateLessonDemoCss,
+  privateLessonDemoHtml,
+  privateLessonDemoJs,
+} from './modules/private-lessons/private-lesson.demo.js';
 
 export function createRoutes(dependencies: AppDependencies) {
   const router = Router();
@@ -65,6 +71,26 @@ export function createRoutes(dependencies: AppDependencies) {
     }
   });
 
+  router.get('/demo/private-lesson', (_request, response) => {
+    response
+      .set({
+        'Cache-Control': 'no-store',
+        'Content-Security-Policy':
+          "default-src 'self'; connect-src 'self' https://api.openai.com; media-src 'self' blob:; script-src 'self'; style-src 'self'; img-src 'self' data:; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'",
+      })
+      .type('html')
+      .send(privateLessonDemoHtml);
+  });
+  router.get('/demo/private-lesson.css', (_request, response) => {
+    response.set('Cache-Control', 'public, max-age=3600').type('css').send(privateLessonDemoCss);
+  });
+  router.get('/demo/private-lesson.js', (_request, response) => {
+    response
+      .set('Cache-Control', 'public, max-age=3600')
+      .type('application/javascript')
+      .send(privateLessonDemoJs);
+  });
+
   router.get('/api/v1', (request, response) => {
     response.status(200).json({
       name: 'GotIt Backend API',
@@ -100,6 +126,7 @@ export function createRoutes(dependencies: AppDependencies) {
         dashboard: Boolean(dependencies.dashboardService),
         readingGeneration: dependencies.readingService?.available ?? false,
         speech: dependencies.speechService?.available ?? false,
+        privateLessons: dependencies.privateLessonService?.available ?? false,
       },
       learningLanguages: profile.languages.map((l) => ({
         languageCode: l.languageCode,
@@ -130,6 +157,12 @@ export function createRoutes(dependencies: AppDependencies) {
       createPracticeRoutes(dependencies.practiceService, requirePractice),
     );
     router.use('/api/v1/learning', createLearningRoutes(dependencies.practiceService));
+  }
+  if (dependencies.privateLessonService) {
+    router.use(
+      '/api/v1/private-lessons',
+      createPrivateLessonRoutes(dependencies.privateLessonService, requirePractice),
+    );
   }
   if (dependencies.dashboardService) {
     router.use('/api/v1/dashboard', createDashboardRoutes(dependencies.dashboardService));

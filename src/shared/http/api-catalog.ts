@@ -35,6 +35,7 @@ export const API_ROUTES = [
   ['POST', '/practice/attempts'],
   ['GET', '/learning/queue'],
   ['GET', '/learning/config'],
+  ['POST', '/private-lessons/realtime-sessions'],
   ['GET', '/dashboard'],
   ['GET', '/dashboard/activity'],
   ['GET', '/gamification'],

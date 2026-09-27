@@ -27,6 +27,7 @@ import { OpenAiStudyImageBriefResolver } from './modules/practice/openai-study-i
 import { PixabayStudyImageProvider } from './modules/practice/pixabay-study-image.provider.js';
 import { FallbackStudyImageProvider } from './modules/practice/study-image.provider.js';
 import { WordPackRepository } from './modules/word-packs/word-packs.repository.js';
+import { PrivateLessonService } from './modules/private-lessons/private-lesson.service.js';
 
 const logger = createLogger(env.LOG_LEVEL);
 const pool = createPool(env.DATABASE_URL);
@@ -116,6 +117,15 @@ const speechProvider =
         )
       : undefined;
 const speechService: SpeechService = new SpeechService(pool, practiceService, speechProvider);
+const privateLessonService = new PrivateLessonService({
+  apiKey: env.OPENAI_REALTIME_API_KEY ?? env.OPENAI_API_KEY,
+  model: env.OPENAI_REALTIME_MODEL,
+  voice: env.OPENAI_REALTIME_VOICE,
+  transcriptionModel: env.OPENAI_REALTIME_TRANSCRIPTION_MODEL,
+  profiles: profileService,
+  vocabulary: practiceService,
+  fetchImpl: fetch,
+});
 const rateLimiter = new PostgresRateLimiter(pool);
 const readingGenerator =
   env.ANTHROPIC_API_KEY && env.AI_READING_MODEL
@@ -147,6 +157,7 @@ const app = createApp({
     new AiMonthlyQuota(pool),
   ),
   speechService,
+  privateLessonService,
   wordPackService: new WordPackRepository(pool),
   enforcePaidEntitlements: env.ENFORCE_PAID_ENTITLEMENTS,
   rateLimiter,
