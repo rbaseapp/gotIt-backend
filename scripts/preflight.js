@@ -52,6 +52,7 @@ export async function verifyRuntimeSchema(client, { strictRole = true } = {}) {
       'target_words',
       'focus_areas',
       'custom_focus',
+      'correction_mode',
       'continuity',
       'report',
       'started_at',

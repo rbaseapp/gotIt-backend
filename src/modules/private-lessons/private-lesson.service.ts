@@ -335,6 +335,7 @@ export class PrivateLessonService {
       focusAreas,
       customFocus:
         input.customFocus === undefined ? (previousLesson?.customFocus ?? null) : input.customFocus,
+      correctionMode: input.correctionMode ?? previousLesson?.correctionMode ?? 'recast',
       teacherVoice: input.teacherVoice ?? 'female',
       speechRate: input.speechRate ?? 'normal',
       interests: profile.interests.slice(0, 10),
@@ -354,6 +355,7 @@ function publicStoredLesson(lesson: StoredPrivateLesson) {
     grammarFocus: lesson.grammarFocus,
     focusAreas: lesson.focusAreas,
     customFocus: lesson.customFocus,
+    correctionMode: lesson.correctionMode,
     continuesFromLessonId: lesson.continuity?.previousLessonId ?? null,
     teacherVoice: lesson.teacherVoice,
     speechRate: lesson.speechRate,
@@ -380,6 +382,7 @@ function publicPlan(plan: PrivateLessonPlan) {
     grammarFocus: plan.grammarFocus,
     focusAreas: plan.focusAreas,
     customFocus: plan.customFocus,
+    correctionMode: plan.correctionMode,
     continuesFromLessonId: plan.continuity?.previousLessonId ?? null,
     teacherVoice: plan.teacherVoice,
     speechRate: plan.speechRate,

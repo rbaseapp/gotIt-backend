@@ -37,9 +37,9 @@ export class PostgresPrivateLessonJournal implements PrivateLessonJournal {
     await this.pool.query(
       `INSERT INTO product_gotit.private_lesson_sessions
        (id,application_id,application_user_id,target_language_code,support_language_code,level,topic,
-        grammar_focus,focus_areas,custom_focus,continuity,teacher_voice,speech_rate,
+        grammar_focus,focus_areas,custom_focus,correction_mode,continuity,teacher_voice,speech_rate,
         planned_duration_seconds,target_words)
-       VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10,$11::jsonb,$12,$13,$14,$15::jsonb)`,
+       VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10,$11,$12::jsonb,$13,$14,$15,$16::jsonb)`,
       [
         plan.id,
         scope.applicationId,
@@ -51,6 +51,7 @@ export class PostgresPrivateLessonJournal implements PrivateLessonJournal {
         plan.grammarFocus,
         JSON.stringify(plan.focusAreas),
         plan.customFocus,
+        plan.correctionMode,
         plan.continuity ? JSON.stringify(plan.continuity) : null,
         plan.teacherVoice,
         plan.speechRate,
@@ -132,7 +133,7 @@ export class PostgresPrivateLessonJournal implements PrivateLessonJournal {
 }
 
 const selectFields = `SELECT id,target_language_code,support_language_code,level,topic,grammar_focus,
- focus_areas,custom_focus,continuity,
+ focus_areas,custom_focus,correction_mode,continuity,
  teacher_voice,speech_rate,planned_duration_seconds,target_words,status,started_at,ended_at,
  actual_duration_seconds,report FROM product_gotit.private_lesson_sessions`;
 
@@ -153,6 +154,10 @@ function storedLesson(row: Record<string, unknown>): StoredPrivateLesson {
       ? (row.focus_areas as PrivateLessonPlan['focusAreas'])
       : ['speaking', 'vocabulary'],
     customFocus: typeof row.custom_focus === 'string' ? row.custom_focus : null,
+    correctionMode:
+      row.correction_mode === 'critical_only' || row.correction_mode === 'deep_explanation'
+        ? row.correction_mode
+        : 'recast',
     teacherVoice: row.teacher_voice as StoredPrivateLesson['teacherVoice'],
     speechRate: row.speech_rate as StoredPrivateLesson['speechRate'],
     interests: [],

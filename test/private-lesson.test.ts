@@ -14,7 +14,10 @@ import type {
   PrivateLessonJournal,
   StoredPrivateLesson,
 } from '../src/modules/private-lessons/private-lesson.repository.js';
-import type { PrivateLessonPlan } from '../src/modules/private-lessons/private-lesson.prompt.js';
+import {
+  buildPrivateLessonPrompt,
+  type PrivateLessonPlan,
+} from '../src/modules/private-lessons/private-lesson.prompt.js';
 import type {
   PrivateLessonReport,
   PrivateLessonSummaryGenerator,
@@ -138,6 +141,7 @@ test('private lesson creates a bounded personalized Realtime session', async () 
     grammarFocus: 'past simple',
     focusAreas: ['speaking', 'grammar', 'fluency'],
     customFocus: 'Answer interview questions with longer examples',
+    correctionMode: 'deep_explanation',
   });
 
   assert.equal(result.realtime.clientSecret, 'ek_demo');
@@ -148,6 +152,7 @@ test('private lesson creates a bounded personalized Realtime session', async () 
   assert.equal(result.lesson.speechRate, 'slow');
   assert.deepEqual(result.lesson.focusAreas, ['speaking', 'grammar', 'fluency']);
   assert.equal(result.lesson.customFocus, 'Answer interview questions with longer examples');
+  assert.equal(result.lesson.correctionMode, 'deep_explanation');
   assert.equal(result.realtime.translationEvent?.type, 'response.create');
   assert.deepEqual(result.lesson.targetWords, [
     {
@@ -167,6 +172,8 @@ test('private lesson creates a bounded personalized Realtime session', async () 
   });
   assert.match(String(session.instructions), /job interviews/u);
   assert.match(String(session.instructions), /achieve/u);
+  assert.match(String(session.instructions), /DEEP CORRECTION AND EXPLANATION/u);
+  assert.match(String(session.instructions), /explain the relevant grammar rule/u);
   assert.doesNotMatch(JSON.stringify(result), /server-secret/u);
 });
 
@@ -268,6 +275,13 @@ test('private lesson route is authenticated and validates language choices', asy
     .send({ targetLanguageCode: 'en', requestedDurationMinutes: 2 })
     .expect(400);
   assert.equal(invalidDuration.body.error.code, 'VALIDATION_ERROR');
+
+  const invalidCorrectionMode = await request(app)
+    .post('/api/v1/private-lessons/realtime-sessions')
+    .set('authorization', 'Bearer valid-token')
+    .send({ targetLanguageCode: 'en', correctionMode: 'correct_every_word' })
+    .expect(400);
+  assert.equal(invalidCorrectionMode.body.error.code, 'VALIDATION_ERROR');
 
   const created = await request(app)
     .post('/api/v1/private-lessons/realtime-sessions')
@@ -410,7 +424,10 @@ test('private lesson persists one structured report and never stores the transcr
         headers: { 'content-type': 'application/json' },
       }),
   });
-  const created = await service.createSession(identity, { targetLanguageCode: 'en' });
+  const created = await service.createSession(identity, {
+    targetLanguageCode: 'en',
+    correctionMode: 'deep_explanation',
+  });
   const completion = {
     actualDurationSeconds: 142,
     completionReason: 'completed' as const,
@@ -440,6 +457,7 @@ test('private lesson persists one structured report and never stores the transcr
   assert.equal(continued.lesson.continuesFromLessonId, created.lesson.id);
   assert.equal(rows.get(continued.lesson.id)?.continuity?.nextLessonPlan, report.nextLessonPlan);
   assert.deepEqual(rows.get(continued.lesson.id)?.continuity?.vocabularyToReview, ['achieve']);
+  assert.equal(continued.lesson.correctionMode, 'deep_explanation');
   assert.deepEqual(await service.removeSession(identity, created.lesson.id), { deleted: true });
   await assert.rejects(service.getSession(identity, created.lesson.id), {
     code: 'PRIVATE_LESSON_NOT_FOUND',
@@ -497,6 +515,7 @@ test('private lesson report generation is structured, transient and limited to l
     grammarFocus: null,
     focusAreas: ['speaking', 'vocabulary'],
     customFocus: null,
+    correctionMode: 'recast',
     teacherVoice: 'female',
     speechRate: 'normal',
     interests: [],
@@ -535,3 +554,34 @@ function stored(plan: PrivateLessonPlan): StoredPrivateLesson {
     report: null,
   };
 }
+
+test('private lesson correction modes produce distinct tutoring behavior', () => {
+  const base: PrivateLessonPlan = {
+    id: '77777777-7777-4777-8777-777777777777',
+    durationSeconds: 300,
+    targetLanguageCode: 'en',
+    supportLanguageCode: 'he',
+    level: 'B1',
+    topic: 'travel',
+    grammarFocus: null,
+    focusAreas: ['speaking'],
+    customFocus: null,
+    correctionMode: 'recast',
+    teacherVoice: 'female',
+    speechRate: 'normal',
+    interests: [],
+    targets: [],
+    continuity: null,
+  };
+
+  const critical = buildPrivateLessonPrompt({ ...base, correctionMode: 'critical_only' });
+  const recast = buildPrivateLessonPrompt(base);
+  const deep = buildPrivateLessonPrompt({ ...base, correctionMode: 'deep_explanation' });
+
+  assert.match(critical, /FREE CONVERSATION WITH CRITICAL CORRECTIONS ONLY/u);
+  assert.match(critical, /Ignore minor grammar, wording, and style errors/u);
+  assert.match(recast, /CORRECT MY SENTENCE/u);
+  assert.match(recast, /natural, correct version of the sentence/u);
+  assert.match(deep, /DEEP CORRECTION AND EXPLANATION/u);
+  assert.match(deep, /why the original form was wrong/u);
+});

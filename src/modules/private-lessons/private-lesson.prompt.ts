@@ -1,7 +1,11 @@
 import type { CefrLevel } from '../profile/profile.types.js';
-import type { privateLessonFocusAreas } from './private-lesson.validation.js';
+import type {
+  privateLessonCorrectionModes,
+  privateLessonFocusAreas,
+} from './private-lesson.validation.js';
 
 export type PrivateLessonFocusArea = (typeof privateLessonFocusAreas)[number];
+export type PrivateLessonCorrectionMode = (typeof privateLessonCorrectionModes)[number];
 
 export type PrivateLessonTarget = {
   learningItemId: string;
@@ -19,6 +23,7 @@ export type PrivateLessonPlan = {
   grammarFocus: string | null;
   focusAreas: PrivateLessonFocusArea[];
   customFocus: string | null;
+  correctionMode: PrivateLessonCorrectionMode;
   teacherVoice: 'female' | 'male';
   speechRate: 'slow' | 'normal' | 'fast';
   interests: string[];
@@ -65,6 +70,18 @@ export function buildPrivateLessonPrompt(plan: PrivateLessonPlan) {
   const translationHelpPolicy = supportLanguage
     ? '- When the learner explicitly asks for a translation, translate your most recent relevant sentence into SUPPORT_LANGUAGE, add at most one short clarification, and return to TARGET_LANGUAGE in the next response.'
     : '- If the learner asks for a translation or help, explain more simply in TARGET_LANGUAGE without switching languages.';
+  const correctionPolicy = {
+    critical_only: `- The learner selected FREE CONVERSATION WITH CRITICAL CORRECTIONS ONLY.
+- Protect conversational flow. Correct only an error that materially blocks or changes the intended meaning, or a critical error that repeatedly prevents clear communication.
+- Ignore minor grammar, wording, and style errors. After the learner finishes, give any necessary correction briefly and continue the conversation; do not give a grammar lecture unless asked.`,
+    recast: `- The learner selected CORRECT MY SENTENCE.
+- Correct meaningful grammar or word-choice errors after the learner finishes by clearly giving a natural, correct version of the sentence.
+- Keep any explanation to one short note only when needed, then invite one retry. Do not turn the correction into a detailed grammar lesson.`,
+    deep_explanation: `- The learner selected DEEP CORRECTION AND EXPLANATION.
+- After the learner finishes, correct each clear, useful grammar or word-choice error that is appropriate for the learner's level.
+- State the corrected sentence, identify the exact error, explain the relevant grammar rule and why the original form was wrong, add one short contrast example when useful, and invite the learner to say the corrected sentence once.
+- Keep the explanation focused and accurate, but do not omit the grammatical reason.`,
+  }[plan.correctionMode];
   const lessonData = JSON.stringify(
     {
       lessonId: plan.id,
@@ -80,6 +97,7 @@ export function buildPrivateLessonPrompt(plan: PrivateLessonPlan) {
       grammarFocus: plan.grammarFocus,
       focusAreas: plan.focusAreas,
       learnerRequestedFocus: plan.customFocus,
+      correctionMode: plan.correctionMode,
       teacherVoice: plan.teacherVoice,
       speechRate: plan.speechRate,
       learnerInterests: plan.interests,
@@ -118,9 +136,9 @@ ${supportLanguagePolicy}
 - Create natural opportunities for the learner to produce the target vocabulary; do not merely recite the list.
 - Never claim a word was mastered just because you used it.
 - If there are no target vocabulary items, run a useful conversational lesson without inventing saved learner words.
-- Correct only errors that block understanding, match the grammar focus, or repeat during the lesson.
-- For a correction: briefly recast the sentence, explain only if needed, then invite one retry.
 - Do not interrupt a learner mid-sentence to correct them.
+- Follow the selected correction mode exactly:
+${correctionPolicy}
 - Praise specifically and sparingly.
 - Give extra practice time to the selected focus areas and the learner's custom focus.
 - Treat the CEFR level as a working estimate. Adapt difficulty from the learner's actual responses.

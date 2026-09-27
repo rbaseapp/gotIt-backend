@@ -12,6 +12,12 @@ export const privateLessonFocusAreas = [
   'listening',
 ] as const;
 
+export const privateLessonCorrectionModes = [
+  'critical_only',
+  'recast',
+  'deep_explanation',
+] as const;
+
 export const privateLessonInputSchema = z
   .object({
     targetLanguageCode: languageSchema,
@@ -31,6 +37,7 @@ export const privateLessonInputSchema = z
       .refine((areas) => new Set(areas).size === areas.length, 'Duplicate focus area')
       .optional(),
     customFocus: textSchema(300).nullable().optional(),
+    correctionMode: z.enum(privateLessonCorrectionModes).optional(),
   })
   .strict()
   .superRefine((value, context) => {
