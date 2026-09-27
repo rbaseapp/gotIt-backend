@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { languageSchema, sameBaseLanguage, textSchema } from '../capture/capture.validation.js';
 import { CEFR_LEVELS } from '../profile/profile.types.js';
+import { privateLessonTurnSchema } from './private-lesson.summary.js';
 
 export const privateLessonInputSchema = z
   .object({
@@ -26,3 +27,26 @@ export const privateLessonInputSchema = z
   });
 
 export type PrivateLessonInput = z.output<typeof privateLessonInputSchema>;
+
+export const privateLessonCompletionSchema = z
+  .object({
+    actualDurationSeconds: z.number().int().min(0).max(1800),
+    completionReason: z.enum(['completed', 'stopped', 'disconnected']),
+    turns: z.array(privateLessonTurnSchema).max(200),
+  })
+  .strict()
+  .superRefine((value, context) => {
+    const totalCharacters = value.turns.reduce((sum, turn) => sum + [...turn.text].length, 0);
+    if (totalCharacters > 40_000)
+      context.addIssue({
+        code: 'custom',
+        path: ['turns'],
+        message: 'Lesson transcript is too long',
+      });
+  });
+
+export const privateLessonListSchema = z
+  .object({ limit: z.coerce.number().int().min(1).max(50).default(20) })
+  .strict();
+
+export type PrivateLessonCompletionInput = z.output<typeof privateLessonCompletionSchema>;

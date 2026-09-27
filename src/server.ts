@@ -28,6 +28,8 @@ import { PixabayStudyImageProvider } from './modules/practice/pixabay-study-imag
 import { FallbackStudyImageProvider } from './modules/practice/study-image.provider.js';
 import { WordPackRepository } from './modules/word-packs/word-packs.repository.js';
 import { PrivateLessonService } from './modules/private-lessons/private-lesson.service.js';
+import { PostgresPrivateLessonJournal } from './modules/private-lessons/private-lesson.repository.js';
+import { OpenAiPrivateLessonSummaryGenerator } from './modules/private-lessons/private-lesson.summary.js';
 
 const logger = createLogger(env.LOG_LEVEL);
 const pool = createPool(env.DATABASE_URL);
@@ -125,6 +127,15 @@ const privateLessonService = new PrivateLessonService({
   profiles: profileService,
   vocabulary: practiceService,
   fetchImpl: fetch,
+  journal: new PostgresPrivateLessonJournal(pool),
+  summaryGenerator:
+    env.OPENAI_API_KEY && env.OPENAI_TRANSLATION_MODEL
+      ? new OpenAiPrivateLessonSummaryGenerator(
+          env.OPENAI_API_KEY,
+          env.OPENAI_TRANSLATION_MODEL,
+          fetch,
+        )
+      : undefined,
 });
 const rateLimiter = new PostgresRateLimiter(pool);
 const readingGenerator =

@@ -10,6 +10,16 @@ import {
   type PrivateLessonVocabularySource,
 } from '../src/modules/private-lessons/private-lesson.service.js';
 import { privateLessonDemoJs } from '../src/modules/private-lessons/private-lesson.demo.js';
+import type {
+  PrivateLessonJournal,
+  StoredPrivateLesson,
+} from '../src/modules/private-lessons/private-lesson.repository.js';
+import type { PrivateLessonPlan } from '../src/modules/private-lessons/private-lesson.prompt.js';
+import type {
+  PrivateLessonReport,
+  PrivateLessonSummaryGenerator,
+} from '../src/modules/private-lessons/private-lesson.summary.js';
+import { OpenAiPrivateLessonSummaryGenerator } from '../src/modules/private-lessons/private-lesson.summary.js';
 
 const logger = pino({ enabled: false });
 const identity = {
@@ -247,3 +257,192 @@ test('private lesson hides provider authentication details', async () => {
     },
   );
 });
+
+test('private lesson persists one structured report and never stores the transcript', async () => {
+  const rows = new Map<string, StoredPrivateLesson>();
+  const journal: PrivateLessonJournal = {
+    async create(_scope, plan) {
+      rows.set(plan.id, stored(plan));
+    },
+    async get(_scope, id) {
+      return rows.get(id) ?? null;
+    },
+    async list() {
+      return [...rows.values()];
+    },
+    async claim(_scope, id, duration) {
+      const lesson = rows.get(id);
+      if (!lesson || !['active', 'report_failed'].includes(lesson.status)) return null;
+      const claimed = {
+        ...lesson,
+        status: 'summarizing' as const,
+        actualDurationSeconds: duration,
+        endedAt: new Date().toISOString(),
+      };
+      rows.set(id, claimed);
+      return claimed;
+    },
+    async complete(_scope, id, report) {
+      const lesson = rows.get(id)!;
+      const completed = { ...lesson, status: 'completed' as const, report };
+      rows.set(id, completed);
+      return completed;
+    },
+    async fail(_scope, id) {
+      const lesson = rows.get(id)!;
+      rows.set(id, { ...lesson, status: 'report_failed' });
+    },
+    async remove(_scope, id) {
+      return rows.delete(id);
+    },
+  };
+  let generationCount = 0;
+  const report: PrivateLessonReport = {
+    summary: 'A useful lesson about interviews.',
+    strengths: ['Clear short answers'],
+    corrections: [],
+    grammarPoints: [],
+    vocabulary: [
+      {
+        learningItemId: '33333333-3333-4333-8333-333333333333',
+        sourceText: 'achieve',
+        translationText: 'להשיג',
+        outcome: 'needs_review',
+        note: 'Use it in one more sentence.',
+      },
+    ],
+    newWordSuggestions: [],
+    nextLessonPlan: 'Practice longer answers.',
+    recommendedReviewItemIds: ['33333333-3333-4333-8333-333333333333'],
+  };
+  const summaryGenerator: PrivateLessonSummaryGenerator = {
+    async generate(_plan, turns) {
+      generationCount += 1;
+      assert.equal(turns[0]?.text, 'I want to achieve my goal.');
+      return report;
+    },
+  };
+  const service = new PrivateLessonService({
+    apiKey: 'server-secret',
+    model: 'gpt-realtime-test',
+    voice: 'marin',
+    transcriptionModel: 'gpt-transcribe-test',
+    profiles,
+    vocabulary,
+    journal,
+    summaryGenerator,
+    fetchImpl: async () =>
+      new Response(JSON.stringify({ value: 'ek_demo' }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      }),
+  });
+  const created = await service.createSession(identity, { targetLanguageCode: 'en' });
+  const completion = {
+    actualDurationSeconds: 142,
+    completionReason: 'completed' as const,
+    turns: [{ role: 'learner' as const, text: 'I want to achieve my goal.' }],
+  };
+  const first = await service.completeSession(identity, created.lesson.id, completion);
+  const replay = await service.completeSession(identity, created.lesson.id, completion);
+
+  assert.equal(generationCount, 1);
+  assert.deepEqual(first.report, report);
+  assert.deepEqual(replay.report, report);
+  assert.equal(first.actualDurationSeconds, 142);
+  assert.equal(
+    'turns' in (rows.get(created.lesson.id) as unknown as Record<string, unknown>),
+    false,
+  );
+  assert.equal((await service.listSessions(identity, 20)).lessons.length, 1);
+  assert.deepEqual(await service.removeSession(identity, created.lesson.id), { deleted: true });
+  await assert.rejects(service.getSession(identity, created.lesson.id), {
+    code: 'PRIVATE_LESSON_NOT_FOUND',
+  });
+});
+
+test('private lesson report generation is structured, transient and limited to lesson vocabulary', async () => {
+  let requestBody: Record<string, unknown> | undefined;
+  const generated: PrivateLessonReport = {
+    summary: 'סיכום שימושי.',
+    strengths: ['דיברתם במשפטים ברורים.'],
+    corrections: [],
+    grammarPoints: [],
+    vocabulary: [
+      {
+        learningItemId: '33333333-3333-4333-8333-333333333333',
+        sourceText: 'forged text',
+        translationText: 'forged translation',
+        outcome: 'practiced',
+        note: 'השתמשתם במילה בשיחה.',
+      },
+    ],
+    newWordSuggestions: [
+      { sourceText: 'achieve', translationText: 'כפילות', example: null },
+      { sourceText: 'confident', translationText: 'בטוח', example: 'I feel confident.' },
+    ],
+    nextLessonPlan: 'להאריך את התשובות.',
+    recommendedReviewItemIds: [
+      '33333333-3333-4333-8333-333333333333',
+      '55555555-5555-4555-8555-555555555555',
+    ],
+  };
+  const generator = new OpenAiPrivateLessonSummaryGenerator(
+    'summary-secret',
+    'gpt-summary-test',
+    async (_url, init) => {
+      requestBody = JSON.parse(String(init?.body)) as Record<string, unknown>;
+      return new Response(
+        JSON.stringify({
+          status: 'completed',
+          output: [{ content: [{ type: 'output_text', text: JSON.stringify(generated) }] }],
+        }),
+        { status: 200, headers: { 'content-type': 'application/json' } },
+      );
+    },
+  );
+  const plan: PrivateLessonPlan = {
+    id: '66666666-6666-4666-8666-666666666666',
+    durationSeconds: 300,
+    targetLanguageCode: 'en',
+    supportLanguageCode: 'he',
+    level: 'B1',
+    topic: 'interviews',
+    grammarFocus: null,
+    teacherVoice: 'female',
+    speechRate: 'normal',
+    interests: [],
+    targets: [
+      {
+        learningItemId: '33333333-3333-4333-8333-333333333333',
+        sourceText: 'achieve',
+        translationText: 'להשיג',
+      },
+    ],
+  };
+  const report = await generator.generate(
+    plan,
+    [{ role: 'learner', text: 'I want to achieve my goal.' }],
+    'safe-user-id',
+  );
+
+  assert.equal(requestBody?.store, false);
+  assert.equal((requestBody?.text as { format: { strict: boolean } }).format.strict, true);
+  assert.deepEqual(report.recommendedReviewItemIds, ['33333333-3333-4333-8333-333333333333']);
+  assert.equal(report.vocabulary[0]?.sourceText, 'achieve');
+  assert.deepEqual(
+    report.newWordSuggestions.map((word) => word.sourceText),
+    ['confident'],
+  );
+});
+
+function stored(plan: PrivateLessonPlan): StoredPrivateLesson {
+  return {
+    ...plan,
+    status: 'active',
+    startedAt: new Date().toISOString(),
+    endedAt: null,
+    actualDurationSeconds: null,
+    report: null,
+  };
+}

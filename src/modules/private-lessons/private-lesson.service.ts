@@ -13,7 +13,19 @@ import type {
   ProfileServiceContract,
 } from '../profile/profile.types.js';
 import { buildPrivateLessonPrompt, type PrivateLessonPlan } from './private-lesson.prompt.js';
-import type { PrivateLessonInput } from './private-lesson.validation.js';
+import {
+  privateLessonNotFound,
+  type PrivateLessonJournal,
+  type StoredPrivateLesson,
+} from './private-lesson.repository.js';
+import {
+  basicPrivateLessonReport,
+  type PrivateLessonSummaryGenerator,
+} from './private-lesson.summary.js';
+import type {
+  PrivateLessonCompletionInput,
+  PrivateLessonInput,
+} from './private-lesson.validation.js';
 
 const clientSecretSchema = z
   .object({
@@ -52,6 +64,8 @@ export type PrivateLessonServiceOptions = {
   profiles: ProfileServiceContract;
   vocabulary: PrivateLessonVocabularySource;
   fetchImpl?: typeof fetch;
+  journal?: PrivateLessonJournal;
+  summaryGenerator?: PrivateLessonSummaryGenerator;
   durationSeconds?: number;
   requestTimeoutMs?: number;
 };
@@ -121,6 +135,7 @@ export class PrivateLessonService {
       });
       const secret = clientSecretSchema.parse(await readProviderJson(response, controller.signal));
 
+      await this.options.journal?.create(scope, plan);
       return {
         lesson: publicPlan(plan),
         realtime: {
@@ -160,6 +175,68 @@ export class PrivateLessonService {
     } finally {
       clearTimeout(timeout);
     }
+  }
+
+  async completeSession(scope: ProfileScope, id: string, input: PrivateLessonCompletionInput) {
+    const journal = this.requireJournal();
+    const existing = await journal.get(scope, id);
+    if (!existing) throw privateLessonNotFound();
+    if (existing.status === 'completed' && existing.report) return publicStoredLesson(existing);
+
+    const claimed = await journal.claim(scope, id, input.actualDurationSeconds);
+    if (!claimed) {
+      const current = await journal.get(scope, id);
+      if (current?.status === 'completed' && current.report) return publicStoredLesson(current);
+      if (!current) throw privateLessonNotFound();
+      throw new AppError(
+        409,
+        'PRIVATE_LESSON_REPORT_IN_PROGRESS',
+        'The lesson report is already being generated',
+      );
+    }
+
+    try {
+      const report = this.options.summaryGenerator
+        ? await this.options.summaryGenerator.generate(
+            claimed,
+            input.turns,
+            safetyIdentifier(scope),
+          )
+        : basicPrivateLessonReport(claimed);
+      return publicStoredLesson(await journal.complete(scope, id, report));
+    } catch {
+      await journal.fail(scope, id);
+      throw new AppError(
+        503,
+        'PRIVATE_LESSON_REPORT_FAILED',
+        'The lesson ended, but its report could not be generated yet',
+      );
+    }
+  }
+
+  async listSessions(scope: ProfileScope, limit: number) {
+    return { lessons: (await this.requireJournal().list(scope, limit)).map(publicStoredLesson) };
+  }
+
+  async getSession(scope: ProfileScope, id: string) {
+    const lesson = await this.requireJournal().get(scope, id);
+    if (!lesson) throw privateLessonNotFound();
+    return publicStoredLesson(lesson);
+  }
+
+  async removeSession(scope: ProfileScope, id: string) {
+    if (!(await this.requireJournal().remove(scope, id))) throw privateLessonNotFound();
+    return { deleted: true };
+  }
+
+  private requireJournal() {
+    if (!this.options.journal)
+      throw new AppError(
+        503,
+        'PRIVATE_LESSON_JOURNAL_NOT_CONFIGURED',
+        'Private lesson history is unavailable',
+      );
+    return this.options.journal;
   }
 
   private buildPlan(input: PrivateLessonInput, profile: GotItProfile, queue: QueueItem[]) {
@@ -208,6 +285,26 @@ export class PrivateLessonService {
       targets,
     } satisfies PrivateLessonPlan;
   }
+}
+
+function publicStoredLesson(lesson: StoredPrivateLesson) {
+  return {
+    id: lesson.id,
+    targetLanguageCode: lesson.targetLanguageCode,
+    supportLanguageCode: lesson.supportLanguageCode,
+    level: lesson.level,
+    topic: lesson.topic,
+    grammarFocus: lesson.grammarFocus,
+    teacherVoice: lesson.teacherVoice,
+    speechRate: lesson.speechRate,
+    plannedDurationSeconds: lesson.durationSeconds,
+    actualDurationSeconds: lesson.actualDurationSeconds,
+    targetWords: lesson.targets,
+    status: lesson.status,
+    startedAt: lesson.startedAt,
+    endedAt: lesson.endedAt,
+    report: lesson.report,
+  };
 }
 
 function publicPlan(plan: PrivateLessonPlan) {
