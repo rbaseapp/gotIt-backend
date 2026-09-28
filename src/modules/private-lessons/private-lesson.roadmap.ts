@@ -8,7 +8,10 @@ import {
 } from './private-lesson.curriculum.js';
 import type { PrivateLessonPlan } from './private-lesson.prompt.js';
 import type { PrivateLessonReport } from './private-lesson.summary.js';
-import type { PrivateLessonInput } from './private-lesson.validation.js';
+import type {
+  PrivateLessonInput,
+  PrivateLessonPreferencesInput,
+} from './private-lesson.validation.js';
 
 export type PrivateLessonPreferences = Pick<
   PrivateLessonPlan,
@@ -58,6 +61,10 @@ export interface PrivateLessonRoadmapStore {
     input: PrivateLessonInput,
     plan: PrivateLessonPlan,
   ): Promise<void>;
+  savePreferenceValues(
+    scope: ProfileScope,
+    input: PrivateLessonPreferencesInput,
+  ): Promise<void>;
   getActive(scope: ProfileScope, targetLanguageCode: string): Promise<PrivateLessonRoadmap | null>;
   create(
     scope: ProfileScope,
@@ -98,6 +105,20 @@ export class PostgresPrivateLessonRoadmapStore implements PrivateLessonRoadmapSt
   }
 
   async savePreferences(scope: ProfileScope, input: PrivateLessonInput, plan: PrivateLessonPlan) {
+    await this.savePreferenceValues(scope, {
+      targetLanguageCode: input.targetLanguageCode,
+      supportLanguageCode: plan.supportLanguageCode,
+      requestedDurationMinutes: Math.round(plan.durationSeconds / 60) as 1 | 5 | 10 | 15,
+      teacherVoice: plan.teacherVoice,
+      speechRate: plan.speechRate,
+      correctionMode: plan.correctionMode,
+      vocabularyMode: plan.vocabularyMode,
+      focusAreas: plan.focusAreas,
+      customFocus: plan.customFocus,
+    });
+  }
+
+  async savePreferenceValues(scope: ProfileScope, input: PrivateLessonPreferencesInput) {
     await this.pool.query(
       `INSERT INTO product_gotit.private_lesson_preferences(application_id,application_user_id,target_language_code,support_language_code,requested_duration_minutes,teacher_voice,speech_rate,correction_mode,vocabulary_mode,focus_areas,custom_focus)
        VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11)
@@ -106,14 +127,14 @@ export class PostgresPrivateLessonRoadmapStore implements PrivateLessonRoadmapSt
         scope.applicationId,
         scope.applicationUserId,
         base(input.targetLanguageCode),
-        plan.supportLanguageCode,
-        Math.round(plan.durationSeconds / 60),
-        plan.teacherVoice,
-        plan.speechRate,
-        plan.correctionMode,
-        plan.vocabularyMode,
-        JSON.stringify(plan.focusAreas),
-        plan.customFocus,
+        input.supportLanguageCode,
+        input.requestedDurationMinutes,
+        input.teacherVoice,
+        input.speechRate,
+        input.correctionMode,
+        input.vocabularyMode,
+        JSON.stringify(input.focusAreas),
+        input.customFocus,
       ],
     );
   }

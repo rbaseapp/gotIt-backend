@@ -6,6 +6,7 @@ import {
   privateLessonCompletionSchema,
   privateLessonInputSchema,
   privateLessonListSchema,
+  privateLessonPreferencesInputSchema,
   privateLessonRoadmapInputSchema,
   privateLessonSetupSchema,
 } from './private-lesson.validation.js';
@@ -29,6 +30,16 @@ export function createPrivateLessonRoutes(
       ...(await service.createRoadmap(
         request.gotitAuth!,
         parseInput(privateLessonRoadmapInputSchema, request.body),
+      )),
+      requestId: request.id,
+    });
+  });
+
+  router.put('/preferences', requireLessonAccess, async (request, response) => {
+    response.json({
+      ...(await service.savePreferences(
+        request.gotitAuth!,
+        parseInput(privateLessonPreferencesInputSchema, request.body),
       )),
       requestId: request.id,
     });

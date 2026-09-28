@@ -31,6 +31,7 @@ import {
 import type {
   PrivateLessonCompletionInput,
   PrivateLessonInput,
+  PrivateLessonPreferencesInput,
 } from './private-lesson.validation.js';
 import type { PrivateLessonRoadmapStore } from './private-lesson.roadmap.js';
 import { setupPayload } from './private-lesson.roadmap.js';
@@ -99,6 +100,17 @@ export class PrivateLessonService {
 
   get available() {
     return Boolean(this.options.apiKey);
+  }
+
+  async savePreferences(scope: ProfileScope, input: PrivateLessonPreferencesInput) {
+    if (!this.options.roadmaps)
+      throw new AppError(
+        503,
+        'PRIVATE_LESSON_PREFERENCES_NOT_CONFIGURED',
+        'Private lesson preferences are unavailable',
+      );
+    await this.options.roadmaps.savePreferenceValues(scope, input);
+    return { preferences: await this.options.roadmaps.getPreferences(scope, input.targetLanguageCode) };
   }
 
   async createSession(scope: ProfileScope, input: PrivateLessonInput) {
@@ -210,7 +222,7 @@ export class PrivateLessonService {
           openingEvent: {
             type: 'response.create',
             response: {
-              instructions: `Begin the lesson now. Speak only in ${targetLanguage.promptName}. The very first spoken word must be in this language. Give a brief greeting, then follow the lesson flow in the session instructions. If this is the first lesson of the current roadmap milestone, teach the named topic with simple examples before conversation; otherwise include the short previous-lesson review when continuity data is present. Ask only one short question. Do not use any other language.`,
+              instructions: `Begin the lesson now. Speak only in ${targetLanguage.promptName}. The very first spoken word must be in this language. Give a brief greeting, then follow the lesson flow in the session instructions. If this is the first lesson of the current roadmap milestone, teach the named topic, its use and sentence pattern with simple examples before conversation. Start with a recognition or guided-completion check, never a request for an original sentence. Otherwise include the short previous-lesson review when continuity data is present. Ask only one short question. Do not use any other language.`,
             },
           },
           wrapUpEvent: {
@@ -451,7 +463,10 @@ export class PrivateLessonService {
               grammarTopics: currentMilestone.grammarTopics,
               successCriteria: currentMilestone.successCriteria,
               evidenceLessonCount: currentMilestone.evidenceLessonCount,
-              isFirstMilestoneLesson: currentMilestone.lessonSessionCount === 0,
+              // A disconnected or abandoned session is not evidence that the learner
+              // received the foundation. Keep teaching the introduction until the
+              // milestone has at least one completed piece of learning evidence.
+              isFirstMilestoneLesson: currentMilestone.evidenceLessonCount === 0,
             }
           : null,
     } satisfies PrivateLessonPlan;

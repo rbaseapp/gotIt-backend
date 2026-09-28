@@ -70,6 +70,44 @@ export const privateLessonInputSchema = z
 
 export type PrivateLessonInput = z.output<typeof privateLessonInputSchema>;
 
+export const privateLessonPreferencesInputSchema = z
+  .object({
+    targetLanguageCode: languageSchema,
+    supportLanguageCode: languageSchema.nullable(),
+    requestedDurationMinutes: z.union([
+      z.literal(1),
+      z.literal(5),
+      z.literal(10),
+      z.literal(15),
+    ]),
+    teacherVoice: z.enum(['female', 'male']),
+    speechRate: z.enum(privateLessonSpeechRates),
+    focusAreas: z
+      .array(z.enum(privateLessonFocusAreas))
+      .min(1)
+      .max(6)
+      .refine((areas) => new Set(areas).size === areas.length, 'Duplicate focus area'),
+    customFocus: textSchema(300).nullable(),
+    correctionMode: z.enum(privateLessonCorrectionModes),
+    vocabularyMode: z.enum(privateLessonVocabularyModes),
+  })
+  .strict()
+  .superRefine((value, context) => {
+    if (
+      value.supportLanguageCode &&
+      sameBaseLanguage(value.targetLanguageCode, value.supportLanguageCode)
+    )
+      context.addIssue({
+        code: 'custom',
+        path: ['supportLanguageCode'],
+        message: 'Support language must differ from the target language',
+      });
+  });
+
+export type PrivateLessonPreferencesInput = z.output<
+  typeof privateLessonPreferencesInputSchema
+>;
+
 export const privateLessonSetupSchema = z.object({ targetLanguageCode: languageSchema }).strict();
 export const privateLessonRoadmapInputSchema = z
   .object({

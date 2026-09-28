@@ -925,6 +925,8 @@ test('first roadmap milestone lesson teaches the topic before conversation', () 
   });
 
   assert.match(prompt, /teach before starting the conversation/u);
+  assert.match(prompt, /short explanation, sentence pattern, examples/u);
+  assert.match(prompt, /only then independent speaking/u);
   assert.match(prompt, /Do not assume the learner already knows the name of the topic/u);
   assert.match(prompt, /"isFirstMilestoneLesson": true/u);
 });
