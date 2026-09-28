@@ -25,6 +25,7 @@ import {
 } from './private-lesson.repository.js';
 import {
   basicPrivateLessonReport,
+  PrivateLessonSummaryError,
   type PrivateLessonSummaryGenerator,
 } from './private-lesson.summary.js';
 import type {
@@ -523,6 +524,12 @@ function safetyIdentifier(scope: ProfileScope) {
 function privateLessonReportFailureCode(error: unknown): PrivateLessonReportFailureCode {
   const providerFailure = providerFailureCode(error);
   if (providerFailure) return `provider_${providerFailure}`;
+  if (error instanceof PrivateLessonSummaryError) {
+    if (error.reason === 'output_limit') return 'output_limit';
+    if (error.reason === 'content_filter') return 'content_filter';
+    if (error.reason === 'refusal') return 'refusal';
+    return 'incomplete_response';
+  }
   if (error instanceof z.ZodError || error instanceof SyntaxError) return 'invalid_report';
   return 'generation_failed';
 }

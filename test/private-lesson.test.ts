@@ -24,7 +24,10 @@ import type {
   PrivateLessonReport,
   PrivateLessonSummaryGenerator,
 } from '../src/modules/private-lessons/private-lesson.summary.js';
-import { OpenAiPrivateLessonSummaryGenerator } from '../src/modules/private-lessons/private-lesson.summary.js';
+import {
+  OpenAiPrivateLessonSummaryGenerator,
+  PrivateLessonSummaryError,
+} from '../src/modules/private-lessons/private-lesson.summary.js';
 import {
   buildRoadmapBlueprint,
   privateLessonCurriculum,
@@ -611,6 +614,9 @@ test('private lesson report generation is structured, transient and limited to l
   );
 
   assert.equal(requestBody?.store, false);
+  assert.equal(requestBody?.max_output_tokens, 25_000);
+  assert.deepEqual(requestBody?.reasoning, { effort: 'none' });
+  assert.equal((requestBody?.text as { verbosity: string }).verbosity, 'low');
   assert.equal((requestBody?.text as { format: { strict: boolean } }).format.strict, true);
   assert.match(String(requestBody?.instructions), /holistically across every learner turn/u);
   assert.deepEqual(report.recommendedReviewItemIds, ['33333333-3333-4333-8333-333333333333']);
@@ -618,6 +624,35 @@ test('private lesson report generation is structured, transient and limited to l
   assert.deepEqual(
     report.newWordSuggestions.map((word) => word.sourceText),
     ['confident'],
+  );
+});
+
+test('private lesson reports an exhausted output budget precisely', async () => {
+  const generator = new OpenAiPrivateLessonSummaryGenerator(
+    'summary-secret',
+    'gpt-summary-test',
+    async () =>
+      new Response(
+        JSON.stringify({
+          status: 'incomplete',
+          incomplete_details: { reason: 'max_output_tokens' },
+          output: [],
+        }),
+        { status: 200, headers: { 'content-type': 'application/json' } },
+      ),
+  );
+
+  await assert.rejects(
+    generator.generate(
+      reportPlan,
+      [{ role: 'learner', text: 'I want to achieve my goal.' }],
+      'safe-user-id',
+    ),
+    (error: unknown) => {
+      assert.ok(error instanceof PrivateLessonSummaryError);
+      assert.equal(error.reason, 'output_limit');
+      return true;
+    },
   );
 });
 

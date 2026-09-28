@@ -27,6 +27,10 @@ export type PrivateLessonReportFailureCode =
   | 'provider_timeout'
   | 'provider_invalid_response'
   | 'provider_upstream'
+  | 'output_limit'
+  | 'content_filter'
+  | 'incomplete_response'
+  | 'refusal'
   | 'invalid_report'
   | 'generation_failed';
 
