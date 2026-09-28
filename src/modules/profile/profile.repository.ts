@@ -30,6 +30,18 @@ type LanguageRow = {
   effective_level: CefrLevel | null;
   system_confidence: string | number | null;
   last_evaluated_at: Date | string | null;
+  estimated_level_lower: CefrLevel | null;
+  estimated_level_upper: CefrLevel | null;
+  assessment_evidence_count: number;
+  calibration_target: CefrLevel | null;
+  skill_estimates: Array<{
+    skill: 'speaking' | 'vocabulary' | 'grammar' | 'fluency' | 'comprehension';
+    score: number | string;
+    level: CefrLevel;
+    confidence: number | string;
+    evidenceCount: number;
+    highestTestedLevel: CefrLevel | null;
+  }>;
 };
 
 type InterestRow = {
@@ -361,8 +373,33 @@ export class ProfileRepository {
           system_estimated_level,
           effective_level,
           system_confidence,
-          last_evaluated_at
-        FROM product_gotit.user_language_proficiencies
+          last_evaluated_at,
+          estimated_level_lower,
+          estimated_level_upper,
+          assessment_evidence_count,
+          calibration_target,
+          COALESCE((
+            SELECT jsonb_agg(jsonb_build_object(
+              'skill', skill_profile.skill,
+              'score', skill_profile.ability_score,
+              'level', CASE
+                WHEN skill_profile.ability_score < 28 THEN 'A1'
+                WHEN skill_profile.ability_score < 43 THEN 'A2'
+                WHEN skill_profile.ability_score < 58 THEN 'B1'
+                WHEN skill_profile.ability_score < 73 THEN 'B2'
+                WHEN skill_profile.ability_score < 86 THEN 'C1'
+                ELSE 'C2'
+              END,
+              'confidence', skill_profile.confidence,
+              'evidenceCount', skill_profile.evidence_count,
+              'highestTestedLevel', skill_profile.highest_tested_level
+            ) ORDER BY skill_profile.skill)
+            FROM product_gotit.private_lesson_skill_profiles skill_profile
+            WHERE skill_profile.application_id=proficiency.application_id
+              AND skill_profile.application_user_id=proficiency.application_user_id
+              AND skill_profile.language_code=proficiency.language_code
+          ), '[]'::jsonb) skill_estimates
+        FROM product_gotit.user_language_proficiencies proficiency
         WHERE application_id = $1
           AND application_user_id = $2
         ORDER BY language_code ASC
@@ -404,6 +441,17 @@ export class ProfileRepository {
         effectiveLevel: language.effective_level,
         systemConfidence:
           language.system_confidence === null ? null : Number(language.system_confidence),
+        estimatedLevelRange:
+          language.estimated_level_lower && language.estimated_level_upper
+            ? { from: language.estimated_level_lower, to: language.estimated_level_upper }
+            : null,
+        assessmentEvidenceCount: language.assessment_evidence_count,
+        calibrationTarget: language.calibration_target,
+        skillEstimates: language.skill_estimates.map((skill) => ({
+          ...skill,
+          score: Number(skill.score),
+          confidence: Number(skill.confidence),
+        })),
         lastEvaluatedAt:
           language.last_evaluated_at === null
             ? null

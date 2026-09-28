@@ -917,7 +917,7 @@ test(
             client.release();
           }
           const inspection = await inspectProduction(db.runtimePool.options.connectionString);
-          assert.equal(inspection.productTableCount, 35);
+          assert.equal(inspection.productTableCount, 37);
           assert.deepEqual(inspection.v1, {
             learningRevision: true,
             captureReceipts: true,

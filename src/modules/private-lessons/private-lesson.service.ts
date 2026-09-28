@@ -35,6 +35,7 @@ import type {
 } from './private-lesson.validation.js';
 import type { PrivateLessonRoadmapStore } from './private-lesson.roadmap.js';
 import { setupPayload } from './private-lesson.roadmap.js';
+import type { PrivateLessonProficiencyStore } from './private-lesson.proficiency.js';
 import type { PrivateLessonGoalKind } from './private-lesson.curriculum.js';
 
 const clientSecretSchema = z
@@ -83,6 +84,7 @@ export type PrivateLessonServiceOptions = {
   journal?: PrivateLessonJournal;
   summaryGenerator?: PrivateLessonSummaryGenerator;
   roadmaps?: PrivateLessonRoadmapStore;
+  proficiency?: PrivateLessonProficiencyStore;
   durationSeconds?: number;
   requestTimeoutMs?: number;
 };
@@ -110,7 +112,9 @@ export class PrivateLessonService {
         'Private lesson preferences are unavailable',
       );
     await this.options.roadmaps.savePreferenceValues(scope, input);
-    return { preferences: await this.options.roadmaps.getPreferences(scope, input.targetLanguageCode) };
+    return {
+      preferences: await this.options.roadmaps.getPreferences(scope, input.targetLanguageCode),
+    };
   }
 
   async createSession(scope: ProfileScope, input: PrivateLessonInput) {
@@ -276,13 +280,18 @@ export class PrivateLessonService {
         : basicPrivateLessonReport(claimed);
       const completed = await journal.complete(scope, id, report);
       await this.options.roadmaps?.recordEvidence(scope, claimed, report).catch(() => undefined);
-      await this.options.profiles
-        .recordSystemAssessment?.(scope, {
-          languageCode: claimed.targetLanguageCode,
-          level: report.assessment.overallLevel,
-          confidence: { low: 0.35, medium: 0.7, high: 0.9 }[report.assessment.confidence],
-        })
-        .catch(() => undefined);
+      if (this.options.proficiency)
+        await this.options.proficiency
+          .recordLessonEvidence(scope, claimed, report)
+          .catch(() => undefined);
+      else if (report.assessment.overallLevel && report.assessment.evidenceSufficient)
+        await this.options.profiles
+          .recordSystemAssessment?.(scope, {
+            languageCode: claimed.targetLanguageCode,
+            level: report.assessment.overallLevel,
+            confidence: { low: 0.35, medium: 0.7, high: 0.9 }[report.assessment.confidence],
+          })
+          .catch(() => undefined);
       return publicStoredLesson(completed);
     } catch (error) {
       await journal.fail(scope, id, privateLessonReportFailureCode(error));

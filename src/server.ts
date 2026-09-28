@@ -34,6 +34,7 @@ import {
   PostgresPrivateLessonVocabularySource,
 } from './modules/private-lessons/private-lesson.repository.js';
 import { OpenAiPrivateLessonSummaryGenerator } from './modules/private-lessons/private-lesson.summary.js';
+import { PostgresPrivateLessonProficiencyStore } from './modules/private-lessons/private-lesson.proficiency.js';
 
 const logger = createLogger(env.LOG_LEVEL);
 const pool = createPool(env.DATABASE_URL);
@@ -133,6 +134,7 @@ const privateLessonService = new PrivateLessonService({
   fetchImpl: fetch,
   journal: new PostgresPrivateLessonJournal(pool),
   roadmaps: new PostgresPrivateLessonRoadmapStore(pool),
+  proficiency: new PostgresPrivateLessonProficiencyStore(pool),
   summaryGenerator:
     env.OPENAI_API_KEY && env.OPENAI_TRANSLATION_MODEL
       ? new OpenAiPrivateLessonSummaryGenerator(

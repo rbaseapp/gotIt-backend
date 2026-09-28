@@ -19,6 +19,17 @@ export type ProfileLanguage = {
   effectiveLevel: CefrLevel | null;
   systemConfidence: number | null;
   lastEvaluatedAt: string | null;
+  estimatedLevelRange?: { from: CefrLevel; to: CefrLevel } | null;
+  assessmentEvidenceCount?: number;
+  calibrationTarget?: CefrLevel | null;
+  skillEstimates?: Array<{
+    skill: 'speaking' | 'vocabulary' | 'grammar' | 'fluency' | 'comprehension';
+    score: number;
+    level: CefrLevel;
+    confidence: number;
+    evidenceCount: number;
+    highestTestedLevel: CefrLevel | null;
+  }>;
 };
 
 export type GotItProfile = {

@@ -27,6 +27,7 @@ import type {
 import {
   OpenAiPrivateLessonSummaryGenerator,
   PrivateLessonSummaryError,
+  privateLessonReportSchema,
 } from '../src/modules/private-lessons/private-lesson.summary.js';
 import {
   buildRoadmapBlueprint,
@@ -34,10 +35,22 @@ import {
 } from '../src/modules/private-lessons/private-lesson.curriculum.js';
 import { privateLessonRoadmapInputSchema } from '../src/modules/private-lessons/private-lesson.validation.js';
 import { PostgresPrivateLessonRoadmapStore } from '../src/modules/private-lessons/private-lesson.roadmap.js';
+import { taskLevelForPlan } from '../src/modules/private-lessons/private-lesson.assessment.js';
 
-const assessment = {
+const assessment = privateLessonReportSchema.shape.assessment.parse({
   overallLevel: 'B1' as const,
+  levelRange: { from: 'B1', to: 'B1' },
   confidence: 'medium' as const,
+  evidenceSufficient: true,
+  calibrationTarget: 'B2',
+  basis: 'Broad independent evidence across the lesson.',
+  lessonPerformance: {
+    taskLevel: 'B1',
+    score: 78,
+    result: 'successful',
+    evidenceQuality: 'moderate',
+    independence: 75,
+  },
   skills: {
     speaking: { score: 58, level: 'B1' as const, feedback: 'Clear spoken answers.' },
     vocabulary: { score: 55, level: 'B1' as const, feedback: 'Useful word choices.' },
@@ -45,7 +58,7 @@ const assessment = {
     fluency: { score: 54, level: 'B1' as const, feedback: 'Keep extending answers.' },
     comprehension: { score: 60, level: 'B1' as const, feedback: 'Relevant responses.' },
   },
-};
+});
 
 const logger = pino({ enabled: false });
 const identity = {
@@ -618,7 +631,8 @@ test('private lesson report generation is structured, transient and limited to l
   assert.deepEqual(requestBody?.reasoning, { effort: 'none' });
   assert.equal((requestBody?.text as { verbosity: string }).verbosity, 'low');
   assert.equal((requestBody?.text as { format: { strict: boolean } }).format.strict, true);
-  assert.match(String(requestBody?.instructions), /holistically across every learner turn/u);
+  assert.match(String(requestBody?.instructions), /server, not you, is the authority/u);
+  assert.match(String(requestBody?.instructions), /0-100 scale, never 0-10/u);
   assert.deepEqual(report.recommendedReviewItemIds, ['33333333-3333-4333-8333-333333333333']);
   assert.equal(report.vocabulary[0]?.sourceText, 'achieve');
   assert.deepEqual(
@@ -656,8 +670,8 @@ test('private lesson reports an exhausted output budget precisely', async () => 
   );
 });
 
-test('private lesson assessment stabilizes a short imperfect answer instead of turning it into zero', async () => {
-  const zeroAssessment = {
+test('private lesson keeps a short imperfect answer as evidence without declaring a global level', async () => {
+  const zeroAssessment = privateLessonReportSchema.shape.assessment.parse({
     overallLevel: 'A1' as const,
     confidence: 'low' as const,
     skills: Object.fromEntries(
@@ -666,7 +680,7 @@ test('private lesson assessment stabilizes a short imperfect answer instead of t
         { score: 0, level: 'A1' as const, feedback: 'The sentence was incomplete.' },
       ]),
     ) as PrivateLessonReport['assessment']['skills'],
-  };
+  });
   const generated: PrivateLessonReport = {
     summary: 'Short attempt.',
     assessment: zeroAssessment,
@@ -701,6 +715,79 @@ test('private lesson assessment stabilizes a short imperfect answer instead of t
   assert.ok(report.assessment.skills.speaking.score > 0);
   assert.ok(report.assessment.skills.grammar.score > 0);
   assert.equal(report.assessment.confidence, 'low');
+  assert.equal(report.assessment.overallLevel, null);
+  assert.equal(report.assessment.evidenceSufficient, false);
+});
+
+test('private lesson normalizes legacy ten-point scores and removes unsupported corrections', async () => {
+  const generated = privateLessonReportSchema.parse({
+    summary: 'Practice complete.',
+    assessment: {
+      overallLevel: 'A2',
+      confidence: 'medium',
+      skills: Object.fromEntries(
+        ['speaking', 'vocabulary', 'grammar', 'fluency', 'comprehension'].map((skill) => [
+          skill,
+          {
+            score: 7,
+            level: 'A2',
+            feedback: 'Useful evidence.',
+            evidenceQuality: 'moderate',
+            dimensions: null,
+            evidence: [
+              {
+                learnerQuote: 'I explain my work and compare the options clearly.',
+                observation: 'Independent response.',
+                independent: true,
+              },
+            ],
+          },
+        ])),
+    },
+    roadmapProgress: null,
+    strengths: [],
+    corrections: [
+      {
+        original: 'I used a phrase that was never said.',
+        corrected: 'A fabricated correction.',
+        explanation: 'Unsupported.',
+      },
+    ],
+    grammarPoints: [],
+    vocabulary: [],
+    newWordSuggestions: [],
+    nextLessonPlan: 'Continue with an open response.',
+    recommendedReviewItemIds: [],
+  });
+  const generator = new OpenAiPrivateLessonSummaryGenerator(
+    'summary-secret',
+    'gpt-summary-test',
+    async () =>
+      Response.json({
+        status: 'completed',
+        output: [{ content: [{ type: 'output_text', text: JSON.stringify(generated) }] }],
+      }),
+  );
+  const turns = Array.from({ length: 6 }, () => ({
+    role: 'learner' as const,
+    text: 'I explain my work and compare the options clearly.',
+  }));
+  const report = await generator.generate(reportPlan, turns, 'safe-user-id');
+
+  assert.ok(report.assessment.skills.speaking.score > 40);
+  assert.equal(report.assessment.overallLevel, null);
+  assert.deepEqual(report.corrections, []);
+});
+
+test('assessment uses the curriculum task level instead of the working profile level', () => {
+  assert.equal(
+    taskLevelForPlan({
+      ...reportPlan,
+      level: 'B2',
+      grammarFocus: 'present-simple-continuous',
+    }),
+    'A1',
+  );
 });
 
 test('private lesson computes roadmap completion separately from holistic level', async () => {
