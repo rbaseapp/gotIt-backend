@@ -43,11 +43,62 @@ let draining = false;
 
 try {
   const { verifyRuntimeSchema } = await import(pathToFileURL(resolve('scripts/preflight.js')).href);
-  await verifyRuntimeSchema(pool, { strictRole: env.NODE_ENV === 'production' });
-} catch {
-  logger.fatal('Startup preflight failed; check schema migrations and runtime privileges');
+  await verifyStartupSchema(() =>
+    verifyRuntimeSchema(pool, { strictRole: env.NODE_ENV === 'production' }),
+  );
+} catch (error) {
+  logger.fatal(
+    { preflightCode: safePreflightFailureCode(error) },
+    'Startup preflight failed; check schema migrations, runtime privileges, and DATABASE_URL',
+  );
   await pool.end();
   process.exit(1);
+}
+
+async function verifyStartupSchema(verify: () => Promise<unknown>) {
+  const attempts = 3;
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      return await verify();
+    } catch (error) {
+      if (attempt === attempts || !isTransientPreflightFailure(error)) throw error;
+      logger.warn(
+        { attempt, attempts, preflightCode: safePreflightFailureCode(error) },
+        'Startup preflight database connection is temporarily unavailable; retrying',
+      );
+      await new Promise((resolveDelay) => setTimeout(resolveDelay, attempt * 750));
+    }
+  }
+}
+
+function safePreflightFailureCode(error: unknown) {
+  if (error instanceof Error && /^GOTIT_[A-Z_]+$|^DATABASE_URL_REQUIRED$/u.test(error.message))
+    return error.message;
+  const databaseCode =
+    error && typeof error === 'object' && 'code' in error
+      ? String((error as { code?: unknown }).code ?? '')
+      : '';
+  if (databaseCode === '28P01') return 'PREFLIGHT_DATABASE_AUTHENTICATION_FAILED';
+  if (databaseCode === '3D000') return 'PREFLIGHT_DATABASE_NOT_FOUND';
+  return 'PREFLIGHT_DATABASE_UNAVAILABLE';
+}
+
+function isTransientPreflightFailure(error: unknown) {
+  const databaseCode =
+    error && typeof error === 'object' && 'code' in error
+      ? String((error as { code?: unknown }).code ?? '')
+      : '';
+  if (
+    databaseCode.startsWith('08') ||
+    ['57P03', '57014', '53300', 'ECONNREFUSED', 'ECONNRESET', 'ETIMEDOUT', 'ENOTFOUND'].includes(
+      databaseCode,
+    )
+  )
+    return true;
+  return (
+    error instanceof Error &&
+    /connection.*(?:timeout|terminated)|timeout.*connection/iu.test(error.message)
+  );
 }
 
 const coreAuthClient = new CoreAuthClient({
