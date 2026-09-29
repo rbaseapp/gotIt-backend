@@ -136,6 +136,14 @@ function retryableReadingFailure(error: unknown, timedOut: boolean) {
   return retryableProviderFailures.has(providerFailureCode(error) ?? 'upstream');
 }
 
+function previewFailure(error: unknown, phase: 'quota' | 'generation' | 'finalization') {
+  if (error instanceof AppError) return error;
+  if (phase === 'quota')
+    return new AppError(503, 'DATABASE_UNAVAILABLE', 'Reading quota is temporarily unavailable');
+  if (phase === 'generation') return readingFailure(error);
+  return new AppError(503, 'READING_UNAVAILABLE', 'The generated reading could not be finalized');
+}
+
 export class ReadingService {
   private readonly key: Buffer | undefined;
   constructor(
@@ -204,8 +212,14 @@ export class ReadingService {
       },
       true,
     );
-    if (this.quota) await this.quota.reserve(scope, quotaPolicy);
+    let quotaReserved = false;
+    let phase: 'quota' | 'generation' | 'finalization' = 'quota';
     try {
+      if (this.quota) {
+        await this.quota.reserve(scope, quotaPolicy);
+        quotaReserved = true;
+      }
+      phase = 'generation';
       const generationDeadline = Date.now() + 45000;
       const maxAttempts = 3;
       let content: z.output<typeof generatedReadingSchema> | undefined;
@@ -298,10 +312,12 @@ export class ReadingService {
         }
       }
       if (!content || !bound) throw readingFailure(lastError, lastTimedOut);
+      phase = 'finalization';
       const ticket = ticketSchema.parse({
         version: 1,
         id: randomUUID(),
-        ...scope,
+        applicationId: scope.applicationId,
+        applicationUserId: scope.applicationUserId,
         expiresAt: this.now() + 15 * 60000,
         input,
         topic,
@@ -340,8 +356,14 @@ export class ReadingService {
         provider: { name: ticket.providerName, model: ticket.providerModel },
       };
     } catch (error) {
-      if (this.quota) await this.quota.release(scope, quotaPolicy);
-      throw error;
+      if (this.quota && quotaReserved)
+        try {
+          await this.quota.release(scope, quotaPolicy);
+        } catch {
+          // Preserve the actionable generation/finalization failure. A quota
+          // cleanup outage must not turn it into an opaque INTERNAL_ERROR.
+        }
+      throw previewFailure(error, phase);
     }
   }
   private decode(scope: ProfileScope, token: string) {

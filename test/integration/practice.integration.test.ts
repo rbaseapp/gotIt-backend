@@ -724,6 +724,17 @@ test(
       await t.test(
         'reading preview is not persisted; encrypted publication is scoped, single-use and replays after expiry/deletion',
         async () => {
+          const automaticPreview = await call('post', '/reading/preview', {
+            targetLanguageCode: 'en',
+            topic: 'my kitchen',
+            contentType: 'article',
+            lengthPreset: 'short',
+          });
+          assert.equal(automaticPreview.status, 200, JSON.stringify(automaticPreview.body));
+          assert.ok(automaticPreview.body.reading.targets.length > 0);
+          assert.equal(automaticPreview.body.reading.contentType, 'article');
+          assert.equal(automaticPreview.body.reading.targetLanguageCode, 'en');
+
           const input = { targetLanguageCode: 'en', topic: 'Daily life', learningItemIds: ids };
           const preview = await call('post', '/reading/preview', input).expect(200),
             token = preview.body.publicationToken;
@@ -746,7 +757,7 @@ test(
             opened = await call('post', '/reading', { publicationToken: token }, key).expect(201),
             id = opened.body.reading.id;
           assert.equal(opened.body.reading.targets.length, 3);
-          assert.equal(generationCalls, 1);
+          assert.equal(generationCalls, 2);
           await call('post', '/reading', { publicationToken: token }).expect(409);
           const quiz = await call('post', '/practice/sessions', {
             sessionType: 'article_quiz',

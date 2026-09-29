@@ -267,6 +267,189 @@ test('reading preview repairs omissions and salvages the valid draft if repair c
   assert.match(result.reading.bodyText, /train station/u);
 });
 
+test('AI article preview with the public request payload uses automatic vocabulary selection', async () => {
+  const queries: string[] = [];
+  const client = {
+    query: async (query: string | { text: string }) => {
+      const text = typeof query === 'string' ? query : query.text;
+      queries.push(text);
+      if (text.includes('FROM product_gotit.learning_items'))
+        return {
+          rowCount: 1,
+          rows: [
+            {
+              id: input.targets[0]!.id,
+              source_text: 'train station',
+              source_language_code: 'en',
+              translation_language_code: 'he',
+              user_status: 'active',
+              deleted_at: null,
+              learning_revision: 1,
+              part_of_speech: 'noun',
+              translations: ['תחנת רכבת'],
+            },
+          ],
+        };
+      return { rowCount: 0, rows: [] };
+    },
+    release: () => {},
+  };
+  const scope = {
+    applicationId: 'b6ee48fc-d538-4b49-8d31-f89f399342aa',
+    applicationUserId: '455910fe-0d25-4ef8-8674-2bcc80aebf8e',
+    role: 'user',
+  };
+  const pool = { connect: async () => client } as any;
+  const profiles = {
+    getProfile: async () => ({
+      defaultSourceLanguage: null,
+      defaultTranslationLanguage: 'he',
+      timezone: 'UTC',
+      dailyGoal: { type: 'items', value: 5 },
+      defaultNewItemsPerDay: 10,
+      translationMethodPreference: 'auto',
+      languages: [],
+      interests: [],
+    }),
+  } as any;
+  let generationInput: Record<string, unknown> | undefined;
+  let reserved = 0;
+  const service = new ReadingService(
+    pool,
+    profiles,
+    {
+      queue: async () => ({
+        items: [{ id: input.targets[0]!.id, sourceLanguageCode: 'en' }],
+      }),
+    } as any,
+    {
+      id: 'test',
+      generate: async (value) => {
+        generationInput = value as unknown as Record<string, unknown>;
+        return {
+          title: 'My kitchen',
+          bodyText:
+            'My kitchen is a warm place near the train station where my family cooks together.',
+          providerModel: 'test-model',
+        };
+      },
+    },
+    's'.repeat(32),
+    Date.now,
+    {
+      status: async () => ({
+        limit: 4,
+        used: 0,
+        remaining: 4,
+        period: 'month',
+        resetsAt: null,
+      }),
+      reserve: async () => {
+        reserved++;
+        return { limit: 4, used: 1, remaining: 3, period: 'month', resetsAt: null };
+      },
+      release: async () => {
+        reserved--;
+      },
+    },
+  );
+
+  const result = await service.preview(scope, {
+    targetLanguageCode: 'en',
+    topic: 'my kitchen',
+    contentType: 'article',
+    lengthPreset: 'short',
+  });
+
+  assert.equal(reserved, 1);
+  assert.equal(generationInput?.topic, 'my kitchen');
+  assert.equal((generationInput?.targets as unknown[]).length, 1);
+  assert.equal(result.reading.contentType, 'article');
+  assert.equal(result.reading.targetLanguageCode, 'en');
+  assert.equal(result.reading.targets[0]?.sourceText, 'train station');
+  assert.ok(result.publicationToken.length > 100);
+  assert.ok(queries.some((query) => query.includes('FROM product_gotit.learning_items')));
+});
+
+test('reading finalization failures never escape as opaque internal errors', async () => {
+  const client = {
+    query: async (query: string | { text: string }) => {
+      const text = typeof query === 'string' ? query : query.text;
+      if (text.includes('FROM product_gotit.learning_items'))
+        return {
+          rowCount: 1,
+          rows: [
+            {
+              id: input.targets[0]!.id,
+              source_text: 'train station',
+              source_language_code: 'en',
+              translation_language_code: 'he',
+              user_status: 'active',
+              deleted_at: null,
+              learning_revision: 1,
+              part_of_speech: 'noun',
+              translations: ['תחנת רכבת'],
+            },
+          ],
+        };
+      return { rowCount: 0, rows: [] };
+    },
+    release: () => {},
+  };
+  let releases = 0;
+  const service = new ReadingService(
+    { connect: async () => client } as any,
+    {
+      getProfile: async () => ({
+        languages: [],
+        interests: [],
+      }),
+    } as any,
+    {} as any,
+    {
+      id: 'test',
+      generate: async () => ({
+        title: 'My kitchen',
+        bodyText: 'My kitchen is close to the train station and is pleasant every day.',
+        providerModel: 'test-model',
+      }),
+    },
+    's'.repeat(32),
+    () => Number.NaN,
+    {
+      status: async () => null as never,
+      reserve: async () => null as never,
+      release: async () => {
+        releases++;
+        throw new Error('cleanup unavailable');
+      },
+    },
+  );
+
+  await assert.rejects(
+    () =>
+      service.preview(
+        {
+          applicationId: 'b6ee48fc-d538-4b49-8d31-f89f399342aa',
+          applicationUserId: '455910fe-0d25-4ef8-8674-2bcc80aebf8e',
+        },
+        {
+          targetLanguageCode: 'en',
+          topic: 'my kitchen',
+          contentType: 'article',
+          lengthPreset: 'short',
+          learningItemIds: [input.targets[0]!.id],
+        },
+      ),
+    (error: unknown) =>
+      error instanceof Error &&
+      'code' in error &&
+      error.code === 'READING_UNAVAILABLE' &&
+      !error.message.includes('cleanup unavailable'),
+  );
+  assert.equal(releases, 1);
+});
+
 const requestSchema = {
   type: 'object',
   additionalProperties: false,
