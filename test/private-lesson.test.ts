@@ -740,6 +740,75 @@ test('private lesson reports an exhausted output budget precisely', async () => 
   );
 });
 
+test('private lesson normalizes generated prose bounds before validating the report', async () => {
+  const generated = {
+    summary: `  ${'s'.repeat(2_100)}  `,
+    assessment: {
+      ...assessment,
+      basis: 'b'.repeat(800),
+      skills: Object.fromEntries(
+        Object.entries(assessment.skills).map(([skill, value]) => [
+          skill,
+          {
+            ...value,
+            feedback: 'f'.repeat(600),
+            evidence: [
+              {
+                learnerQuote: 'I want to achieve my goal.',
+                observation: 'o'.repeat(600),
+                independent: true,
+              },
+            ],
+          },
+        ]),
+      ),
+    },
+    roadmapProgress: null,
+    strengths: ['  clear answer  ', '', 'x'.repeat(600)],
+    corrections: [{ original: ' ', corrected: 'fixed', explanation: 'empty source' }],
+    grammarPoints: [],
+    vocabulary: [
+      {
+        learningItemId: 'not-a-uuid',
+        sourceText: 'invented',
+        translationText: 'invented',
+        outcome: 'practiced',
+        note: 'invented',
+      },
+    ],
+    newWordSuggestions: [],
+    nextLessonPlan: 'n'.repeat(1_100),
+    recommendedReviewItemIds: ['not-a-uuid'],
+  };
+  const generator = new OpenAiPrivateLessonSummaryGenerator(
+    'summary-secret',
+    'gpt-summary-test',
+    async () =>
+      Response.json({
+        status: 'completed',
+        output: [{ content: [{ type: 'output_text', text: JSON.stringify(generated) }] }],
+      }),
+  );
+
+  const report = await generator.generate(
+    reportPlan,
+    [{ role: 'learner', text: 'I want to achieve my goal.' }],
+    'safe-user-id',
+  );
+
+  assert.equal(report.summary.length, 2_000);
+  assert.equal(report.nextLessonPlan.length, 1_000);
+  assert.deepEqual(
+    report.strengths.map((strength) => strength.length),
+    [12, 500],
+  );
+  assert.ok(report.assessment.skills.speaking.feedback.length <= 500);
+  assert.ok(report.assessment.skills.speaking.evidence[0]!.observation.length <= 500);
+  assert.deepEqual(report.corrections, []);
+  assert.equal(report.vocabulary[0]?.learningItemId, reportPlan.targets[0]?.learningItemId);
+  assert.deepEqual(report.recommendedReviewItemIds, []);
+});
+
 test('private lesson keeps a short imperfect answer as evidence without declaring a global level', async () => {
   const zeroAssessment = privateLessonReportSchema.shape.assessment.parse({
     overallLevel: 'A1' as const,
@@ -991,7 +1060,10 @@ test('private lesson report timeout is categorized safely for retry diagnostics'
       completionReason: 'completed',
       turns: [{ role: 'learner', text: 'I want to achieve my goal.' }],
     }),
-    { code: 'PRIVATE_LESSON_REPORT_FAILED' },
+    {
+      code: 'PRIVATE_LESSON_REPORT_FAILED',
+      details: { reason: 'provider_timeout' },
+    },
   );
   assert.equal(savedFailureCode, 'provider_timeout');
 });

@@ -374,10 +374,7 @@ const reportJsonSchema = {
                     required: ['accuracy', 'independence', 'range', 'complexity', 'consistency'],
                     properties: Object.fromEntries(
                       ['accuracy', 'independence', 'range', 'complexity', 'consistency'].map(
-                        (dimension) => [
-                          dimension,
-                          { type: 'integer', minimum: 0, maximum: 100 },
-                        ],
+                        (dimension) => [dimension, { type: 'integer', minimum: 0, maximum: 100 }],
                       ),
                     ),
                   },
@@ -578,7 +575,9 @@ export class OpenAiPrivateLessonSummaryGenerator implements PrivateLessonSummary
         .filter((item) => item.type === 'output_text' && typeof item.text === 'string')
         .map((item) => item.text)
         .join('');
-      const report = privateLessonReportSchema.parse(JSON.parse(text));
+      const report = privateLessonReportSchema.parse(
+        normalizeGeneratedReportCandidate(JSON.parse(text), plan),
+      );
       return sanitizeReport(report, plan, turns);
     } catch (error) {
       if (controller.signal.aborted) throw new ProviderHttpError(504, 'timeout');
@@ -587,6 +586,183 @@ export class OpenAiPrivateLessonSummaryGenerator implements PrivateLessonSummary
       clearTimeout(timeout);
     }
   }
+}
+
+/**
+ * Structured Outputs validates the JSON schema sent to the provider, but that schema cannot
+ * express every storage constraint enforced by privateLessonReportSchema. Keep those two
+ * validation layers from diverging on harmless transport details such as surrounding whitespace,
+ * overlong prose, or a hallucinated identifier. Shape/type/enum errors still fail closed below.
+ */
+function normalizeGeneratedReportCandidate(value: unknown, plan: PrivateLessonPlan): unknown {
+  const report = record(value);
+  if (!report) return value;
+  const fallback = basicPrivateLessonReport(plan);
+  const normalized: Record<string, unknown> = {
+    ...report,
+    summary: boundedRequiredText(report.summary, 2000, fallback.summary),
+    nextLessonPlan: boundedRequiredText(report.nextLessonPlan, 1000, fallback.nextLessonPlan),
+    strengths: normalizeTextArray(report.strengths, 5, 500),
+    corrections: normalizeObjectArray(report.corrections, 8, (item) => {
+      const correction = record(item);
+      if (!correction) return item;
+      const original = boundedRequiredText(correction.original, 500, '');
+      const corrected = boundedRequiredText(correction.corrected, 500, '');
+      const explanation = boundedRequiredText(correction.explanation, 700, '');
+      if (hasEmptyText(original, corrected, explanation)) return undefined;
+      return {
+        ...correction,
+        original,
+        corrected,
+        explanation,
+      };
+    }),
+    grammarPoints: normalizeObjectArray(report.grammarPoints, 6, (item) => {
+      const point = record(item);
+      if (!point) return item;
+      const topic = boundedRequiredText(point.topic, 200, '');
+      const explanation = boundedRequiredText(point.explanation, 700, '');
+      if (hasEmptyText(topic, explanation)) return undefined;
+      return {
+        ...point,
+        topic,
+        explanation,
+        example: boundedNullableText(point.example, 500),
+      };
+    }),
+    vocabulary: normalizeObjectArray(report.vocabulary, 12, (item) => {
+      const word = record(item);
+      if (!word || !validUuid(word.learningItemId)) return undefined;
+      const sourceText = boundedRequiredText(word.sourceText, 500, '');
+      const translationText = boundedRequiredText(word.translationText, 1000, '');
+      const note = boundedRequiredText(word.note, 500, '');
+      if (hasEmptyText(sourceText, translationText, note)) return undefined;
+      return {
+        ...word,
+        sourceText,
+        translationText,
+        note,
+      };
+    }),
+    newWordSuggestions: normalizeObjectArray(report.newWordSuggestions, 8, (item) => {
+      const word = record(item);
+      if (!word) return item;
+      const sourceText = boundedRequiredText(word.sourceText, 500, '');
+      const translationText = boundedRequiredText(word.translationText, 1000, '');
+      if (hasEmptyText(sourceText, translationText)) return undefined;
+      return {
+        ...word,
+        sourceText,
+        translationText,
+        example: boundedNullableText(word.example, 500),
+      };
+    }),
+    recommendedReviewItemIds: Array.isArray(report.recommendedReviewItemIds)
+      ? report.recommendedReviewItemIds.filter(validUuid).slice(0, 10)
+      : report.recommendedReviewItemIds,
+  };
+
+  const assessment = record(report.assessment);
+  if (assessment) {
+    const fallbackAssessment = fallback.assessment;
+    const normalizedAssessment: Record<string, unknown> = {
+      ...assessment,
+      basis: boundedRequiredText(assessment.basis, 700, fallbackAssessment.basis),
+    };
+    const skills = record(assessment.skills);
+    if (skills) {
+      normalizedAssessment.skills = Object.fromEntries(
+        ASSESSMENT_SKILLS.map((skill) => {
+          const rawSkill = record(skills[skill]);
+          if (!rawSkill) return [skill, skills[skill]];
+          return [
+            skill,
+            {
+              ...rawSkill,
+              feedback: boundedRequiredText(
+                rawSkill.feedback,
+                500,
+                fallbackAssessment.skills[skill].feedback,
+              ),
+              evidence: normalizeObjectArray(rawSkill.evidence, 8, (item) => {
+                const evidence = record(item);
+                if (!evidence) return item;
+                const learnerQuote = boundedRequiredText(evidence.learnerQuote, 500, '');
+                const observation = boundedRequiredText(evidence.observation, 500, '');
+                if (hasEmptyText(learnerQuote, observation)) return undefined;
+                return {
+                  ...evidence,
+                  learnerQuote,
+                  observation,
+                };
+              }),
+            },
+          ];
+        }),
+      );
+    }
+    normalized.assessment = normalizedAssessment;
+  }
+
+  const roadmapProgress = record(report.roadmapProgress);
+  if (roadmapProgress) {
+    normalized.roadmapProgress = {
+      ...roadmapProgress,
+      evidence: boundedRequiredText(
+        roadmapProgress.evidence,
+        700,
+        'No reliable independent task-completion evidence was captured.',
+      ),
+    };
+  }
+
+  return normalized;
+}
+
+function record(value: unknown): Record<string, unknown> | undefined {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : undefined;
+}
+
+function boundedRequiredText(value: unknown, maximum: number, fallback: string): unknown {
+  if (typeof value !== 'string') return value;
+  const normalized = value.trim().slice(0, maximum).trim();
+  return normalized || fallback;
+}
+
+function boundedNullableText(value: unknown, maximum: number): unknown {
+  if (value === null || typeof value !== 'string') return value;
+  const normalized = value.trim().slice(0, maximum).trim();
+  return normalized || null;
+}
+
+function hasEmptyText(...values: unknown[]) {
+  return values.some((value) => value === '');
+}
+
+function normalizeTextArray(value: unknown, maximumItems: number, maximumLength: number): unknown {
+  if (!Array.isArray(value)) return value;
+  return value
+    .map((item) => boundedRequiredText(item, maximumLength, ''))
+    .filter((item) => typeof item !== 'string' || item.length > 0)
+    .slice(0, maximumItems);
+}
+
+function normalizeObjectArray(
+  value: unknown,
+  maximumItems: number,
+  normalize: (item: unknown) => unknown,
+): unknown {
+  if (!Array.isArray(value)) return value;
+  return value
+    .map(normalize)
+    .filter((item) => item !== undefined)
+    .slice(0, maximumItems);
+}
+
+function validUuid(value: unknown): value is string {
+  return typeof value === 'string' && z.uuid().safeParse(value).success;
 }
 
 export function basicPrivateLessonReport(plan: PrivateLessonPlan): PrivateLessonReport {

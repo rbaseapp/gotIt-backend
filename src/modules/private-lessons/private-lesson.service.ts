@@ -329,11 +329,13 @@ export class PrivateLessonService {
           .catch(() => undefined);
       return publicStoredLesson(completed);
     } catch (error) {
-      await journal.fail(scope, id, privateLessonReportFailureCode(error));
+      const failureCode = privateLessonReportFailureCode(error);
+      await journal.fail(scope, id, failureCode);
       throw new AppError(
         503,
         'PRIVATE_LESSON_REPORT_FAILED',
         'The lesson ended, but its report could not be generated yet',
+        { reason: failureCode },
       );
     }
   }
