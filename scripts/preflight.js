@@ -60,6 +60,7 @@ export async function verifyRuntimeSchema(client, { strictRole = true } = {}) {
       'custom_focus',
       'correction_mode',
       'vocabulary_mode',
+      'lesson_mode',
       'roadmap_id',
       'milestone_id',
       'continuity',
@@ -67,7 +68,12 @@ export async function verifyRuntimeSchema(client, { strictRole = true } = {}) {
       'started_at',
       'deleted_at',
     ],
-    private_lesson_preferences: ['target_language_code', 'correction_mode', 'vocabulary_mode'],
+    private_lesson_preferences: [
+      'target_language_code',
+      'correction_mode',
+      'vocabulary_mode',
+      'lesson_mode',
+    ],
     private_lesson_roadmaps: ['goal_kind', 'goal_key', 'current_milestone_position'],
     private_lesson_milestones: [
       'roadmap_id',
