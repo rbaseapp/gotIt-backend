@@ -221,6 +221,12 @@ test('private lesson creates a bounded personalized Realtime session', async () 
     (session.audio as { input: { noise_reduction: unknown } }).input.noise_reduction,
     { type: 'far_field' },
   );
+  assert.deepEqual((session.audio as { input: { transcription: unknown } }).input.transcription, {
+    model: 'gpt-transcribe-test',
+    language: 'en',
+    prompt:
+      'The learner is speaking only American English. Transcribe the audio as American English; do not interpret it as another language.',
+  });
   assert.deepEqual((session.audio as { output: unknown }).output, {
     voice: 'cedar',
     speed: 0.7,
@@ -247,12 +253,16 @@ test('private lesson pins every spoken response to the selected target language'
     supportLanguageCode: 'he',
   });
 
-  const session = requestBody?.session as { instructions?: unknown };
+  const session = requestBody?.session as {
+    instructions?: unknown;
+    audio?: { input?: { transcription?: { language?: string } } };
+  };
   const sessionInstructions = String(session.instructions);
   const openingInstructions = result.realtime.openingEvent.response.instructions;
   const closingInstructions = result.realtime.wrapUpEvent.response.instructions;
   const translationInstructions = result.realtime.translationEvent?.response.instructions ?? '';
 
+  assert.equal(session.audio?.input?.transcription?.language, 'ar');
   assert.match(sessionInstructions, /TARGET_LANGUAGE is Arabic \(العربية; language code: ar\)/u);
   assert.match(sessionInstructions, /from the very first spoken word through the final goodbye/u);
   assert.match(sessionInstructions, /Every greeting, question, example, hint, correction/u);
@@ -260,6 +270,8 @@ test('private lesson pins every spoken response to the selected target language'
   assert.match(openingInstructions, /very first spoken word/u);
   assert.match(closingInstructions, /Speak only in Arabic \(العربية; language code: ar\)/u);
   assert.match(translationInstructions, /translate .* into Hebrew \(עברית; language code: he\)/u);
+  assert.match(translationInstructions, /entire most recent speaking turn/u);
+  assert.match(translationInstructions, /every sentence/u);
   assert.match(translationInstructions, /resume speaking only in Arabic/u);
 });
 
@@ -633,6 +645,22 @@ test('private lesson report generation is structured, transient and limited to l
   assert.equal((requestBody?.text as { format: { strict: boolean } }).format.strict, true);
   assert.match(String(requestBody?.instructions), /server, not you, is the authority/u);
   assert.match(String(requestBody?.instructions), /0-100 scale, never 0-10/u);
+  assert.match(
+    String(requestBody?.instructions),
+    /all user-facing report prose in Hebrew \(עברית; language code: he\)/u,
+  );
+  assert.match(String(requestBody?.instructions), /Never default report prose to English/u);
+  assert.equal(
+    (
+      (
+        requestBody?.input as Array<{
+          content: string;
+        }>
+      )[0] &&
+      JSON.parse((requestBody?.input as Array<{ content: string }>)[0]!.content).untrustedLessonData
+    ).reportLanguageCode,
+    'he',
+  );
   assert.deepEqual(report.recommendedReviewItemIds, ['33333333-3333-4333-8333-333333333333']);
   assert.equal(report.vocabulary[0]?.sourceText, 'achieve');
   assert.deepEqual(

@@ -174,6 +174,7 @@ export class PrivateLessonService {
     const supportLanguage = plan.supportLanguageCode
       ? describeLessonLanguage(plan.supportLanguageCode)
       : null;
+    const transcriptionLanguage = new Intl.Locale(targetLanguage.code).language;
     const voice = input.teacherVoice ? voiceByGender[input.teacherVoice] : this.options.voice;
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), this.requestTimeoutMs);
@@ -195,7 +196,11 @@ export class PrivateLessonService {
             audio: {
               input: {
                 noise_reduction: { type: 'far_field' },
-                transcription: { model: this.options.transcriptionModel },
+                transcription: {
+                  model: this.options.transcriptionModel,
+                  language: transcriptionLanguage,
+                  prompt: `The learner is speaking only ${targetLanguage.englishName}. Transcribe the audio as ${targetLanguage.englishName}; do not interpret it as another language.`,
+                },
                 turn_detection: {
                   type: 'semantic_vad',
                   eagerness: 'medium',
@@ -239,7 +244,7 @@ export class PrivateLessonService {
             ? {
                 type: 'response.create',
                 response: {
-                  instructions: `For this response only, translate the most recent tutor sentence into ${supportLanguage.promptName}. Give only the translation and at most one brief clarification. Do not advance the lesson or ask a new question. After this response, resume speaking only in ${targetLanguage.promptName}.`,
+                  instructions: `For this response only, translate the tutor's entire most recent speaking turn into ${supportLanguage.promptName}. Translate every sentence from that turn, from beginning to end; do not translate only its final sentence. Give only the complete translation and at most one brief clarification. Do not advance the lesson or ask a new question. After this response, resume speaking only in ${targetLanguage.promptName}.`,
                 },
               }
             : null,

@@ -91,7 +91,7 @@ function plan(): PrivateLessonPlan {
     level: 'B1',
     topic: 'open conversation',
     grammarFocus: null,
-    focusAreas: ['speaking', 'vocabulary', 'grammar', 'fluency', 'comprehension'],
+    focusAreas: ['speaking', 'vocabulary', 'grammar', 'fluency', 'listening'],
     customFocus: null,
     correctionMode: 'recast',
     vocabularyMode: 'none',
