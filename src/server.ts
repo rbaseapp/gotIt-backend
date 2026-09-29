@@ -7,7 +7,7 @@ import { LibraryRepository } from './modules/library/library.repository.js';
 import { PracticeService } from './modules/practice/practice.service.js';
 import { DashboardService } from './modules/dashboard/dashboard.service.js';
 import { ReadingService } from './modules/reading/reading.service.js';
-import { AnthropicReadingGenerator } from './modules/reading/anthropic-reading.js';
+import { OpenAiReadingGenerator } from './modules/reading/openai-reading.js';
 import { AiMonthlyQuota } from './modules/reading/ai-monthly-quota.js';
 import { SpeechService } from './modules/speech/speech.service.js';
 import { AzureSpeechProvider } from './modules/speech/azure-speech.provider.js';
@@ -131,9 +131,10 @@ const studyImageProviders = [
       ]
     : []),
 ];
-const studyImageBriefResolver = env.OPENAI_API_KEY
-  ? new OpenAiStudyImageBriefResolver(env.OPENAI_API_KEY, env.OPENAI_TRANSLATION_MODEL!, fetch)
-  : undefined;
+const studyImageBriefResolver =
+  env.OPENAI_API_KEY && env.OPENAI_TRANSLATION_MODEL
+    ? new OpenAiStudyImageBriefResolver(env.OPENAI_API_KEY, env.OPENAI_TRANSLATION_MODEL, fetch)
+    : undefined;
 const practiceService: PracticeService = new PracticeService(
   pool,
   profileService,
@@ -197,14 +198,8 @@ const privateLessonService = new PrivateLessonService({
 });
 const rateLimiter = new PostgresRateLimiter(pool);
 const readingGenerator =
-  env.ANTHROPIC_API_KEY && env.AI_READING_MODEL
-    ? new AnthropicReadingGenerator(
-        env.ANTHROPIC_API_KEY,
-        env.AI_READING_MODEL,
-        env.CLAUDE_STRUCTURED_OUTPUT,
-        fetch,
-        env.ANTHROPIC_WORKSPACE_ID,
-      )
+  env.OPENAI_API_KEY && env.AI_READING_MODEL
+    ? new OpenAiReadingGenerator(env.OPENAI_API_KEY, env.AI_READING_MODEL, fetch)
     : undefined;
 
 const app = createApp({

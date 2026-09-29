@@ -17,12 +17,6 @@ const envSchema = z
       .enum(['true', 'false'])
       .default('true')
       .transform((value) => value === 'true'),
-    ANTHROPIC_API_KEY: z.string().min(1).optional(),
-    ANTHROPIC_WORKSPACE_ID: z
-      .string()
-      .trim()
-      .regex(/^wrkspc_[A-Za-z0-9]+$/u)
-      .optional(),
     OPENAI_API_KEY: z.string().min(1).optional(),
     OPENAI_TRANSLATION_MODEL: z.string().min(1).max(200).optional(),
     OPENAI_IMAGE_MODEL: z.string().min(1).max(200).optional(),
@@ -36,10 +30,6 @@ const envSchema = z
       .default('gpt-4o-mini-transcribe'),
     PIXABAY_API_KEY: z.string().min(1).max(500).optional(),
     AI_READING_MODEL: z.string().min(1).max(200).optional(),
-    CLAUDE_STRUCTURED_OUTPUT: z
-      .enum(['true', 'false'])
-      .default('false')
-      .transform((v) => v === 'true'),
     ENRICHMENT_SIGNING_SECRET: z.string().min(32).optional(),
     ENRICHMENT_PROFILES_JSON: z.string().min(1).max(32000).optional(),
     GOOGLE_TRANSLATION_API: z.enum(['cloud_basic_v2']).optional(),
@@ -77,10 +67,10 @@ const envSchema = z
     LEARNING_POLICY_JSON: z.string().max(8000).optional(),
   })
   .superRefine((v, ctx) => {
-    if (Boolean(v.OPENAI_API_KEY) !== Boolean(v.OPENAI_TRANSLATION_MODEL))
+    if (v.OPENAI_TRANSLATION_MODEL && !v.OPENAI_API_KEY)
       ctx.addIssue({
         code: 'custom',
-        path: [v.OPENAI_API_KEY ? 'OPENAI_TRANSLATION_MODEL' : 'OPENAI_API_KEY'],
+        path: ['OPENAI_API_KEY'],
         message: 'OpenAI translation requires both an API key and a model',
       });
     if (v.OPENAI_IMAGE_MODEL && !v.OPENAI_API_KEY)
@@ -89,7 +79,7 @@ const envSchema = z
         path: ['OPENAI_IMAGE_MODEL'],
         message: 'OpenAI image generation requires an API key',
       });
-    if (v.AI_READING_MODEL && (!v.ANTHROPIC_API_KEY || !v.ENRICHMENT_SIGNING_SECRET))
+    if (v.AI_READING_MODEL && (!v.OPENAI_API_KEY || !v.ENRICHMENT_SIGNING_SECRET))
       ctx.addIssue({
         code: 'custom',
         path: ['AI_READING_MODEL'],

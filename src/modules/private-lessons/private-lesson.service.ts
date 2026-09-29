@@ -1,4 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto';
+import { privateLessonTeachers } from './private-lesson.teachers.js';
 import { z } from 'zod';
 import { AppError } from '../../shared/errors/app-error.js';
 import {
@@ -51,11 +52,6 @@ type QueueItem = {
   sourceLanguageCode: string;
   primaryTranslation: string;
 };
-
-const voiceByGender = {
-  female: 'marin',
-  male: 'cedar',
-} as const;
 
 const speedByRate = {
   very_slow: 0.7,
@@ -197,7 +193,8 @@ export class PrivateLessonService {
       : null;
     const transcriptionLanguage = new Intl.Locale(targetLanguage.code).language;
     const absoluteBeginner = plan.lessonMode === 'absolute_beginner';
-    const voice = input.teacherVoice ? voiceByGender[input.teacherVoice] : this.options.voice;
+    const teacher = privateLessonTeachers[plan.teacherVoice];
+    const voice = teacher.voice;
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), this.requestTimeoutMs);
 
@@ -256,8 +253,8 @@ export class PrivateLessonService {
             type: 'response.create',
             response: {
               instructions: absoluteBeginner
-                ? `Begin the absolute-beginner lesson now. Greet and explain the plan in ${supportLanguage!.promptName}. Introduce the first useful ${targetLanguage.promptName} phrase slowly, give its meaning in ${supportLanguage!.promptName}, and ask the learner to repeat it. Ask only one short question or practice instruction at a time.`
-                : `Begin the lesson now. Speak only in ${targetLanguage.promptName}. The very first spoken word must be in this language. Give a brief greeting, then follow the lesson flow in the session instructions. If this is the first lesson of the current roadmap milestone, teach the named topic, its use and sentence pattern with simple examples before conversation. Start with a recognition or guided-completion check, never a request for an original sentence. Otherwise include the short previous-lesson review when continuity data is present. Ask only one short question. Do not use any other language.`,
+                ? `Begin the absolute-beginner lesson now. Greet, introduce yourself as ${teacher.name}, and explain the plan in ${supportLanguage!.promptName}. Introduce the first useful ${targetLanguage.promptName} phrase slowly, give its meaning in ${supportLanguage!.promptName}, and ask the learner to repeat it. Ask only one short question or practice instruction at a time.`
+                : `Begin the lesson now. Speak only in ${targetLanguage.promptName}. The very first spoken word must be in this language. Give a brief greeting and introduce yourself as ${teacher.name}, then follow the lesson flow in the session instructions. If this is the first lesson of the current roadmap milestone, teach the named topic, its use and sentence pattern with simple examples before conversation. Start with a recognition or guided-completion check, never a request for an original sentence. Otherwise include the short previous-lesson review when continuity data is present. Ask only one short question. Do not use any other language.`,
             },
           },
           wrapUpEvent: {

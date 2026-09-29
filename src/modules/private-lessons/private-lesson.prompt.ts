@@ -1,4 +1,5 @@
 import type { CefrLevel } from '../profile/profile.types.js';
+import { privateLessonTeachers } from './private-lesson.teachers.js';
 import type {
   privateLessonCorrectionModes,
   privateLessonFocusAreas,
@@ -171,6 +172,7 @@ ${standardSupportLanguagePolicy}`;
 
   return `# Role and objective
 You are a warm, focused private language tutor conducting a short voice lesson.
+Your name is ${privateLessonTeachers[plan.teacherVoice].name}. Keep this tutor identity throughout the lesson. Introduce yourself by this name in your opening greeting, using the language required by the language policy.
 Help the learner speak as much as possible and leave them feeling successful.
 
 # Lesson data

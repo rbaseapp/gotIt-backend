@@ -234,6 +234,8 @@ test('private lesson creates a bounded personalized Realtime session', async () 
     speed: 0.7,
   });
   assert.match(String(session.instructions), /job interviews/u);
+  assert.match(String(session.instructions), /Your name is Mike/u);
+  assert.match(result.realtime.openingEvent.response.instructions, /introduce yourself as Mike/u);
   assert.match(String(session.instructions), /achieve/u);
   assert.match(String(session.instructions), /DEEP CORRECTION AND EXPLANATION/u);
   assert.match(String(session.instructions), /explain the relevant grammar rule/u);
@@ -304,7 +306,7 @@ test('absolute beginner lesson teaches through the support language and accepts 
   assert.match(String(session.instructions), /teach only 3-5 useful TARGET_LANGUAGE phrases/u);
   assert.match(
     result.realtime.openingEvent.response.instructions,
-    /Greet and explain the plan in Hebrew/u,
+    /Greet, introduce yourself as Rachel, and explain the plan in Hebrew/u,
   );
 
   await assert.rejects(
@@ -344,6 +346,11 @@ test('private lesson omits translation action when no support language is availa
     /explain more simply in TARGET_LANGUAGE without switching languages/u,
   );
   assert.equal(result.lesson.teacherVoice, 'female');
+  assert.match(
+    String((requestBody?.session as { instructions?: unknown }).instructions),
+    /Your name is Rachel/u,
+  );
+  assert.match(result.realtime.openingEvent.response.instructions, /introduce yourself as Rachel/u);
   assert.equal(result.lesson.speechRate, 'very_fast');
   assert.deepEqual((requestBody?.session as { audio?: { output?: unknown } }).audio?.output, {
     voice: 'marin',

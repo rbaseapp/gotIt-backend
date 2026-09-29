@@ -26,16 +26,10 @@ services:
         value: '0'
       - key: ENRICHMENT_SIGNING_SECRET
         generateValue: true
-      - key: ANTHROPIC_API_KEY
-        sync: false
-      - key: ANTHROPIC_WORKSPACE_ID
-        sync: false
-      - key: AI_READING_MODEL
-        value: claude-sonnet-5
-      - key: CLAUDE_STRUCTURED_OUTPUT
-        value: 'true'
       - key: OPENAI_API_KEY
         sync: false
+      - key: AI_READING_MODEL
+        value: gpt-6-luna
       - key: OPENAI_TRANSLATION_MODEL
         value: gpt-5.4-nano
       - key: OPENAI_IMAGE_MODEL

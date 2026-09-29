@@ -145,11 +145,10 @@ when it creates the short-lived Realtime session.
 OpenAI contextual translation uses the Responses API with strict structured output.
 Set `OPENAI_API_KEY`, `OPENAI_TRANSLATION_MODEL` (the deployment default is
 `gpt-5.4-nano`) and an independent `ENRICHMENT_SIGNING_SECRET` of at least 32
-bytes. Responses are not stored by OpenAI. Anthropic remains dedicated to
-reading/story generation: set `ANTHROPIC_API_KEY`, optional
-`ANTHROPIC_WORKSPACE_ID` and `AI_READING_MODEL`. Reading with `claude-sonnet-5`
-explicitly disables thinking; `CLAUDE_STRUCTURED_OUTPUT` controls structured
-reading output.
+bytes. Reading/story generation uses the same `OPENAI_API_KEY` with
+`AI_READING_MODEL`; the deployment default is `gpt-6-luna`. Both workloads use
+strict structured output, disable reasoning for these focused requests, and set
+`store: false`, so responses are not stored by OpenAI.
 Reading receives target expressions with their confirmed meanings; unopened
 content is not saved. Missing vocabulary is repaired with a bounded regeneration;
 if the model still omits it, exact targets are appended and rebound locally so a
@@ -235,7 +234,7 @@ On 2026-09-16, `https://gotit-backend.onrender.com` returned 200 on health,
 readiness and the then-current 41-route API catalog. A provider-authenticated smoke
 test still requires a valid production session. OpenAI translation requires
 `OPENAI_API_KEY`, `OPENAI_TRANSLATION_MODEL` and `ENRICHMENT_SIGNING_SECRET`
-together, followed by a new deployment. Anthropic remains configured only for
-story generation through `AI_READING_MODEL`. Web/extension origins, Google Speech API
+together, followed by a new deployment. OpenAI reading generation uses the same
+key with `AI_READING_MODEL=gpt-6-luna`. Web/extension origins, Google Speech API
 enablement and live verification, production administrator access, calibrated
 level estimation and retention policy still require deployment-specific verification.

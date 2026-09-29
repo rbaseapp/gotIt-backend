@@ -48,8 +48,6 @@ export function createEnrichment(
   additionalProviders: EnrichmentProvider[] = [],
 ) {
   if (!settings.ENRICHMENT_PROFILES_JSON) {
-    if (settings.OPENAI_API_KEY && !settings.OPENAI_TRANSLATION_MODEL)
-      throw new Error('OPENAI_API_KEY requires OPENAI_TRANSLATION_MODEL');
     if (settings.OPENAI_TRANSLATION_MODEL && !settings.OPENAI_API_KEY)
       throw new Error('OPENAI_TRANSLATION_MODEL requires OPENAI_API_KEY');
   }

@@ -85,13 +85,13 @@ function readingFailure(error: unknown, timedOut = false): AppError {
     return new AppError(
       503,
       'READING_PROVIDER_WORKSPACE',
-      'The configured Anthropic workspace does not match the API key',
+      'The configured AI provider project or workspace does not match the API key',
     );
   if (providerFailure === 'model_access')
     return new AppError(
       503,
       'READING_PROVIDER_MODEL_ACCESS',
-      'The configured Anthropic model is unavailable to this API key',
+      'The configured OpenAI model is unavailable to this API key',
     );
   if (providerFailure === 'rate_limit')
     return new AppError(

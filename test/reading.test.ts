@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { AnthropicReadingGenerator } from '../src/modules/reading/anthropic-reading.js';
+import { OpenAiReadingGenerator } from '../src/modules/reading/openai-reading.js';
 import {
   bindReadingTargets,
   completeMissingTargets,
@@ -26,40 +26,49 @@ const input = {
   ],
 };
 
-test('reading generation requests structured JSON when enabled', async () => {
+test('OpenAI reading generation requests non-stored structured JSON with reasoning disabled', async () => {
   let request: Record<string, unknown> | undefined;
-  const generator = new AnthropicReadingGenerator(
-    'test-key',
-    'claude-sonnet-5',
-    true,
-    async (_url, init) => {
-      request = JSON.parse(String(init?.body));
-      assert.equal(new Headers(init?.headers).get('anthropic-workspace-id'), 'wrkspc_test');
-      return Response.json({
-        model: 'claude-sonnet-5',
-        stop_reason: 'end_turn',
-        content: [
-          {
-            type: 'text',
-            text: JSON.stringify({
-              title: 'A short journey',
-              bodyText: 'I arrived at the train station early enough to buy a ticket.',
-            }),
-          },
-        ],
-      });
-    },
-    'wrkspc_test',
-  );
+  const generator = new OpenAiReadingGenerator('test-key', 'gpt-6-luna', async (url, init) => {
+    assert.equal(url, 'https://api.openai.com/v1/responses');
+    assert.equal(new Headers(init?.headers).get('authorization'), 'Bearer test-key');
+    request = JSON.parse(String(init?.body));
+    return Response.json({
+      model: 'gpt-6-luna',
+      status: 'completed',
+      output: [
+        {
+          type: 'message',
+          content: [
+            {
+              type: 'output_text',
+              text: JSON.stringify({
+                title: 'A short journey',
+                bodyText: 'I arrived at the train station early enough to buy a ticket.',
+              }),
+            },
+          ],
+        },
+      ],
+    });
+  });
 
   const result = await generator.generate(input, new AbortController().signal);
 
-  assert.deepEqual(request?.output_config, {
-    format: { type: 'json_schema', schema: requestSchema },
+  assert.equal(request?.model, 'gpt-6-luna');
+  assert.equal(request?.store, false);
+  assert.equal(request?.max_output_tokens, 6000);
+  assert.deepEqual(request?.reasoning, { effort: 'none' });
+  assert.deepEqual(request?.text, {
+    format: {
+      type: 'json_schema',
+      name: 'reading_content',
+      strict: true,
+      schema: requestSchema,
+    },
   });
-  assert.match(String(request?.system), /requiredTopic is mandatory/u);
-  const messages = request?.messages as Array<{ content: string }>;
-  const userPayload = JSON.parse(messages[0]?.content ?? '{}') as {
+  assert.match(String(request?.instructions), /requiredTopic is mandatory/u);
+  const requestInput = request?.input as Array<{ content: string }>;
+  const userPayload = JSON.parse(requestInput[0]?.content ?? '{}') as {
     untrustedReadingData?: {
       requiredTopic?: string;
       vocabularyTargets?: Array<{ text?: string }>;
@@ -67,20 +76,25 @@ test('reading generation requests structured JSON when enabled', async () => {
   };
   assert.equal(userPayload.untrustedReadingData?.requiredTopic, 'Travel');
   assert.equal(userPayload.untrustedReadingData?.vocabularyTargets?.[0]?.text, 'train station');
-  assert.equal(result.providerModel, 'claude-sonnet-5');
+  assert.equal(result.providerModel, 'gpt-6-luna');
   assert.match(result.bodyText, /train station/u);
 });
 
-test('reading generation accepts fenced JSON and ignores thinking blocks', async () => {
-  const generator = new AnthropicReadingGenerator('test-key', 'claude-sonnet-5', false, async () =>
+test('OpenAI reading generation accepts fenced JSON and ignores reasoning output items', async () => {
+  const generator = new OpenAiReadingGenerator('test-key', 'gpt-6-luna', async () =>
     Response.json({
-      model: 'claude-sonnet-5',
-      stop_reason: 'end_turn',
-      content: [
-        { type: 'thinking', thinking: 'omitted' },
+      model: 'gpt-6-luna',
+      status: 'completed',
+      output: [
+        { type: 'reasoning', summary: [] },
         {
-          type: 'text',
-          text: '```json\n{"title":"A short journey","bodyText":"The train station was quiet in the early morning."}\n```',
+          type: 'message',
+          content: [
+            {
+              type: 'output_text',
+              text: '```json\n{"title":"A short journey","bodyText":"The train station was quiet in the early morning."}\n```',
+            },
+          ],
         },
       ],
     }),
@@ -92,37 +106,25 @@ test('reading generation accepts fenced JSON and ignores thinking blocks', async
   assert.match(result.bodyText, /train station/u);
 });
 
-test('reading generation retries without a stale optional workspace', async () => {
-  const workspaceHeaders: Array<string | null> = [];
-  const generator = new AnthropicReadingGenerator(
-    'test-key',
-    'claude-sonnet-5',
-    false,
-    async (_url, init) => {
-      workspaceHeaders.push(new Headers(init?.headers).get('anthropic-workspace-id'));
-      if (workspaceHeaders.length === 1)
-        return Response.json(
-          { error: { type: 'not_found_error', message: 'Workspace not found.' } },
-          { status: 404 },
-        );
-      return Response.json({
-        model: 'claude-sonnet-5',
-        stop_reason: 'end_turn',
-        content: [
-          {
-            type: 'text',
-            text: '{"title":"A journey","bodyText":"The train station was busy."}',
-          },
-        ],
-      });
-    },
-    'wrkspc_stale',
+test('OpenAI reading generation rejects refusals and incomplete responses', async () => {
+  const refusal = new OpenAiReadingGenerator('test-key', 'gpt-6-luna', async () =>
+    Response.json({
+      model: 'gpt-6-luna',
+      status: 'completed',
+      output: [{ type: 'message', content: [{ type: 'refusal', refusal: 'Cannot comply' }] }],
+    }),
   );
-
-  const result = await generator.generate(input, new AbortController().signal);
-
-  assert.deepEqual(workspaceHeaders, ['wrkspc_stale', null]);
-  assert.equal(result.title, 'A journey');
+  await assert.rejects(
+    () => refusal.generate(input, new AbortController().signal),
+    /refused reading output/u,
+  );
+  const incomplete = new OpenAiReadingGenerator('test-key', 'gpt-6-luna', async () =>
+    Response.json({ model: 'gpt-6-luna', status: 'incomplete', output: [] }),
+  );
+  await assert.rejects(
+    () => incomplete.generate(input, new AbortController().signal),
+    /stopped before completing reading output/u,
+  );
 });
 
 test('reading target matching tolerates harmless case, Unicode and whitespace variation', () => {
@@ -149,25 +151,25 @@ test('missing reading targets are completed deterministically and rebound', () =
 
 test('repair generation sends the prior draft and exact missing targets as untrusted data', async () => {
   let supplied: Record<string, any> | undefined;
-  const generator = new AnthropicReadingGenerator(
-    'test-key',
-    'claude-sonnet-5',
-    false,
-    async (_url, init) => {
-      const request = JSON.parse(String(init?.body));
-      supplied = JSON.parse(request.messages[0].content).untrustedReadingData;
-      return Response.json({
-        model: 'claude-sonnet-5',
-        stop_reason: 'end_turn',
-        content: [
-          {
-            type: 'text',
-            text: '{"title":"A journey","bodyText":"The train station was busy."}',
-          },
-        ],
-      });
-    },
-  );
+  const generator = new OpenAiReadingGenerator('test-key', 'gpt-6-luna', async (_url, init) => {
+    const request = JSON.parse(String(init?.body));
+    supplied = JSON.parse(request.input[0].content).untrustedReadingData;
+    return Response.json({
+      model: 'gpt-6-luna',
+      status: 'completed',
+      output: [
+        {
+          type: 'message',
+          content: [
+            {
+              type: 'output_text',
+              text: '{"title":"A journey","bodyText":"The train station was busy."}',
+            },
+          ],
+        },
+      ],
+    });
+  });
   await generator.generate(
     {
       ...input,

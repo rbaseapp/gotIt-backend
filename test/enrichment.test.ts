@@ -150,10 +150,9 @@ test('default OpenAI configuration serves only explicit AI while Google owns aut
     timeoutMs: 10000,
     maxAttempts: 2,
   });
-  assert.throws(
-    () => createEnrichment({ OPENAI_API_KEY: 'test-key' }),
-    /OPENAI_TRANSLATION_MODEL/u,
-  );
+  const openAiKeyForOtherFeatures = createEnrichment({ OPENAI_API_KEY: 'test-key' })
+    .registry as unknown as { routes: Record<string, unknown> };
+  assert.equal(openAiKeyForOtherFeatures.routes.ai, undefined);
   const noTranslationProvider = createEnrichment({}).registry as unknown as {
     routes: Record<string, unknown>;
   };
