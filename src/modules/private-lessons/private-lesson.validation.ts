@@ -33,10 +33,13 @@ export const privateLessonSpeechRates = [
   'very_fast',
 ] as const;
 
+export const privateLessonModes = ['standard', 'absolute_beginner'] as const;
+
 export const privateLessonInputSchema = z
   .object({
     targetLanguageCode: languageSchema,
     supportLanguageCode: languageSchema.nullable().optional(),
+    lessonMode: z.enum(privateLessonModes).optional(),
     requestedLevel: z.enum(CEFR_LEVELS).optional(),
     requestedDurationMinutes: z
       .union([z.literal(1), z.literal(5), z.literal(10), z.literal(15)])
@@ -74,12 +77,8 @@ export const privateLessonPreferencesInputSchema = z
   .object({
     targetLanguageCode: languageSchema,
     supportLanguageCode: languageSchema.nullable(),
-    requestedDurationMinutes: z.union([
-      z.literal(1),
-      z.literal(5),
-      z.literal(10),
-      z.literal(15),
-    ]),
+    lessonMode: z.enum(privateLessonModes).default('standard'),
+    requestedDurationMinutes: z.union([z.literal(1), z.literal(5), z.literal(10), z.literal(15)]),
     teacherVoice: z.enum(['female', 'male']),
     speechRate: z.enum(privateLessonSpeechRates),
     focusAreas: z
@@ -93,6 +92,12 @@ export const privateLessonPreferencesInputSchema = z
   })
   .strict()
   .superRefine((value, context) => {
+    if (value.lessonMode === 'absolute_beginner' && !value.supportLanguageCode)
+      context.addIssue({
+        code: 'custom',
+        path: ['supportLanguageCode'],
+        message: 'Absolute beginner lessons require a support language',
+      });
     if (
       value.supportLanguageCode &&
       sameBaseLanguage(value.targetLanguageCode, value.supportLanguageCode)
@@ -104,9 +109,7 @@ export const privateLessonPreferencesInputSchema = z
       });
   });
 
-export type PrivateLessonPreferencesInput = z.output<
-  typeof privateLessonPreferencesInputSchema
->;
+export type PrivateLessonPreferencesInput = z.output<typeof privateLessonPreferencesInputSchema>;
 
 export const privateLessonSetupSchema = z.object({ targetLanguageCode: languageSchema }).strict();
 export const privateLessonRoadmapInputSchema = z

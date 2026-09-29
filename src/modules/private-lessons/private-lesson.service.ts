@@ -132,12 +132,31 @@ export class PrivateLessonService {
         Promise.resolve(null),
       this.options.roadmaps?.getActive(scope, input.targetLanguageCode) ?? Promise.resolve(null),
     ]);
+    const requestedLessonMode = input.lessonMode ?? preferences?.lessonMode ?? 'standard';
+    const configuredSupportLanguage =
+      input.supportLanguageCode === undefined && preferences
+        ? preferences.supportLanguageCode
+        : input.supportLanguageCode === undefined
+          ? profile.defaultTranslationLanguage
+          : input.supportLanguageCode;
+    if (
+      requestedLessonMode === 'absolute_beginner' &&
+      (!configuredSupportLanguage ||
+        new Intl.Locale(configuredSupportLanguage).language ===
+          new Intl.Locale(input.targetLanguageCode).language)
+    )
+      throw new AppError(
+        400,
+        'PRIVATE_LESSON_SUPPORT_LANGUAGE_REQUIRED',
+        'Absolute beginner lessons require a support language that differs from the target language',
+      );
     const targetBaseLanguage = new Intl.Locale(input.targetLanguageCode).language;
     const previousLesson =
       previousLessons.find(
         (lesson) =>
           lesson.status === 'completed' &&
           lesson.report &&
+          lesson.lessonMode === requestedLessonMode &&
           new Intl.Locale(lesson.targetLanguageCode).language === targetBaseLanguage,
       ) ?? null;
     const activeRoadmap =
@@ -148,7 +167,9 @@ export class PrivateLessonService {
             input.targetLanguageCode,
             'recommended',
             'recommended-foundation',
-            profileLevel(profile, input.targetLanguageCode),
+            requestedLessonMode === 'absolute_beginner'
+              ? 'A1'
+              : profileLevel(profile, input.targetLanguageCode),
           )
         : null);
     const vocabularyMode =
@@ -175,6 +196,7 @@ export class PrivateLessonService {
       ? describeLessonLanguage(plan.supportLanguageCode)
       : null;
     const transcriptionLanguage = new Intl.Locale(targetLanguage.code).language;
+    const absoluteBeginner = plan.lessonMode === 'absolute_beginner';
     const voice = input.teacherVoice ? voiceByGender[input.teacherVoice] : this.options.voice;
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), this.requestTimeoutMs);
@@ -198,8 +220,10 @@ export class PrivateLessonService {
                 noise_reduction: { type: 'far_field' },
                 transcription: {
                   model: this.options.transcriptionModel,
-                  language: transcriptionLanguage,
-                  prompt: `The learner is speaking only ${targetLanguage.englishName}. Transcribe the audio as ${targetLanguage.englishName}; do not interpret it as another language.`,
+                  ...(absoluteBeginner ? {} : { language: transcriptionLanguage }),
+                  prompt: absoluteBeginner
+                    ? `The learner may speak ${targetLanguage.englishName} or ${supportLanguage!.englishName}. Transcribe each utterance in the language actually spoken without translating it.`
+                    : `The learner is speaking only ${targetLanguage.englishName}. Transcribe the audio as ${targetLanguage.englishName}; do not interpret it as another language.`,
                 },
                 turn_detection: {
                   type: 'semantic_vad',
@@ -231,20 +255,26 @@ export class PrivateLessonService {
           openingEvent: {
             type: 'response.create',
             response: {
-              instructions: `Begin the lesson now. Speak only in ${targetLanguage.promptName}. The very first spoken word must be in this language. Give a brief greeting, then follow the lesson flow in the session instructions. If this is the first lesson of the current roadmap milestone, teach the named topic, its use and sentence pattern with simple examples before conversation. Start with a recognition or guided-completion check, never a request for an original sentence. Otherwise include the short previous-lesson review when continuity data is present. Ask only one short question. Do not use any other language.`,
+              instructions: absoluteBeginner
+                ? `Begin the absolute-beginner lesson now. Greet and explain the plan in ${supportLanguage!.promptName}. Introduce the first useful ${targetLanguage.promptName} phrase slowly, give its meaning in ${supportLanguage!.promptName}, and ask the learner to repeat it. Ask only one short question or practice instruction at a time.`
+                : `Begin the lesson now. Speak only in ${targetLanguage.promptName}. The very first spoken word must be in this language. Give a brief greeting, then follow the lesson flow in the session instructions. If this is the first lesson of the current roadmap milestone, teach the named topic, its use and sentence pattern with simple examples before conversation. Start with a recognition or guided-completion check, never a request for an original sentence. Otherwise include the short previous-lesson review when continuity data is present. Ask only one short question. Do not use any other language.`,
             },
           },
           wrapUpEvent: {
             type: 'response.create',
             response: {
-              instructions: `The lesson is ending now. Speak only in ${targetLanguage.promptName}. Do not ask another question. In three short parts, give one specific success, one correction with the correct form, and the target words worth reviewing. Then say a warm, encouraging goodbye in the same language. Do not use any other language. Keep the entire closing under 20 seconds.`,
+              instructions: absoluteBeginner
+                ? `The lesson is ending now. In ${supportLanguage!.promptName}, briefly praise one success and recap the 3-5 ${targetLanguage.promptName} phrases learned today, saying each phrase slowly with its meaning. Do not introduce new material or ask another question. End warmly in ${supportLanguage!.promptName}. Keep the closing under 25 seconds.`
+                : `The lesson is ending now. Speak only in ${targetLanguage.promptName}. Do not ask another question. In three short parts, give one specific success, one correction with the correct form, and the target words worth reviewing. Then say a warm, encouraging goodbye in the same language. Do not use any other language. Keep the entire closing under 20 seconds.`,
             },
           },
           translationEvent: supportLanguage
             ? {
                 type: 'response.create',
                 response: {
-                  instructions: `For this response only, translate the tutor's entire most recent speaking turn into ${supportLanguage.promptName}. Translate every sentence from that turn, from beginning to end; do not translate only its final sentence. Give only the complete translation and at most one brief clarification. Do not advance the lesson or ask a new question. After this response, resume speaking only in ${targetLanguage.promptName}.`,
+                  instructions: absoluteBeginner
+                    ? `In ${supportLanguage.promptName}, explain the meaning of every ${targetLanguage.promptName} phrase from the tutor's most recent turn. Do not introduce new material or ask a new question. Then continue the absolute-beginner lesson using the configured bilingual method.`
+                    : `For this response only, translate the tutor's entire most recent speaking turn into ${supportLanguage.promptName}. Translate every sentence from that turn, from beginning to end; do not translate only its final sentence. Give only the complete translation and at most one brief clarification. Do not advance the lesson or ask a new question. After this response, resume speaking only in ${targetLanguage.promptName}.`,
                 },
               }
             : null,
@@ -378,11 +408,14 @@ export class PrivateLessonService {
         new Intl.Locale(language.languageCode).language ===
         new Intl.Locale(input.targetLanguageCode).language,
     );
+    const lessonMode = input.lessonMode ?? preferences?.lessonMode ?? 'standard';
     const level =
-      input.requestedLevel ??
-      languageProfile?.effectiveLevel ??
-      languageProfile?.selfAssessedLevel ??
-      ('A2' satisfies CefrLevel);
+      lessonMode === 'absolute_beginner'
+        ? 'A1'
+        : (input.requestedLevel ??
+          languageProfile?.effectiveLevel ??
+          languageProfile?.selfAssessedLevel ??
+          ('A2' satisfies CefrLevel));
     const profileSupportLanguage = profile.defaultTranslationLanguage;
     const supportLanguageCode =
       input.supportLanguageCode === undefined && preferences
@@ -394,6 +427,12 @@ export class PrivateLessonService {
             ? profileSupportLanguage
             : null
           : input.supportLanguageCode;
+    if (lessonMode === 'absolute_beginner' && !supportLanguageCode)
+      throw new AppError(
+        400,
+        'PRIVATE_LESSON_SUPPORT_LANGUAGE_REQUIRED',
+        'Absolute beginner lessons require a support language',
+      );
     const targets = queue
       .filter(
         (item) =>
@@ -407,7 +446,9 @@ export class PrivateLessonService {
         translationText: item.primaryTranslation,
       }));
     const currentMilestone =
-      activeRoadmap?.milestones.find((item) => item.status === 'current') ?? null;
+      lessonMode === 'absolute_beginner'
+        ? null
+        : (activeRoadmap?.milestones.find((item) => item.status === 'current') ?? null);
     const focusAreas = [
       ...new Set([
         ...(input.focusAreas ??
@@ -443,6 +484,7 @@ export class PrivateLessonService {
           : this.durationSeconds,
       targetLanguageCode: input.targetLanguageCode,
       supportLanguageCode,
+      lessonMode,
       level,
       topic:
         input.topic ??
@@ -492,6 +534,7 @@ function publicStoredLesson(lesson: StoredPrivateLesson) {
     id: lesson.id,
     targetLanguageCode: lesson.targetLanguageCode,
     supportLanguageCode: lesson.supportLanguageCode,
+    lessonMode: lesson.lessonMode,
     level: lesson.level,
     topic: lesson.topic,
     grammarFocus: lesson.grammarFocus,
@@ -521,6 +564,7 @@ function publicPlan(plan: PrivateLessonPlan) {
     wrapUpAfterSeconds: Math.max(0, plan.durationSeconds - wrapUpLeadSeconds),
     targetLanguageCode: plan.targetLanguageCode,
     supportLanguageCode: plan.supportLanguageCode,
+    lessonMode: plan.lessonMode,
     level: plan.level,
     topic: plan.topic,
     grammarFocus: plan.grammarFocus,

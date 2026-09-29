@@ -16,6 +16,7 @@ import type {
 export type PrivateLessonPreferences = Pick<
   PrivateLessonPlan,
   | 'supportLanguageCode'
+  | 'lessonMode'
   | 'teacherVoice'
   | 'speechRate'
   | 'focusAreas'
@@ -61,10 +62,7 @@ export interface PrivateLessonRoadmapStore {
     input: PrivateLessonInput,
     plan: PrivateLessonPlan,
   ): Promise<void>;
-  savePreferenceValues(
-    scope: ProfileScope,
-    input: PrivateLessonPreferencesInput,
-  ): Promise<void>;
+  savePreferenceValues(scope: ProfileScope, input: PrivateLessonPreferencesInput): Promise<void>;
   getActive(scope: ProfileScope, targetLanguageCode: string): Promise<PrivateLessonRoadmap | null>;
   create(
     scope: ProfileScope,
@@ -94,6 +92,7 @@ export class PostgresPrivateLessonRoadmapStore implements PrivateLessonRoadmapSt
     return {
       supportLanguageCode:
         typeof row.support_language_code === 'string' ? row.support_language_code : null,
+      lessonMode: row.lesson_mode === 'absolute_beginner' ? 'absolute_beginner' : 'standard',
       requestedDurationMinutes: Number(row.requested_duration_minutes) as 1 | 5 | 10 | 15,
       teacherVoice: row.teacher_voice,
       speechRate: row.speech_rate,
@@ -108,6 +107,7 @@ export class PostgresPrivateLessonRoadmapStore implements PrivateLessonRoadmapSt
     await this.savePreferenceValues(scope, {
       targetLanguageCode: input.targetLanguageCode,
       supportLanguageCode: plan.supportLanguageCode,
+      lessonMode: plan.lessonMode,
       requestedDurationMinutes: Math.round(plan.durationSeconds / 60) as 1 | 5 | 10 | 15,
       teacherVoice: plan.teacherVoice,
       speechRate: plan.speechRate,
@@ -120,14 +120,15 @@ export class PostgresPrivateLessonRoadmapStore implements PrivateLessonRoadmapSt
 
   async savePreferenceValues(scope: ProfileScope, input: PrivateLessonPreferencesInput) {
     await this.pool.query(
-      `INSERT INTO product_gotit.private_lesson_preferences(application_id,application_user_id,target_language_code,support_language_code,requested_duration_minutes,teacher_voice,speech_rate,correction_mode,vocabulary_mode,focus_areas,custom_focus)
-       VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11)
-       ON CONFLICT(application_id,application_user_id,target_language_code) DO UPDATE SET support_language_code=EXCLUDED.support_language_code,requested_duration_minutes=EXCLUDED.requested_duration_minutes,teacher_voice=EXCLUDED.teacher_voice,speech_rate=EXCLUDED.speech_rate,correction_mode=EXCLUDED.correction_mode,vocabulary_mode=EXCLUDED.vocabulary_mode,focus_areas=EXCLUDED.focus_areas,custom_focus=EXCLUDED.custom_focus,updated_at=now()`,
+      `INSERT INTO product_gotit.private_lesson_preferences(application_id,application_user_id,target_language_code,support_language_code,lesson_mode,requested_duration_minutes,teacher_voice,speech_rate,correction_mode,vocabulary_mode,focus_areas,custom_focus)
+       VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::jsonb,$12)
+       ON CONFLICT(application_id,application_user_id,target_language_code) DO UPDATE SET support_language_code=EXCLUDED.support_language_code,lesson_mode=EXCLUDED.lesson_mode,requested_duration_minutes=EXCLUDED.requested_duration_minutes,teacher_voice=EXCLUDED.teacher_voice,speech_rate=EXCLUDED.speech_rate,correction_mode=EXCLUDED.correction_mode,vocabulary_mode=EXCLUDED.vocabulary_mode,focus_areas=EXCLUDED.focus_areas,custom_focus=EXCLUDED.custom_focus,updated_at=now()`,
       [
         scope.applicationId,
         scope.applicationUserId,
         base(input.targetLanguageCode),
         input.supportLanguageCode,
+        input.lessonMode,
         input.requestedDurationMinutes,
         input.teacherVoice,
         input.speechRate,

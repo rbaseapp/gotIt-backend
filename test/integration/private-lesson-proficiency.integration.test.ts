@@ -88,6 +88,7 @@ function plan(): PrivateLessonPlan {
     durationSeconds: 300,
     targetLanguageCode: 'en',
     supportLanguageCode: 'he',
+    lessonMode: 'standard',
     level: 'B1',
     topic: 'open conversation',
     grammarFocus: null,

@@ -117,6 +117,7 @@ const reportPlan: PrivateLessonPlan = {
   durationSeconds: 300,
   targetLanguageCode: 'en',
   supportLanguageCode: 'he',
+  lessonMode: 'standard',
   level: 'B1',
   topic: 'interviews',
   grammarFocus: null,
@@ -184,6 +185,7 @@ test('private lesson creates a bounded personalized Realtime session', async () 
   const result = await service.createSession(identity, {
     targetLanguageCode: 'en-US',
     supportLanguageCode: 'he',
+    lessonMode: 'standard',
     requestedDurationMinutes: 10,
     teacherVoice: 'male',
     speechRate: 'very_slow',
@@ -273,6 +275,46 @@ test('private lesson pins every spoken response to the selected target language'
   assert.match(translationInstructions, /entire most recent speaking turn/u);
   assert.match(translationInstructions, /every sentence/u);
   assert.match(translationInstructions, /resume speaking only in Arabic/u);
+});
+
+test('absolute beginner lesson teaches through the support language and accepts bilingual speech', async () => {
+  let requestBody: Record<string, unknown> | undefined;
+  const service = makeService(async (_url, init) => {
+    requestBody = JSON.parse(String(init?.body)) as Record<string, unknown>;
+    return Response.json({ value: 'ek_demo' });
+  });
+
+  const result = await service.createSession(identity, {
+    targetLanguageCode: 'es',
+    supportLanguageCode: 'he',
+    lessonMode: 'absolute_beginner',
+    requestedLevel: 'B2',
+  });
+
+  const session = requestBody?.session as {
+    instructions?: unknown;
+    audio?: { input?: { transcription?: { language?: string; prompt?: string } } };
+  };
+  assert.equal(result.lesson.lessonMode, 'absolute_beginner');
+  assert.equal(result.lesson.level, 'A1');
+  assert.equal(session.audio?.input?.transcription?.language, undefined);
+  assert.match(session.audio?.input?.transcription?.prompt ?? '', /Spanish or Hebrew/u);
+  assert.match(String(session.instructions), /ABSOLUTE BEGINNER/u);
+  assert.match(String(session.instructions), /Speak primarily in TEACHING_LANGUAGE/u);
+  assert.match(String(session.instructions), /teach only 3-5 useful TARGET_LANGUAGE phrases/u);
+  assert.match(
+    result.realtime.openingEvent.response.instructions,
+    /Greet and explain the plan in Hebrew/u,
+  );
+
+  await assert.rejects(
+    service.createSession(identity, {
+      targetLanguageCode: 'es',
+      supportLanguageCode: null,
+      lessonMode: 'absolute_beginner',
+    }),
+    { code: 'PRIVATE_LESSON_SUPPORT_LANGUAGE_REQUIRED' },
+  );
 });
 
 test('private lesson omits translation action when no support language is available', async () => {
@@ -770,7 +812,8 @@ test('private lesson normalizes legacy ten-point scores and removes unsupported 
               },
             ],
           },
-        ])),
+        ]),
+      ),
     },
     roadmapProgress: null,
     strengths: [],
@@ -970,6 +1013,7 @@ test('private lesson correction modes produce distinct tutoring behavior', () =>
     durationSeconds: 300,
     targetLanguageCode: 'en',
     supportLanguageCode: 'he',
+    lessonMode: 'standard',
     level: 'B1',
     topic: 'travel',
     grammarFocus: null,
