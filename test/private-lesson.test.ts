@@ -54,7 +54,10 @@ import type { MinuteWallet } from '../src/modules/private-lessons/minute-wallet.
 
 test('lesson history accepts a scoped course filter and rejects invalid IDs', () => {
   const courseId = '10000000-0000-4000-8000-000000000001';
-  assert.deepEqual(privateLessonListSchema.parse({ limit: '50', courseId }), { limit: 50, courseId });
+  assert.deepEqual(privateLessonListSchema.parse({ limit: '50', courseId }), {
+    limit: 50,
+    courseId,
+  });
   assert.equal(privateLessonListSchema.safeParse({ courseId: 'invalid' }).success, false);
 });
 
@@ -261,7 +264,10 @@ test('child course uses Rachel and short spoken checks while adult course keeps 
         result.realtime.openingEvent.response.instructions,
         /short spoken understanding question/u,
       );
-      assert.match(result.realtime.continuationEvent.response.instructions, /specific feedback/u);
+      assert.match(
+        result.realtime.continuationEvent.response.instructions,
+        /After the second unsuccessful attempt at the same task, reassure the child, give the answer briefly, and move to a different activity/u,
+      );
       assert.match(result.realtime.wrapUpEvent.response.instructions, /one specific success/u);
       assert.match(result.realtime.wrapUpEvent.response.instructions, /time is up/u);
       assert.match(result.realtime.wrapUpEvent.response.instructions, /continue next time/u);
@@ -347,31 +353,65 @@ test('private lesson reserves its selected minute duration and releases it only 
   const reservations: Array<{ id: string; seconds: number; token: string }> = [];
   const releases: string[] = [];
   const minuteWallet: MinuteWallet = {
-    async balance() { return { secondsTotal: 3600, secondsUsed: 0, secondsRemaining: 3600, expiresAt: null }; },
-    async reserve(_scope, id, seconds, token) { reservations.push({ id, seconds, token }); },
-    async release(id) { releases.push(id); },
+    async balance() {
+      return { secondsTotal: 3600, secondsUsed: 0, secondsRemaining: 3600, expiresAt: null };
+    },
+    async reserve(_scope, id, seconds, token) {
+      reservations.push({ id, seconds, token });
+    },
+    async release(id) {
+      releases.push(id);
+    },
   };
   const options = {
-    apiKey: 'server-secret', model: 'gpt-realtime-test', voice: 'marin',
-    transcriptionModel: 'gpt-transcribe-test', profiles, vocabulary, minuteWallet,
+    apiKey: 'server-secret',
+    model: 'gpt-realtime-test',
+    voice: 'marin',
+    transcriptionModel: 'gpt-transcribe-test',
+    profiles,
+    vocabulary,
+    minuteWallet,
   };
-  const successful = new PrivateLessonService({ ...options,
+  const successful = new PrivateLessonService({
+    ...options,
     fetchImpl: async () => new Response(JSON.stringify({ value: 'ek_demo' }), { status: 200 }),
   });
-  const opened = await successful.createSession(identity, {
-    targetLanguageCode: 'en', requestedDurationMinutes: 20,
-  }, 'trusted-token');
+  const opened = await successful.createSession(
+    identity,
+    {
+      targetLanguageCode: 'en',
+      requestedDurationMinutes: 20,
+    },
+    'trusted-token',
+  );
   assert.equal(opened.lesson.durationSeconds, 1200);
-  assert.deepEqual(reservations.map(({ seconds, token }) => [seconds, token]), [[1200, 'trusted-token']]);
+  assert.deepEqual(
+    reservations.map(({ seconds, token }) => [seconds, token]),
+    [[1200, 'trusted-token']],
+  );
   assert.deepEqual(releases, []);
 
-  const failing = new PrivateLessonService({ ...options,
-    fetchImpl: async () => { throw new Error('provider unavailable'); },
+  const failing = new PrivateLessonService({
+    ...options,
+    fetchImpl: async () => {
+      throw new Error('provider unavailable');
+    },
   });
-  await assert.rejects(failing.createSession(identity, {
-    targetLanguageCode: 'en', requestedDurationMinutes: 5,
-  }, 'trusted-token'), (error: any) => error.code === 'PRIVATE_LESSON_PROVIDER_UPSTREAM');
-  assert.deepEqual(reservations.map(({ seconds }) => seconds), [1200, 300]);
+  await assert.rejects(
+    failing.createSession(
+      identity,
+      {
+        targetLanguageCode: 'en',
+        requestedDurationMinutes: 5,
+      },
+      'trusted-token',
+    ),
+    (error: any) => error.code === 'PRIVATE_LESSON_PROVIDER_UPSTREAM',
+  );
+  assert.deepEqual(
+    reservations.map(({ seconds }) => seconds),
+    [1200, 300],
+  );
   assert.deepEqual(releases, [reservations[1]!.id]);
 });
 
@@ -428,17 +468,14 @@ test('private lesson creates a bounded personalized Realtime session', async () 
     (session.audio as { input: { noise_reduction: unknown } }).input.noise_reduction,
     { type: 'far_field' },
   );
-  assert.deepEqual(
-    (session.audio as { input: { turn_detection: unknown } }).input.turn_detection,
-    {
-      type: 'server_vad',
-      threshold: 0.7,
-      prefix_padding_ms: 400,
-      silence_duration_ms: 700,
-      create_response: true,
-      interrupt_response: true,
-    },
-  );
+  assert.deepEqual((session.audio as { input: { turn_detection: unknown } }).input.turn_detection, {
+    type: 'server_vad',
+    threshold: 0.7,
+    prefix_padding_ms: 400,
+    silence_duration_ms: 700,
+    create_response: true,
+    interrupt_response: true,
+  });
   assert.deepEqual((session.audio as { input: { transcription: unknown } }).input.transcription, {
     model: 'gpt-transcribe-test',
     language: 'en',
@@ -459,7 +496,7 @@ test('private lesson creates a bounded personalized Realtime session', async () 
   assert.doesNotMatch(JSON.stringify(result), /server-secret/u);
 });
 
-test('a correct independent answer advances the lesson, while a copied answer needs a new check', async () => {
+test('an independent answer advances while copied answers get at most one more check', async () => {
   let requestBody: Record<string, unknown> | undefined;
   const service = makeService(async (_url, init) => {
     requestBody = JSON.parse(String(init?.body)) as Record<string, unknown>;
@@ -487,15 +524,20 @@ test('a correct independent answer advances the lesson, while a copied answer ne
   assert.match(opening, /without saying the answer/u);
   assert.match(
     continuation,
-    /Advance only after evidence of understanding; a copied answer is not enough/u,
+    /After a second unsuccessful attempt at the same task, briefly explain the answer, reassure the learner that it is okay, and move to a different task or the next planned activity/u,
   );
+  assert.match(
+    continuation,
+    /Count rephrased checks of the same task toward the two-attempt limit/u,
+  );
+  assert.match(continuation, /Do not claim mastery from a copied answer/u);
   assert.doesNotMatch(
     opening.split('# Current turn directive\n')[1]!,
     /recognition or guided-completion check/u,
   );
 });
 
-test('a wrong answer receives a reasoned correction and a fresh check before advancing', async () => {
+test('a wrong answer gets one reasoned retry, then the teacher moves on without awarding mastery', async () => {
   const prompt = buildPrivateLessonPrompt({
     ...reportPlan,
     grammarFocus: 'am, is, and are by subject',
@@ -504,14 +546,31 @@ test('a wrong answer receives a reasoned correction and a fresh check before adv
 
   assert.match(
     prompt,
-    /If an answer is wrong, identify the specific misconception, explain the correction and why it fits, then ask a different question that tests the same point without giving its answer/u,
+    /If an answer is wrong, identify the specific misconception, explain the correction and why it fits, then ask a different question that tests the same point without giving its answer only when one attempt remains/u,
   );
   assert.match(
     prompt,
-    /Regardless of the conversational correction mode, explain and recheck an error in the concept being taught before advancing/u,
+    /Regardless of the conversational correction mode, explain and recheck an error in the concept being taught when one attempt remains/u,
   );
   assert.match(prompt, /Keep unrelated corrections at the selected mode's depth/u);
-  assert.match(prompt, /Do not claim understanding or advance until the learner demonstrates it/u);
+  assert.match(
+    prompt,
+    /Limit each task to two learner attempts total: the initial answer and at most one retry/u,
+  );
+  assert.match(
+    prompt,
+    /Count a reworded or simplified check of the same skill or requested answer as the same task/u,
+  );
+  assert.match(prompt, /move to a different task or the next planned activity/u);
+  assert.match(prompt, /Record the point as needing later practice, not as mastered/u);
+  assert.match(
+    prompt,
+    /Silence, an inaudible response, or a request for explanation is not a learner attempt/u,
+  );
+  assert.doesNotMatch(
+    prompt,
+    /Do not claim understanding or advance until the learner demonstrates it/u,
+  );
 });
 
 test('confusion prompts a simpler explanation and open check without disclosing the answer', async () => {
@@ -535,7 +594,7 @@ test('confusion prompts a simpler explanation and open check without disclosing 
   );
   assert.match(
     instructions,
-    /If the learner is wrong or confused, explain the missing meaning or use with a different simple example and ask a new open check/u,
+    /If the learner is wrong or confused on the first attempt, explain the missing meaning or use with a different simple example and ask one new open check/u,
   );
   assert.match(
     opening,
@@ -543,7 +602,7 @@ test('confusion prompts a simpler explanation and open check without disclosing 
   );
   assert.match(
     continuation,
-    /If the last task is unanswered or the learner is confused, re-explain with a different example and ask a smaller open question without its answer/u,
+    /If the last task is unanswered or the learner is confused, offer a different example and a smaller open question without its answer/u,
   );
 });
 

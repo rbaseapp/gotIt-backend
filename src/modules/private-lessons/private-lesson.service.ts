@@ -243,7 +243,10 @@ export class PrivateLessonService {
       if (!accessToken) throw new AppError(401, 'UNAUTHORIZED', 'Access token is required');
       await this.options.minuteWallet.reserve(scope, plan.id, plan.durationSeconds, accessToken);
       reservedLessonId = plan.id;
-    } else if (this.options.lessonAccess && (scope as ProfileScope & { role?: string }).role !== 'admin') {
+    } else if (
+      this.options.lessonAccess &&
+      (scope as ProfileScope & { role?: string }).role !== 'admin'
+    ) {
       const allowance = await this.options.lessonAccess.reserveLesson(scope, plan.id);
       reservedLessonId = plan.id;
       plan = { ...plan, durationSeconds: allowance.lessonDurationSeconds! };
@@ -356,8 +359,8 @@ export class PrivateLessonService {
           ),
           continuationEvent: responseEvent(
             childCourse
-              ? `Continue the child's current lesson under the configured language policy. Keep the approved objective. If the child has not answered, re-explain with one different concrete example and ask a smaller spoken question; never claim the child answered. If the answer was wrong, kindly explain the specific point and ask a fresh check. Give specific feedback and advance only after evidence of understanding, then pause for the next answer.`
-              : `Continue the current lesson after a pause or the learner's request to continue. ${supportTeaching ? `Use ${supportLanguage!.promptName} for explanation and understanding checks and ${targetLanguage.promptName} for practice; keep target-language examples and answer options untranslated.` : `Speak only in ${targetLanguage.promptName}.`} Keep the current objective and conversation history. Do not restart or assume an unheard answer was correct. If the last task is unanswered or the learner is confused, re-explain with a different example and ask a smaller open question without its answer. If the learner answered incorrectly, explain the specific error and ask a fresh check of the same point. Advance only after evidence of understanding; a copied answer is not enough. End with one concrete prompt. Do not repeat a mastered sentence or ask the learner to choose what happens next.`,
+              ? `Continue the child's current lesson under the configured language policy. Keep the approved objective. If the child has not answered, offer one different concrete example and a smaller spoken question; never claim the child answered or count silence as an attempt. After the first wrong answer, kindly explain the specific point and ask one fresh check. After the second unsuccessful attempt at the same task, reassure the child, give the answer briefly, and move to a different activity without another check of that task or claiming mastery. End with one small next step.`
+              : `Continue the current lesson after a pause or the learner's request to continue. ${supportTeaching ? `Use ${supportLanguage!.promptName} for explanation and understanding checks and ${targetLanguage.promptName} for practice; keep target-language examples and answer options untranslated.` : `Speak only in ${targetLanguage.promptName}.`} Keep the current objective and conversation history. Do not restart or assume an unheard answer was correct. If the last task is unanswered or the learner is confused, offer a different example and a smaller open question without its answer; silence does not count as an attempt. After the first incorrect answer, explain the specific error and ask one fresh check of the same point. After a second unsuccessful attempt at the same task, briefly explain the answer, reassure the learner that it is okay, and move to a different task or the next planned activity. Count rephrased checks of the same task toward the two-attempt limit. Do not claim mastery from a copied answer or require success before moving on. End with one concrete prompt. Do not repeat a mastered sentence or ask the learner to choose what happens next.`,
           ),
           wrapUpEvent: responseEvent(
             childCourse
@@ -443,7 +446,9 @@ export class PrivateLessonService {
   }
 
   async listSessions(scope: ProfileScope, limit: number, courseId?: string) {
-    return { lessons: (await this.requireJournal().list(scope, limit, courseId)).map(publicStoredLesson) };
+    return {
+      lessons: (await this.requireJournal().list(scope, limit, courseId)).map(publicStoredLesson),
+    };
   }
 
   async getSession(scope: ProfileScope, id: string) {
