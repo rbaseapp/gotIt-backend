@@ -16,11 +16,9 @@ export function createCourseRoutes(service: CourseService, requireAccess: Reques
   router.use(requireAccess);
   router.get('/', async (req, res) => res.json(await service.list(req.gotitAuth!)));
   router.post('/intake', async (req, res) =>
-    res
-      .status(201)
-      .json({
-        course: await service.start(req.gotitAuth!, parseInput(intakeStartSchema, req.body)),
-      }),
+    res.status(201).json({
+      course: await service.start(req.gotitAuth!, parseInput(intakeStartSchema, req.body)),
+    }),
   );
   router.post('/transcribe', async (req, res) => {
     const input = parseInput(speechInputSchema, req.body);

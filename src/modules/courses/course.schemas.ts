@@ -99,6 +99,8 @@ export type CourseLessonContext = {
   lessonIndex: number;
   courseTitle: string;
   unitTitle: string;
+  lessonTitle: string;
+  level: CoursePreferences['startingLevel'];
   objective: string;
   successTask: string;
   isUnitCheck: boolean;

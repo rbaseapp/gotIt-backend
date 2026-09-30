@@ -27,6 +27,8 @@ import { CoreAuthClient } from '../src/shared/core/core-auth.client.js';
 import { API_ROUTES } from '../src/shared/http/api-catalog.js';
 import { basicPrivateLessonReport } from '../src/modules/private-lessons/private-lesson.summary.js';
 import type { PrivateLessonPlan } from '../src/modules/private-lessons/private-lesson.prompt.js';
+import { PrivateLessonService } from '../src/modules/private-lessons/private-lesson.service.js';
+import { privateLessonInputSchema } from '../src/modules/private-lessons/private-lesson.validation.js';
 
 const command = (revision: number) => ({ revision, eventId: randomUUID() });
 const setup = () => {
@@ -270,6 +272,40 @@ test('generated homework must cite actual lesson evidence', async () => {
   await assert.rejects(service.prepareHomework(scope, homework.id, command(0)));
   assert.equal((await service.homework(scope, homework.id)).content, null);
 });
+test('homework generation restricts source quotes to saved lesson excerpts', async () => {
+  const store = new MemoryLearningStore();
+  const homework = homeworkFixture();
+  homework.content = null;
+  homework.progress = [];
+  homework.source.turns.push({ role: 'learner', text: 'We are at home.' });
+  store.seed(homework);
+  const provider = new OpenAiCourseGenerator(
+    'test-key',
+    'configured-model',
+    'configured-transcriber',
+    async (_url, options) => {
+      const body = JSON.parse(String(options?.body));
+      assert.deepEqual(body.text.format.schema.properties.tasks.items.properties.sourceQuote.enum, [
+        'I am at home.',
+        'We are at home.',
+      ]);
+      return Response.json({
+        status: 'completed',
+        output: [
+          { content: [{ type: 'output_text', text: JSON.stringify(homeworkFixture().content) }] },
+        ],
+      });
+    },
+  );
+  const service = new CourseService(store, profiles, provider);
+  const prepared = await service.prepareHomework(scope, homework.id, command(0));
+  assert.equal(prepared.revision, 1);
+  assert.equal(prepared.tasks.length, 2);
+  assert.equal(
+    (await service.homework(scope, homework.id)).content?.tasks[0]?.sourceQuote,
+    'I am at home.',
+  );
+});
 test('structured provider serializes transformed language schemas and rejects refusal/incomplete output', async () => {
   let calls = 0;
   const provider = new OpenAiCourseGenerator(
@@ -481,6 +517,56 @@ test('course HTTP routes enforce Core identity, entitlement, strict input and pr
     .expect(400);
   assert.equal((await service.homework(scope, homework.id)).revision, 0);
   assert.equal(API_ROUTES.filter(({ path }) => path.startsWith('/api/v1/courses')).length, 12);
-  assert.equal(new Set(API_ROUTES.map(({ method, path }) => `${method} ${path}`)).size, API_ROUTES.length);
+  assert.equal(
+    new Set(API_ROUTES.map(({ method, path }) => `${method} ${path}`)).size,
+    API_ROUTES.length,
+  );
   assert.equal(API_ROUTES.length, 68);
+});
+
+test('course session resolves approved language and objective before creating the Realtime session', async () => {
+  const { store, service } = setup();
+  const course = courseFixture();
+  const approved = { ...preferences, absoluteBeginner: false, supportLanguageCode: 'en' };
+  Object.assign(course, {
+    activeVersion: 1,
+    approvedPreferences: approved,
+    preferencesApprovedAt: course.createdAt,
+    versions: [{ version: 1, preferences: approved, plan, createdAt: course.createdAt }],
+  });
+  store.seed(course);
+  const lessons = new PrivateLessonService({
+    courses: service,
+    apiKey: 'fixture-key',
+    model: 'fixture-realtime',
+    voice: 'marin',
+    transcriptionModel: 'fixture-transcriber',
+    profiles,
+    vocabulary: {
+      learned: async () => {
+        throw new Error('Unrelated vocabulary must not replace course material');
+      },
+    },
+    fetchImpl: async (_url, options) => {
+      const body = JSON.parse(String(options?.body));
+      assert.match(body.session.instructions, /course/);
+      assert.equal(body.session.audio.input.transcription.language, undefined);
+      return Response.json({ value: 'ek_fixture' });
+    },
+  });
+  const input = privateLessonInputSchema.parse({
+    courseId: course.id,
+    targetLanguageCode: 'de',
+    supportLanguageCode: 'de',
+    lessonMode: 'absolute_beginner',
+    requestedDurationMinutes: 1,
+  });
+  const result = await lessons.createSession(scope, input);
+  assert.equal(result.lesson.targetLanguageCode, 'en');
+  assert.equal(result.lesson.supportLanguageCode, 'en');
+  assert.equal(result.lesson.durationSeconds, 600);
+  assert.equal(result.lesson.lessonMode, 'standard');
+  assert.equal(result.lesson.course?.objective, plan.units[0]!.lessons[0]!.objective);
+  assert.equal(result.lesson.roadmap, null);
+  assert.deepEqual(result.lesson.targetWords, []);
 });

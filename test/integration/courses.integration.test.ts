@@ -68,6 +68,19 @@ test(
         }),
       ]);
       assert.equal(race.filter((r) => r.status === 'fulfilled').length, 1);
+      const replayAfterEdit = await service.approvePreferences(scope, initial.id, input);
+      assert.equal(replayAfterEdit.revision, 1, 'receipt preserves the original committed result');
+      assert.equal(
+        (await service.course(scope, initial.id)).revision,
+        2,
+        'replay does not revert newer state',
+      );
+      await assert.rejects(
+        service.plan(scope, initial.id, {
+          revision: replayAfterEdit.revision,
+          eventId: randomUUID(),
+        }),
+      );
       let course = await service.course(scope, initial.id);
       course = {
         ...course,

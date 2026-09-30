@@ -9,7 +9,7 @@ remain unchanged.
 
 `src/server.ts` constructs the services, `src/app.ts` creates Express and
 [src/routes.ts](src/routes.ts) mounts all module routers. The old root-level
-`app.ts` is excluded from the build. Public `GET /api/v1` lists **49 product
+`app.ts` is excluded from the build. Public `GET /api/v1` lists **68 product
 routes** from [api-catalog.ts](src/shared/http/api-catalog.ts).
 
 | Prefix under /api/v1                      | Behavior                                                                                           |
@@ -46,7 +46,7 @@ GotIt-owned increments in `migrations/` use
 `gotit_migrations.pgmigrations` and the shared migration advisory lock. They add
 capture/practice/reading receipts, semantic evidence revisions, learning
 preferences, `practice_exercises`, `api_rate_limits`, and a versioned topic/level
-word-pack catalog. The resulting product schema has **29 tables**. The eight historical
+word-pack catalog, lesson evidence and personal courses/homework. The resulting product schema has **39 tables**. The eight historical
 GotIt migrations in Core remain immutable.
 
 For existing databases, first take a backup and review baseline/normalization

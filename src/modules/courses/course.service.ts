@@ -18,6 +18,7 @@ import {
   coursePlanSchema,
   intakeReplySchema,
   homeworkContentSchema,
+  homeworkTaskSchema,
   homeworkJudgmentSchema,
   type CourseDocument,
   type CoursePreferences,
@@ -392,6 +393,8 @@ export class CourseService {
       lessonIndex: next.lessonIndex,
       courseTitle: next.version.plan.title,
       unitTitle: next.unit.title,
+      lessonTitle: next.lesson.title,
+      level: next.unit.level,
       objective: next.lesson.objective,
       successTask: next.unit.successTask,
       isUnitCheck: next.lessonIndex === next.unit.lessons.length - 1,
@@ -401,10 +404,13 @@ export class CourseService {
       homework: JSON.stringify(homework),
     };
   }
-  async prepareLesson(scope: ProfileScope, plan: PrivateLessonPlan, courseId: string) {
-    const context = await this.lessonContext(scope, courseId);
-    const course = await this.course(scope, courseId);
-    const next = nextCourseLesson(course)!;
+  async prepareLesson(
+    scope: ProfileScope,
+    plan: PrivateLessonPlan,
+    courseId: string,
+    snapshot?: CourseLessonContext,
+  ) {
+    const context = snapshot ?? (await this.lessonContext(scope, courseId));
     if (
       new Intl.Locale(context.preferences.targetLanguageCode).language !==
       new Intl.Locale(plan.targetLanguageCode).language
@@ -416,12 +422,12 @@ export class CourseService {
       roadmap: null,
       supportLanguageCode: context.preferences.supportLanguageCode,
       lessonMode:
-        context.preferences.absoluteBeginner && next.unit.level === 'A1'
+        context.preferences.absoluteBeginner && context.level === 'A1'
           ? ('absolute_beginner' as const)
           : ('standard' as const),
-      level: next.unit.level,
-      topic: next.lesson.title,
-      grammarFocus: next.unit.grammar.join('; ').slice(0, 160) || null,
+      level: context.level,
+      topic: context.lessonTitle,
+      grammarFocus: context.grammar.join('; ').slice(0, 160) || null,
       durationSeconds: context.preferences.minutesPerLesson * 60,
       interests: context.preferences.interests,
       correctionMode:
@@ -516,9 +522,26 @@ export class CourseService {
     if (current.replay) return publicHomework(asHomework(current.replay));
     const homework = asHomework(current.document);
     if (homework.content) return publicHomework(homework);
+    const sourceQuotes = [
+      ...new Set(homework.source.turns.map((turn) => turn.text).filter((text) => text.trim())),
+    ];
+    if (sourceQuotes.length === 0)
+      throw new AppError(
+        503,
+        'HOMEWORK_SOURCE_INVALID',
+        'No lesson excerpts are available for practice',
+      );
+    const groundedContentSchema = homeworkContentSchema.extend({
+      tasks: z
+        .array(
+          homeworkTaskSchema.extend({ sourceQuote: z.enum(sourceQuotes as [string, ...string[]]) }),
+        )
+        .min(2)
+        .max(6),
+    });
     const content = await this.ai().generate(
       scope,
-      homeworkContentSchema,
+      groundedContentSchema,
       'lesson_homework',
       homeworkInstruction,
       {
@@ -529,7 +552,7 @@ export class CourseService {
       },
     );
     for (const task of content.tasks) {
-      if (!homework.source.turns.some((turn) => turn.text.includes(task.sourceQuote)))
+      if (!sourceQuotes.includes(task.sourceQuote))
         throw new AppError(
           503,
           'HOMEWORK_SOURCE_INVALID',
@@ -694,6 +717,9 @@ export function publicHomework(homework: HomeworkDocument) {
     ...homeworkSummary(homework),
     revision: homework.revision,
     supportLanguageCode: homework.supportLanguageCode,
+    oralFirst:
+      homework.course?.preferences.ageGroup === 'child' ||
+      ['not_yet', 'developing'].includes(homework.course?.preferences.literacy ?? ''),
     objective: homework.content?.objective ?? null,
     estimatedMinutes: homework.content?.estimatedMinutes ?? null,
     tasks:
@@ -749,4 +775,4 @@ function learningExcerpts(
 }
 const intakeInstruction = `You are the learner's friendly AI language teacher. Conduct a short needs conversation in preferences.supportLanguageCode. Ask ONE concrete question at a time, with up to three easy suggested replies. Never ask the learner to diagnose CEFR or grammar. Reuse known profile information. Help an unsure learner choose through situations they want to handle. Cover goal (comprehensive, systematic grammar, or practical goal), prior experience, age group/reading comfort separately from proficiency, interests, and available time in roughly 4-6 turns. Do not require a placement test; you may offer one tiny optional modeled activity. A beginner gets a model before any question in the target language. Default suggestions belong in recommendations, not statedNeeds. startingLevel is a provisional teaching estimate, not a tested score. Preserve preferences unless the learner changes them. Localize all free-text preferences. After enough information, ready=true and invite review; if already reviewing apply requested corrections and remain ready. Never approve preferences or create/activate a course on the learner's behalf. For the first turn, greet briefly and ask about the intended outcome; ready=false. Avoid long lists or multiple questions.`;
 const planInstruction = `Design a coherent language course in preferences.supportLanguageCode, teaching preferences.targetLanguageCode. Use the actual grammar/writing/phonology of that language; do not translate an English syllabus. All future units must contain real topics, named lessons, practical outcomes, estimated effort, prerequisite keys, and a success task. No placeholders. Comprehensive and grammar paths must cover every supplied syllabus key, progressing foundations through advanced language; normally 12-24 units, grouping related topics. Grammar units name the rule AND its practical use, including tense contrasts, forms, exceptions and advanced clauses where relevant. For goal courses select relevant topics and clearly bound the scope. Keep units already in preservedUnits exactly unchanged, at their existing relative positions, then adapt future units. Reuse stable keys for unchanged units. Unit prerequisites can only refer to earlier unit keys. Lessons progress explanation/model, guided use, independent use; do not use these generic stages as unit titles. Adapt to age and literacy; brief oral activities for non-readers. Every unit needs a concrete homework example limited to that unit's teaching. scope states what the course includes and excludes; do not promise knowledge of every possible rule or guaranteed CEFR. A generated_scope syllabus is a provisional plan, not externally certified completeness; explain this briefly in scope. Never claim existing mastery. changeSummary briefly explains what was created or changed. A requested change cannot secretly replace approved language preferences.`;
-const homeworkInstruction = `Create 3-5 short homework tasks (2-3 for young children/non-readers) grounded ONLY in material actually taught in source.turns, using source.report for context. Each task.sourceQuote must copy an exact taught example or learner utterance from one turn. Do not introduce a new grammar form as required practice. New examples may use the same taught structure and vocabulary. New suggested words not actually taught are excluded. Move from recognition to supported production to one independent application. Choose appropriate kinds: choice, fill, order, transform, response, listening. Supply choices only for choice, tokens only for order, listeningText only for listening (otherwise null). Shuffle choices/tokens. acceptedAnswers includes expectedAnswer and natural variants. Do not put the answer in the prompt or hint. Instructions, objective, hint, explanation and title use supportLanguageCode; target examples/answers use targetLanguageCode. For non-readers prefer choice/listening with short speakable labels and oral responses. Keep explanation friendly and focused. No images or audio URLs; the app provides read-aloud. Return private answer keys only in expectedAnswer/acceptedAnswers.`;
+const homeworkInstruction = `Create 3-5 short homework tasks (2-3 for young children/non-readers) grounded ONLY in material actually taught in source.turns, using source.report for context. For each task, select sourceQuote from the exact text values in source.turns; copy the entire selected excerpt without changing whitespace or punctuation. Do not introduce a new grammar form as required practice. New examples may use the same taught structure and vocabulary. New suggested words not actually taught are excluded. Move from recognition to supported production to one independent application. Choose appropriate kinds: choice, fill, order, transform, response, listening. Supply choices only for choice, tokens only for order, listeningText only for listening (otherwise null). Shuffle choices/tokens. acceptedAnswers includes expectedAnswer and natural variants. Do not put the answer in the prompt or hint. Instructions, objective, hint, explanation and title use supportLanguageCode; target examples/answers use targetLanguageCode. For non-readers prefer choice/listening with short speakable labels and oral responses. Keep explanation friendly and focused. No images or audio URLs; the app provides read-aloud. Return private answer keys only in expectedAnswer/acceptedAnswers.`;

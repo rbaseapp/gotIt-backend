@@ -123,6 +123,25 @@ export class PrivateLessonService {
         'Private voice lessons are unavailable',
       );
 
+    if (input.courseId && !this.options.courses)
+      throw new AppError(503, 'COURSE_AI_UNAVAILABLE', 'Courses are unavailable');
+    const courseContext = input.courseId
+      ? await this.options.courses!.lessonContext(scope, input.courseId)
+      : null;
+    if (courseContext)
+      input = {
+        ...input,
+        targetLanguageCode: courseContext.preferences.targetLanguageCode,
+        supportLanguageCode: courseContext.preferences.supportLanguageCode,
+        requestedLevel: courseContext.level,
+        requestedDurationMinutes: courseContext.preferences.minutesPerLesson,
+        lessonMode:
+          courseContext.preferences.absoluteBeginner && courseContext.level === 'A1'
+            ? 'absolute_beginner'
+            : 'standard',
+        vocabularyMode: 'none',
+        customFocus: null,
+      };
     const [profile, previousLessons, preferences, loadedRoadmap] = await Promise.all([
       this.options.profiles.getProfile(scope),
       this.options.journal?.list(scope, 20) ?? Promise.resolve([]),
@@ -192,9 +211,15 @@ export class PrivateLessonService {
     if (input.courseId) {
       if (!this.options.courses)
         throw new AppError(503, 'COURSE_AI_UNAVAILABLE', 'Courses are unavailable');
-      plan = await this.options.courses.prepareLesson(scope, plan, input.courseId);
+      plan = await this.options.courses.prepareLesson(scope, plan, input.courseId, courseContext!);
     }
     const instructions = buildPrivateLessonPrompt(plan);
+    // Realtime response instructions replace (rather than append to) session
+    // instructions. Preserve the full teaching policy and approved lesson data.
+    const responseEvent = (directive: string) => ({
+      type: 'response.create' as const,
+      response: { instructions: `${instructions}\n\n# Current turn directive\n${directive}` },
+    });
     const targetLanguage = describeLessonLanguage(plan.targetLanguageCode);
     const supportLanguage = plan.supportLanguageCode
       ? describeLessonLanguage(plan.supportLanguageCode)
@@ -247,7 +272,7 @@ export class PrivateLessonService {
       });
       const secret = clientSecretSchema.parse(await readProviderJson(response, controller.signal));
 
-      await this.options.roadmaps?.savePreferences(scope, input, plan);
+      if (!input.courseId) await this.options.roadmaps?.savePreferences(scope, input, plan);
       await this.options.journal?.create(scope, plan);
       return {
         lesson: publicPlan(plan),
@@ -259,33 +284,25 @@ export class PrivateLessonService {
               : new Date(secret.expires_at * 1000).toISOString(),
           model: this.options.model,
           connectionUrl: 'https://api.openai.com/v1/realtime/calls',
-          openingEvent: {
-            type: 'response.create',
-            response: {
-              instructions: plan.course
-                ? `Begin the approved course lesson now. Introduce yourself as ${teacher.name}, state today's objective briefly in ${supportLanguage?.promptName ?? targetLanguage.promptName}, then follow the course sequence. Recall a previously taught item when continuity is available; explain and model the next target-language phrase before asking for an answer. Accept questions in the support language. Ask one short question at a time.`
-                : absoluteBeginner
-                  ? `Begin the absolute-beginner lesson now. Greet, introduce yourself as ${teacher.name}, and explain the plan in ${supportLanguage!.promptName}. Introduce the first useful ${targetLanguage.promptName} phrase slowly, give its meaning in ${supportLanguage!.promptName}, and ask the learner to repeat it. Ask only one short question or practice instruction at a time.`
-                  : `Begin the lesson now. Speak only in ${targetLanguage.promptName}. The very first spoken word must be in this language. Give a brief greeting and introduce yourself as ${teacher.name}, then follow the lesson flow in the session instructions. If this is the first lesson of the current roadmap milestone, teach the named topic, its use and sentence pattern with simple examples before conversation. Start with a recognition or guided-completion check, never a request for an original sentence. Otherwise include the short previous-lesson review when continuity data is present. Ask only one short question. Do not use any other language.`,
-            },
-          },
-          wrapUpEvent: {
-            type: 'response.create',
-            response: {
-              instructions: absoluteBeginner
+          openingEvent: responseEvent(
+            absoluteBeginner
+              ? `Begin with one short greeting in ${targetLanguage.promptName}, then give its meaning in ${supportLanguage!.promptName}. Introduce yourself as ${teacher.name} and explain today's objective in ${supportLanguage!.promptName}. Follow the approved objective when course is present. Explain the situation, meaning and useful parts of the first target phrase before one simple choice or completion check. Do not start with a repetition drill.`
+              : `Begin the lesson now. Speak only in ${targetLanguage.promptName}. The very first spoken word must be in this language. Greet briefly and introduce yourself as ${teacher.name}. State today's objective from the approved course, roadmap or grammar focus. Teach its use and sentence pattern with two clear examples, then ask one recognition or guided-completion check. For an independent unit check, elicit the task without giving its answer. If no structured objective is configured, follow the conversational opening policy. Do not use any other language.`,
+          ),
+          continuationEvent: responseEvent(
+            `Continue the current lesson after a pause or the learner's request to continue. ${absoluteBeginner ? `Use ${supportLanguage!.promptName} for a brief explanation and ${targetLanguage.promptName} for practice.` : `Speak only in ${targetLanguage.promptName}.`} Keep the current objective and conversation history. Do not restart or assume an unheard answer was correct. If the last task is unanswered, give one fresh hint or simpler choice; if it was answered, explain and introduce the next activity. End with one concrete prompt. Do not repeat a mastered sentence or ask the learner to choose what happens next.`,
+          ),
+          wrapUpEvent: responseEvent(
+            absoluteBeginner
                 ? `The lesson is ending now. In ${supportLanguage!.promptName}, briefly praise one success and recap the 3-5 ${targetLanguage.promptName} phrases learned today, saying each phrase slowly with its meaning. Do not introduce new material or ask another question. End warmly in ${supportLanguage!.promptName}. Keep the closing under 25 seconds.`
                 : `The lesson is ending now. Speak only in ${targetLanguage.promptName}. Do not ask another question. In three short parts, give one specific success, one correction with the correct form, and the target words worth reviewing. Then say a warm, encouraging goodbye in the same language. Do not use any other language. Keep the entire closing under 20 seconds.`,
-            },
-          },
+          ),
           translationEvent: supportLanguage
-            ? {
-                type: 'response.create',
-                response: {
-                  instructions: absoluteBeginner
+            ? responseEvent(
+                absoluteBeginner
                     ? `In ${supportLanguage.promptName}, explain the meaning of every ${targetLanguage.promptName} phrase from the tutor's most recent turn. Do not introduce new material or ask a new question. Then continue the absolute-beginner lesson using the configured bilingual method.`
                     : `For this response only, translate the tutor's entire most recent speaking turn into ${supportLanguage.promptName}. Translate every sentence from that turn, from beginning to end; do not translate only its final sentence. Give only the complete translation and at most one brief clarification. Do not advance the lesson or ask a new question. After this response, resume speaking only in ${targetLanguage.promptName}.`,
-                },
-              }
+              )
             : null,
         },
       };

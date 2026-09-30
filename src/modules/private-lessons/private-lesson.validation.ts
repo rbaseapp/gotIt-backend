@@ -62,6 +62,7 @@ export const privateLessonInputSchema = z
   .strict()
   .superRefine((value, context) => {
     if (
+      !value.courseId &&
       value.supportLanguageCode &&
       sameBaseLanguage(value.targetLanguageCode, value.supportLanguageCode)
     )

@@ -1385,7 +1385,11 @@ test(
         'study images are reused across users for the same translated sense',
         async () => {
           const generationBaseline = studyImageGenerations;
-          const assetBaseline = (await db.adminPool.query('SELECT count(*)::integer count FROM product_gotit.study_image_assets')).rows[0].count as number;
+          const assetBaseline = (
+            await db.adminPool.query(
+              'SELECT count(*)::integer count FROM product_gotit.study_image_assets',
+            )
+          ).rows[0].count as number;
           const imageResponses = [];
           const directPractices = new PracticeService(
             db.adminPool,
