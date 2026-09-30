@@ -242,6 +242,111 @@ test('private lesson creates a bounded personalized Realtime session', async () 
   assert.doesNotMatch(JSON.stringify(result), /server-secret/u);
 });
 
+test('a correct independent answer advances the lesson, while a copied answer needs a new check', async () => {
+  let requestBody: Record<string, unknown> | undefined;
+  const service = makeService(async (_url, init) => {
+    requestBody = JSON.parse(String(init?.body)) as Record<string, unknown>;
+    return Response.json({ value: 'ek_demo' });
+  });
+  const result = await service.createSession(identity, {
+    targetLanguageCode: 'en',
+    grammarFocus: 'am, is, and are by subject',
+  });
+  const sessionInstructions = String(
+    (requestBody?.session as { instructions: string }).instructions,
+  );
+  const opening = result.realtime.openingEvent.response.instructions;
+  const continuation = result.realtime.continuationEvent.response.instructions;
+
+  assert.match(sessionInstructions, /A correct independent answer is evidence:.*advance/u);
+  assert.match(
+    sessionInstructions,
+    /A copied, prompted, or guessed answer needs a fresh independent check/u,
+  );
+  assert.match(
+    opening.split('# Current turn directive\n')[1]!,
+    /Explain the concept.*show a clear example.*ask one open understanding question/u,
+  );
+  assert.match(opening, /without saying the answer/u);
+  assert.match(
+    continuation,
+    /Advance only after evidence of understanding; a copied answer is not enough/u,
+  );
+  assert.doesNotMatch(
+    opening.split('# Current turn directive\n')[1]!,
+    /recognition or guided-completion check/u,
+  );
+});
+
+test('a wrong answer receives a reasoned correction and a fresh check before advancing', async () => {
+  const prompt = buildPrivateLessonPrompt({
+    ...reportPlan,
+    grammarFocus: 'am, is, and are by subject',
+    correctionMode: 'critical_only',
+  });
+
+  assert.match(
+    prompt,
+    /If an answer is wrong, identify the specific misconception, explain the correction and why it fits, then ask a different question that tests the same point without giving its answer/u,
+  );
+  assert.match(
+    prompt,
+    /Regardless of the conversational correction mode, explain and recheck an error in the concept being taught before advancing/u,
+  );
+  assert.match(prompt, /Keep unrelated corrections at the selected mode's depth/u);
+  assert.match(prompt, /Do not claim understanding or advance until the learner demonstrates it/u);
+});
+
+test('confusion prompts a simpler explanation and open check without disclosing the answer', async () => {
+  let requestBody: Record<string, unknown> | undefined;
+  const service = makeService(async (_url, init) => {
+    requestBody = JSON.parse(String(init?.body)) as Record<string, unknown>;
+    return Response.json({ value: 'ek_demo' });
+  });
+  const result = await service.createSession(identity, {
+    targetLanguageCode: 'es',
+    supportLanguageCode: 'he',
+    lessonMode: 'absolute_beginner',
+  });
+  const instructions = String((requestBody?.session as { instructions: string }).instructions);
+  const opening = result.realtime.openingEvent.response.instructions;
+  const continuation = result.realtime.continuationEvent.response.instructions;
+
+  assert.match(
+    instructions,
+    /short open question in TEACHING_LANGUAGE about its meaning or use.*Do not put the answer in the question/u,
+  );
+  assert.match(
+    instructions,
+    /If the learner is wrong or confused, explain the missing meaning or use with a different simple example and ask a new open check/u,
+  );
+  assert.match(
+    opening,
+    /ask one open understanding question in Hebrew.*Do not say the answer in the question/u,
+  );
+  assert.match(
+    continuation,
+    /If the last task is unanswered or the learner is confused, re-explain with a different example and ask a smaller open question without its answer/u,
+  );
+});
+
+test('explicit imitation goals retain modelling without counting copying as comprehension', () => {
+  const prompt = buildPrivateLessonPrompt({ ...reportPlan, topic: 'shadowing a fixed phrase' });
+
+  assert.match(
+    prompt,
+    /When the explicit lesson objective is imitation, shadowing, pronunciation, or learning a fixed phrase, model the exact phrase and invite imitation as practice/u,
+  );
+  assert.match(
+    prompt,
+    /Do not treat imitation alone as evidence that the learner understands its meaning or use/u,
+  );
+  assert.match(
+    prompt,
+    /Do not default to "repeat after me" unless imitation is the explicit objective/u,
+  );
+});
+
 test('private lesson pins every spoken response to the selected target language', async () => {
   let requestBody: Record<string, unknown> | undefined;
   const service = makeService(async (_url, init) => {
@@ -306,7 +411,7 @@ test('absolute beginner lesson teaches through the support language and accepts 
   assert.match(String(session.instructions), /teach only 3-5 useful TARGET_LANGUAGE phrases/u);
   assert.match(
     result.realtime.openingEvent.response.instructions,
-    /Greet, introduce yourself as Rachel, and explain the plan in Hebrew/u,
+    /Introduce yourself as Rachel and explain today's objective in Hebrew/u,
   );
 
   await assert.rejects(
@@ -1163,8 +1268,11 @@ test('first roadmap milestone lesson teaches the topic before conversation', () 
   });
 
   assert.match(prompt, /teach before starting the conversation/u);
-  assert.match(prompt, /short explanation, sentence pattern, examples/u);
-  assert.match(prompt, /only then independent speaking/u);
+  assert.match(
+    prompt,
+    /plain explanation of the rule and its use, sentence pattern, contrasting examples, an open question about a new case/u,
+  );
+  assert.match(prompt, /independent speaking after the learner shows understanding/u);
   assert.match(prompt, /Do not assume the learner already knows the name of the topic/u);
   assert.match(prompt, /"isFirstMilestoneLesson": true/u);
 });
