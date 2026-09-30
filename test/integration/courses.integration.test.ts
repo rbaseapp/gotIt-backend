@@ -162,6 +162,7 @@ test(
       );
       assert.equal(draft.revision, 2);
       await database.migrate('down');
+      await database.migrate('down');
       const rolledBack = await database.adminPool.query(
         "SELECT to_regclass('product_gotit.learning_documents') AS relation",
       );

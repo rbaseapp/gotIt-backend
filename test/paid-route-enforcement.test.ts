@@ -134,3 +134,91 @@ test('trial accounts can save words but cannot request AI translation', async ()
   assert.equal(ai.body.error.details.feature, 'translation.ai');
   assert.equal(previewCalls, 0);
 });
+
+test('base learning access does not grant AI or private lessons when add-ons are enforced', async () => {
+  const granted = new Set<string>();
+  const coreAuthClient = {
+    async validateAccessToken() {
+      return identity;
+    },
+    async getBillingStatus() {
+      return {
+        tier: 'paid',
+        access: true,
+        plan: { key: 'base', name: 'Base', kind: 'paid' },
+        entitlements: ['vocabulary.write', 'practice.play'],
+        subscription: null,
+        trial: null,
+      };
+    },
+  } as unknown as CoreAuthClient;
+  const app = createApp({
+    logger: createLogger('silent'),
+    checkDatabase: async () => {},
+    coreAuthClient,
+    profileService: {} as never,
+    addonAccess: {
+      async status(_scope: unknown, kind: string) {
+        return granted.has(kind)
+          ? {
+              cycleId: kind,
+              packageKey: kind,
+              startsAt: new Date().toISOString(),
+              endsAt: new Date(Date.now() + 60_000).toISOString(),
+              lessonLimit: null,
+              lessonDurationSeconds: null,
+              lessonsUsed: 0,
+              lessonsRemaining: null,
+            }
+          : null;
+      },
+    } as never,
+    readingService: { quotaStatus: async () => null } as never,
+    privateLessonService: { getSetup: async () => ({ enabled: true }) } as never,
+    enforcePaidEntitlements: true,
+    enforceAddonEntitlements: true,
+  });
+  const auth = (path: string) => request(app).get(path).set('authorization', 'Bearer token');
+  const reading = await auth('/api/v1/reading/quota');
+  const lesson = await auth('/api/v1/private-lessons/setup?targetLanguageCode=en');
+  assert.equal(reading.body.error.code, 'ADDON_REQUIRED');
+  assert.equal(lesson.body.error.code, 'ADDON_REQUIRED');
+  granted.add('ai');
+  assert.equal((await auth('/api/v1/reading/quota')).status, 200);
+  assert.equal((await auth('/api/v1/private-lessons/setup?targetLanguageCode=en')).status, 402);
+  granted.add('private_lessons');
+  assert.equal((await auth('/api/v1/private-lessons/setup?targetLanguageCode=en')).status, 200);
+  const status = await auth('/api/v1/addons/status');
+  assert.equal(status.body.enabled, true);
+  assert.equal(status.body.privateLessons.packageKey, 'private_lessons');
+});
+
+test('disabled add-on rollout exposes its state without querying grants', async () => {
+  const coreAuthClient = {
+    async validateAccessToken() {
+      return identity;
+    },
+    async getBillingStatus() {
+      throw new Error('billing should not be queried');
+    },
+  } as unknown as CoreAuthClient;
+  const app = createApp({
+    logger: createLogger('silent'),
+    checkDatabase: async () => {},
+    coreAuthClient,
+    profileService: {} as never,
+    enforcePaidEntitlements: true,
+  });
+  const status = await request(app)
+    .get('/api/v1/addons/status')
+    .set('authorization', 'Bearer token');
+  assert.equal(status.status, 200);
+  assert.deepEqual(
+    {
+      enabled: status.body.enabled,
+      ai: status.body.ai,
+      privateLessons: status.body.privateLessons,
+    },
+    { enabled: false, ai: null, privateLessons: null },
+  );
+});

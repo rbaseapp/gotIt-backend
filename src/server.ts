@@ -38,9 +38,11 @@ import {
 } from './modules/private-lessons/private-lesson.repository.js';
 import { OpenAiPrivateLessonSummaryGenerator } from './modules/private-lessons/private-lesson.summary.js';
 import { PostgresPrivateLessonProficiencyStore } from './modules/private-lessons/private-lesson.proficiency.js';
+import { PostgresAddonAccess } from './modules/addons/addon-access.js';
 
 const logger = createLogger(env.LOG_LEVEL);
 const pool = createPool(env.DATABASE_URL);
+const addonAccess = new PostgresAddonAccess(pool);
 pool.on('error', () => logger.error('Idle database connection failed'));
 let draining = false;
 
@@ -210,6 +212,7 @@ const privateLessonService = new PrivateLessonService({
           fetch,
         )
       : undefined,
+  lessonAccess: env.ENFORCE_ADDON_ENTITLEMENTS ? addonAccess : undefined,
 });
 const rateLimiter = new PostgresRateLimiter(pool);
 const readingGenerator =
@@ -238,6 +241,8 @@ const app = createApp({
   speechService,
   privateLessonService,
   courseService,
+  addonAccess,
+  enforceAddonEntitlements: env.ENFORCE_ADDON_ENTITLEMENTS,
   wordPackService: new WordPackRepository(pool),
   enforcePaidEntitlements: env.ENFORCE_PAID_ENTITLEMENTS,
   rateLimiter,

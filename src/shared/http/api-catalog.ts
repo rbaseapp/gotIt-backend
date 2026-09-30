@@ -2,6 +2,7 @@ export const API_ROUTES = [
   ['GET', '/profile'],
   ['PATCH', '/profile'],
   ['GET', '/capabilities'],
+  ['GET', '/addons/status'],
   ['POST', '/captures/preview'],
   ['POST', '/captures'],
   ['GET', '/learning-items'],

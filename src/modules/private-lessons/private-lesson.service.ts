@@ -2,6 +2,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { childCourseTeacherVoice, privateLessonTeachers } from './private-lesson.teachers.js';
 import { z } from 'zod';
 import { AppError } from '../../shared/errors/app-error.js';
+import type { AddonAccessContract } from '../addons/addon-access.js';
 import {
   ProviderHttpError,
   providerFailureCode,
@@ -85,6 +86,7 @@ export type PrivateLessonServiceOptions = {
   proficiency?: PrivateLessonProficiencyStore;
   durationSeconds?: number;
   requestTimeoutMs?: number;
+  lessonAccess?: AddonAccessContract;
 };
 
 export class PrivateLessonService {
@@ -216,26 +218,31 @@ export class PrivateLessonService {
     const childCourse = plan.course?.preferences.ageGroup === 'child';
     if (childCourse)
       plan = { ...plan, teacherVoice: childCourseTeacherVoice, correctionMode: 'recast' };
-    const instructions = buildPrivateLessonPrompt(plan);
-    // Realtime response instructions replace (rather than append to) session
-    // instructions. Preserve the full teaching policy and approved lesson data.
-    const responseEvent = (directive: string) => ({
-      type: 'response.create' as const,
-      response: { instructions: `${instructions}\n\n# Current turn directive\n${directive}` },
-    });
-    const targetLanguage = describeLessonLanguage(plan.targetLanguageCode);
-    const supportLanguage = plan.supportLanguageCode
-      ? describeLessonLanguage(plan.supportLanguageCode)
-      : null;
-    const transcriptionLanguage = new Intl.Locale(targetLanguage.code).language;
-    const absoluteBeginner = plan.lessonMode === 'absolute_beginner';
-    const bilingualCourse = absoluteBeginner || Boolean(plan.course);
-    const teacher = privateLessonTeachers[plan.teacherVoice];
-    const voice = teacher.voice;
+    let reservedLessonId: string | null = null;
+    if (this.options.lessonAccess && (scope as ProfileScope & { role?: string }).role !== 'admin') {
+      const allowance = await this.options.lessonAccess.reserveLesson(scope, plan.id);
+      reservedLessonId = plan.id;
+      plan = { ...plan, durationSeconds: allowance.lessonDurationSeconds! };
+    }
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), this.requestTimeoutMs);
-
     try {
+      const instructions = buildPrivateLessonPrompt(plan);
+      // Realtime response instructions replace (rather than append to) session
+      // instructions. Preserve the full teaching policy and approved lesson data.
+      const responseEvent = (directive: string) => ({
+        type: 'response.create' as const,
+        response: { instructions: `${instructions}\n\n# Current turn directive\n${directive}` },
+      });
+      const targetLanguage = describeLessonLanguage(plan.targetLanguageCode);
+      const supportLanguage = plan.supportLanguageCode
+        ? describeLessonLanguage(plan.supportLanguageCode)
+        : null;
+      const transcriptionLanguage = new Intl.Locale(targetLanguage.code).language;
+      const absoluteBeginner = plan.lessonMode === 'absolute_beginner';
+      const bilingualCourse = absoluteBeginner || Boolean(plan.course);
+      const teacher = privateLessonTeachers[plan.teacherVoice];
+      const voice = teacher.voice;
       const response = await this.fetchImpl('https://api.openai.com/v1/realtime/client_secrets', {
         method: 'POST',
         headers: {
@@ -316,6 +323,7 @@ export class PrivateLessonService {
         },
       };
     } catch (error) {
+      if (reservedLessonId) await this.options.lessonAccess!.releaseLesson(reservedLessonId);
       throw privateLessonProviderError(error, controller.signal.aborted);
     } finally {
       clearTimeout(timeout);

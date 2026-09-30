@@ -28,6 +28,12 @@ BEGIN
   LOOP
     EXECUTE format('ALTER TABLE product_gotit.%I OWNER TO gotit_migrator',object_record.relname);
   END LOOP;
+  FOR object_record IN
+    SELECT p.oid::regprocedure AS signature FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+    WHERE n.nspname='product_gotit' AND p.prokind='f'
+  LOOP
+    EXECUTE format('ALTER FUNCTION %s OWNER TO gotit_migrator',object_record.signature);
+  END LOOP;
   IF to_regclass('gotit_migrations.pgmigrations') IS NOT NULL THEN
     ALTER TABLE gotit_migrations.pgmigrations OWNER TO gotit_migrator;
     ALTER SEQUENCE IF EXISTS gotit_migrations.pgmigrations_id_seq OWNER TO gotit_migrator;

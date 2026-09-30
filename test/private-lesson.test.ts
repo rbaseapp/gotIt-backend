@@ -38,6 +38,7 @@ import {
 import { privateLessonRoadmapInputSchema } from '../src/modules/private-lessons/private-lesson.validation.js';
 import { PostgresPrivateLessonRoadmapStore } from '../src/modules/private-lessons/private-lesson.roadmap.js';
 import { taskLevelForPlan } from '../src/modules/private-lessons/private-lesson.assessment.js';
+import type { AddonAccessContract } from '../src/modules/addons/addon-access.js';
 
 const assessment = privateLessonReportSchema.shape.assessment.parse({
   overallLevel: 'B1' as const,
@@ -179,7 +180,9 @@ function makeService(
 
 test('child course uses Rachel and short spoken checks while adult course keeps Mike and the standard lesson', async () => {
   for (const ageGroup of ['child', 'adult'] as const) {
-    let requestBody: { session: { instructions: string; audio: { output: { voice: string } } } } | undefined;
+    let requestBody:
+      | { session: { instructions: string; audio: { output: { voice: string } } } }
+      | undefined;
     const context: CourseLessonContext = {
       courseId: '77777777-7777-4777-8777-777777777777',
       version: 1,
@@ -210,13 +213,17 @@ test('child course uses Rachel and short spoken checks while adult course keeps 
         correctionMode: 'deep_explanation' as const,
       }),
     } as unknown as NonNullable<ConstructorParameters<typeof PrivateLessonService>[0]['courses']>;
-    const service = makeService(async (_url, init) => {
-      requestBody = JSON.parse(String(init?.body));
-      return new Response(JSON.stringify({ value: 'ek_demo' }), {
-        status: 200,
-        headers: { 'content-type': 'application/json' },
-      });
-    }, 'server-secret', courses);
+    const service = makeService(
+      async (_url, init) => {
+        requestBody = JSON.parse(String(init?.body));
+        return new Response(JSON.stringify({ value: 'ek_demo' }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      },
+      'server-secret',
+      courses,
+    );
 
     const result = await service.createSession(identity, {
       courseId: context.courseId,
@@ -232,7 +239,10 @@ test('child course uses Rachel and short spoken checks while adult course keeps 
       assert.match(instructions, /Child teaching method/u);
       assert.match(instructions, /spoken choices and oral responses/u);
       assert.match(instructions, /specific success when earned/u);
-      assert.match(result.realtime.openingEvent.response.instructions, /short spoken understanding question/u);
+      assert.match(
+        result.realtime.openingEvent.response.instructions,
+        /short spoken understanding question/u,
+      );
       assert.match(result.realtime.continuationEvent.response.instructions, /specific feedback/u);
       assert.match(result.realtime.wrapUpEvent.response.instructions, /one specific success/u);
     } else {
@@ -241,9 +251,75 @@ test('child course uses Rachel and short spoken checks while adult course keeps 
       assert.equal(requestBody?.session.audio.output.voice, 'cedar');
       assert.match(instructions, /Your name is Mike/u);
       assert.doesNotMatch(instructions, /Child teaching method/u);
-      assert.match(result.realtime.openingEvent.response.instructions, /introduce yourself as Mike/u);
+      assert.match(
+        result.realtime.openingEvent.response.instructions,
+        /introduce yourself as Mike/u,
+      );
     }
   }
+});
+
+test('private lesson uses approved add-on duration and releases a failed session reservation', async () => {
+  const reserved: string[] = [];
+  const released: string[] = [];
+  const lessonAccess: AddonAccessContract = {
+    async status() {
+      return null;
+    },
+    async reserveLesson(_scope, lessonId) {
+      reserved.push(lessonId);
+      return {
+        cycleId: 'cycle',
+        packageKey: 'lessons-2',
+        startsAt: new Date().toISOString(),
+        endsAt: new Date(Date.now() + 60_000).toISOString(),
+        lessonLimit: 2,
+        lessonDurationSeconds: 420,
+        lessonsUsed: 1,
+        lessonsRemaining: 1,
+      };
+    },
+    async releaseLesson(lessonId) {
+      released.push(lessonId);
+    },
+  };
+  const options = {
+    apiKey: 'server-secret',
+    model: 'gpt-realtime-test',
+    voice: 'marin',
+    transcriptionModel: 'gpt-transcribe-test',
+    profiles,
+    vocabulary,
+    lessonAccess,
+  };
+  const successful = new PrivateLessonService({
+    ...options,
+    fetchImpl: async () =>
+      new Response(JSON.stringify({ value: 'ek_demo' }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      }),
+  });
+  const result = await successful.createSession(identity, {
+    targetLanguageCode: 'en',
+    requestedDurationMinutes: 10,
+  });
+  assert.equal(result.lesson.durationSeconds, 420);
+  assert.equal(reserved.length, 1);
+  assert.deepEqual(released, []);
+
+  const failing = new PrivateLessonService({
+    ...options,
+    fetchImpl: async () => {
+      throw new Error('provider unavailable');
+    },
+  });
+  await assert.rejects(
+    failing.createSession(identity, { targetLanguageCode: 'en' }),
+    (error: any) => error.code === 'PRIVATE_LESSON_PROVIDER_UPSTREAM',
+  );
+  assert.equal(reserved.length, 2);
+  assert.deepEqual(released, [reserved[1]]);
 });
 
 test('private lesson creates a bounded personalized Realtime session', async () => {

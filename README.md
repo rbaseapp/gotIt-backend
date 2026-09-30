@@ -46,7 +46,7 @@ GotIt-owned increments in `migrations/` use
 `gotit_migrations.pgmigrations` and the shared migration advisory lock. They add
 capture/practice/reading receipts, semantic evidence revisions, learning
 preferences, `practice_exercises`, `api_rate_limits`, and a versioned topic/level
-word-pack catalog, lesson evidence and personal courses/homework. The resulting product schema has **39 tables**. The eight historical
+word-pack catalog, lesson evidence, personal courses/homework and add-on cycles. The resulting product schema has **42 tables**. The eight historical
 GotIt migrations in Core remain immutable.
 
 For existing databases, first take a backup and review baseline/normalization
@@ -189,6 +189,41 @@ fabricate audio or scores.
 ## Paid feature enforcement
 
 Paid entitlement enforcement is enabled by default. A new account receives the Core-managed 14-day Pro trial; an active subscription keeps all learning capabilities open. After both trial and paid access end, dashboard and saved vocabulary remain readable while capture, library mutations, imports, games, AI reading generation, speech, and pronunciation return `402 SUBSCRIPTION_REQUIRED`. AI reading generation is limited to one successful creation across the entire trial and four per UTC calendar month for paid accounts. AI translation in the browser extension requires a paid account. GotIt never accepts or stores card data.
+
+### Separate add-on entitlements (Trello 1sAsIoNg)
+
+Core currently has one GotIt subscription per user. Its Pro plan bundles word learning and
+AI entitlements; the existing charge and trial are unchanged. GotIt now has a separate,
+disabled-by-default add-on layer. `ENFORCE_ADDON_ENTITLEMENTS=true` requires a current
+`ai` cycle for AI reading, speech, pronunciation, AI translation and courses, and a
+current `private_lessons` cycle for the voice lesson API. Base word learning still uses
+Core's `vocabulary.write` and `practice.play` entitlements. Both base access and the
+relevant add-on are required. The add-on status endpoint is `GET /api/v1/addons/status`.
+
+`product_gotit.addon_packages` contains an inactive AI option and inactive monthly
+lesson options of 2, 4, 8 and 12. Lesson duration is NULL until approved; an active
+lesson package must have a duration. Prices, provider price IDs, checkout and webhook
+provisioning are deliberately absent. `addon_cycles` holds an explicitly provisioned
+half-open `[starts_at, ends_at)` entitlement window and a snapshot of its approved
+lesson limit and duration. Renewal creates a new non-overlapping cycle with zero use;
+unused lessons do not carry over. This is an implementation default pending a product
+decision, not a billing promise. Concurrent session creation increments `lessons_used`
+atomically before the provider request. A failed creation releases its reservation
+once. Completed, deleted or abandoned sessions keep their consumed slot. The
+`addon_lesson_reservations` table records the lesson ID for idempotent release. No
+background job invents a renewal or grants access from a payment event.
+
+Before enabling the gate, product and billing owners must approve prices and provider
+products, lesson duration, whether AI is separately billed or bundled, trial access,
+the authoritative billing period dates, upgrade/downgrade and cancellation behavior,
+carryover or refund rules, and treatment of existing Pro subscriptions. A trusted
+billing provisioner must create/revoke cycles from verified payment events and reconcile
+renewals; there is no public grant endpoint. The existing AI reading quota (one per
+trial, four per UTC month for paid accounts) remains separate and needs a product
+decision before activation. The lesson duration in the existing five-minute demo is a
+prototype default, not an approved package duration. Keep the flag false until the
+catalog, provisioner and migration plan for current subscribers are ready. Enabling
+the flag without current grants fails closed with `402 ADDON_REQUIRED`.
 
 ## HTTP, deployment and verification
 

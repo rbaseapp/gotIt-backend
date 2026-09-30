@@ -17,6 +17,10 @@ const envSchema = z
       .enum(['true', 'false'])
       .default('true')
       .transform((value) => value === 'true'),
+    ENFORCE_ADDON_ENTITLEMENTS: z
+      .enum(['true', 'false'])
+      .default('false')
+      .transform((value) => value === 'true'),
     OPENAI_API_KEY: z.string().min(1).optional(),
     OPENAI_TRANSLATION_MODEL: z.string().min(1).max(200).optional(),
     OPENAI_IMAGE_MODEL: z.string().min(1).max(200).optional(),

@@ -25,6 +25,7 @@ import {
 import { createWordPackRoutes } from './modules/word-packs/word-packs.routes.js';
 import { createPrivateLessonRoutes } from './modules/private-lessons/private-lesson.routes.js';
 import { createCourseRoutes } from './modules/courses/course.routes.js';
+import { createRequireAddonMiddleware, requireBoth } from './shared/middleware/require-addon.js';
 import {
   privateLessonDemoCss,
   privateLessonDemoHtml,
@@ -117,6 +118,46 @@ export function createRoutes(dependencies: AppDependencies) {
     dependencies.coreAuthClient,
     dependencies.enforcePaidEntitlements === true,
   );
+  if (dependencies.enforceAddonEntitlements && !dependencies.addonAccess)
+    throw new Error('Add-on entitlement enforcement requires an add-on store');
+  const requireAi = dependencies.enforceAddonEntitlements
+    ? requireBoth(
+        requireVocabularyWrite,
+        createRequireAddonMiddleware(dependencies.addonAccess!, 'ai'),
+      )
+    : createRequireEntitlementMiddleware(
+        dependencies.coreAuthClient,
+        'reading.ai',
+        dependencies.enforcePaidEntitlements === true,
+      );
+  const requireLesson = dependencies.enforceAddonEntitlements
+    ? requireBoth(
+        requirePractice,
+        createRequireAddonMiddleware(dependencies.addonAccess!, 'private_lessons'),
+      )
+    : requirePractice;
+  const requireCourse = dependencies.enforceAddonEntitlements
+    ? requireBoth(requirePractice, createRequireAddonMiddleware(dependencies.addonAccess!, 'ai'))
+    : requirePractice;
+  const requireAiTranslation = dependencies.enforceAddonEntitlements
+    ? requireBoth(
+        requirePaidAiTranslation,
+        createRequireAddonMiddleware(dependencies.addonAccess!, 'ai'),
+      )
+    : requirePaidAiTranslation;
+  router.get(
+    '/api/v1/addons/status',
+    dependencies.enforceAddonEntitlements ? requireVocabularyWrite : (_req, _res, next) => next(),
+    async (req, res) => {
+      if (!dependencies.enforceAddonEntitlements)
+        return res.json({ enabled: false, ai: null, privateLessons: null, requestId: req.id });
+      const [ai, privateLessons] = await Promise.all([
+        dependencies.addonAccess!.status(req.gotitAuth!, 'ai'),
+        dependencies.addonAccess!.status(req.gotitAuth!, 'private_lessons'),
+      ]);
+      res.json({ enabled: true, ai, privateLessons, requestId: req.id });
+    },
+  );
   router.get('/api/v1/capabilities', async (req, res) => {
     const profile = await dependencies.profileService.getProfile(req.gotitAuth!);
     res.json({
@@ -163,49 +204,43 @@ export function createRoutes(dependencies: AppDependencies) {
   if (dependencies.privateLessonService) {
     router.use(
       '/api/v1/private-lessons',
-      createPrivateLessonRoutes(dependencies.privateLessonService, requirePractice),
+      createPrivateLessonRoutes(dependencies.privateLessonService, requireLesson),
     );
   }
   if (dependencies.courseService) {
-    router.use('/api/v1/courses', createCourseRoutes(dependencies.courseService, requirePractice));
+    router.use('/api/v1/courses', createCourseRoutes(dependencies.courseService, requireCourse));
   }
   if (dependencies.dashboardService) {
     router.use('/api/v1/dashboard', createDashboardRoutes(dependencies.dashboardService));
     router.use('/api/v1/gamification', createGamificationRoutes(dependencies.dashboardService));
   }
   if (dependencies.readingService)
-    router.use(
-      '/api/v1/reading',
-      createReadingRoutes(
-        dependencies.readingService,
-        createRequireEntitlementMiddleware(
-          dependencies.coreAuthClient,
-          'reading.ai',
-          dependencies.enforcePaidEntitlements === true,
-        ),
-      ),
-    );
+    router.use('/api/v1/reading', createReadingRoutes(dependencies.readingService, requireAi));
   if (dependencies.speechService) {
     router.use(
       '/api/v1/learning-items',
       createSpeechItemRoutes(
         dependencies.speechService,
-        createRequireEntitlementMiddleware(
-          dependencies.coreAuthClient,
-          'speech.audio',
-          dependencies.enforcePaidEntitlements === true,
-        ),
+        dependencies.enforceAddonEntitlements
+          ? requireAi
+          : createRequireEntitlementMiddleware(
+              dependencies.coreAuthClient,
+              'speech.audio',
+              dependencies.enforcePaidEntitlements === true,
+            ),
       ),
     );
     router.use(
       '/api/v1/pronunciation',
       createPronunciationRoutes(
         dependencies.speechService,
-        createRequireEntitlementMiddleware(
-          dependencies.coreAuthClient,
-          'speech.pronunciation',
-          dependencies.enforcePaidEntitlements === true,
-        ),
+        dependencies.enforceAddonEntitlements
+          ? requireAi
+          : createRequireEntitlementMiddleware(
+              dependencies.coreAuthClient,
+              'speech.pronunciation',
+              dependencies.enforcePaidEntitlements === true,
+            ),
       ),
     );
   }
@@ -224,7 +259,7 @@ export function createRoutes(dependencies: AppDependencies) {
       createCaptureRoutes(
         dependencies.captureService,
         requireVocabularyWrite,
-        requirePaidAiTranslation,
+        requireAiTranslation,
       ),
     );
     router.use('/api/v1/learning-items', createLearningItemRoutes(dependencies.captureService));
