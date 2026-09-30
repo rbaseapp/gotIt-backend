@@ -37,6 +37,7 @@ export const privateLessonModes = ['standard', 'absolute_beginner'] as const;
 
 export const privateLessonInputSchema = z
   .object({
+    courseId: z.uuid().optional(),
     targetLanguageCode: languageSchema,
     supportLanguageCode: languageSchema.nullable().optional(),
     lessonMode: z.enum(privateLessonModes).optional(),

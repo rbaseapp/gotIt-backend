@@ -38,6 +38,7 @@ import type { PrivateLessonRoadmapStore } from './private-lesson.roadmap.js';
 import { setupPayload } from './private-lesson.roadmap.js';
 import type { PrivateLessonProficiencyStore } from './private-lesson.proficiency.js';
 import type { PrivateLessonGoalKind } from './private-lesson.curriculum.js';
+import type { CourseService } from '../courses/course.service.js';
 
 const clientSecretSchema = z
   .object({
@@ -70,6 +71,7 @@ export interface PrivateLessonVocabularySource {
 }
 
 export type PrivateLessonServiceOptions = {
+  courses?: CourseService;
   apiKey?: string;
   model: string;
   voice: string;
@@ -152,12 +154,13 @@ export class PrivateLessonService {
         (lesson) =>
           lesson.status === 'completed' &&
           lesson.report &&
-          lesson.lessonMode === requestedLessonMode &&
+          (!input.courseId || lesson.course?.courseId === input.courseId) &&
+          (Boolean(input.courseId) || lesson.lessonMode === requestedLessonMode) &&
           new Intl.Locale(lesson.targetLanguageCode).language === targetBaseLanguage,
       ) ?? null;
     const activeRoadmap =
       loadedRoadmap ??
-      (this.options.roadmaps
+      (this.options.roadmaps && !input.courseId && targetBaseLanguage === 'en'
         ? await this.options.roadmaps.create(
             scope,
             input.targetLanguageCode,
@@ -177,7 +180,7 @@ export class PrivateLessonService {
       vocabularyMode === 'learned'
         ? await this.options.vocabulary.learned(scope, input.targetLanguageCode, 20)
         : { items: [] };
-    const plan = this.buildPlan(
+    let plan: PrivateLessonPlan = this.buildPlan(
       input,
       profile,
       vocabulary.items,
@@ -186,6 +189,11 @@ export class PrivateLessonService {
       preferences,
       activeRoadmap,
     );
+    if (input.courseId) {
+      if (!this.options.courses)
+        throw new AppError(503, 'COURSE_AI_UNAVAILABLE', 'Courses are unavailable');
+      plan = await this.options.courses.prepareLesson(scope, plan, input.courseId);
+    }
     const instructions = buildPrivateLessonPrompt(plan);
     const targetLanguage = describeLessonLanguage(plan.targetLanguageCode);
     const supportLanguage = plan.supportLanguageCode
@@ -193,6 +201,7 @@ export class PrivateLessonService {
       : null;
     const transcriptionLanguage = new Intl.Locale(targetLanguage.code).language;
     const absoluteBeginner = plan.lessonMode === 'absolute_beginner';
+    const bilingualCourse = absoluteBeginner || Boolean(plan.course);
     const teacher = privateLessonTeachers[plan.teacherVoice];
     const voice = teacher.voice;
     const controller = new AbortController();
@@ -217,10 +226,11 @@ export class PrivateLessonService {
                 noise_reduction: { type: 'far_field' },
                 transcription: {
                   model: this.options.transcriptionModel,
-                  ...(absoluteBeginner ? {} : { language: transcriptionLanguage }),
-                  prompt: absoluteBeginner
-                    ? `The learner may speak ${targetLanguage.englishName} or ${supportLanguage!.englishName}. Transcribe each utterance in the language actually spoken without translating it.`
-                    : `The learner is speaking only ${targetLanguage.englishName}. Transcribe the audio as ${targetLanguage.englishName}; do not interpret it as another language.`,
+                  ...(bilingualCourse ? {} : { language: transcriptionLanguage }),
+                  prompt:
+                    bilingualCourse && supportLanguage
+                      ? `The learner may speak ${targetLanguage.englishName} or ${supportLanguage!.englishName}. Transcribe each utterance in the language actually spoken without translating it.`
+                      : `The learner is speaking only ${targetLanguage.englishName}. Transcribe the audio as ${targetLanguage.englishName}; do not interpret it as another language.`,
                 },
                 turn_detection: {
                   type: 'semantic_vad',
@@ -252,9 +262,11 @@ export class PrivateLessonService {
           openingEvent: {
             type: 'response.create',
             response: {
-              instructions: absoluteBeginner
-                ? `Begin the absolute-beginner lesson now. Greet, introduce yourself as ${teacher.name}, and explain the plan in ${supportLanguage!.promptName}. Introduce the first useful ${targetLanguage.promptName} phrase slowly, give its meaning in ${supportLanguage!.promptName}, and ask the learner to repeat it. Ask only one short question or practice instruction at a time.`
-                : `Begin the lesson now. Speak only in ${targetLanguage.promptName}. The very first spoken word must be in this language. Give a brief greeting and introduce yourself as ${teacher.name}, then follow the lesson flow in the session instructions. If this is the first lesson of the current roadmap milestone, teach the named topic, its use and sentence pattern with simple examples before conversation. Start with a recognition or guided-completion check, never a request for an original sentence. Otherwise include the short previous-lesson review when continuity data is present. Ask only one short question. Do not use any other language.`,
+              instructions: plan.course
+                ? `Begin the approved course lesson now. Introduce yourself as ${teacher.name}, state today's objective briefly in ${supportLanguage?.promptName ?? targetLanguage.promptName}, then follow the course sequence. Recall a previously taught item when continuity is available; explain and model the next target-language phrase before asking for an answer. Accept questions in the support language. Ask one short question at a time.`
+                : absoluteBeginner
+                  ? `Begin the absolute-beginner lesson now. Greet, introduce yourself as ${teacher.name}, and explain the plan in ${supportLanguage!.promptName}. Introduce the first useful ${targetLanguage.promptName} phrase slowly, give its meaning in ${supportLanguage!.promptName}, and ask the learner to repeat it. Ask only one short question or practice instruction at a time.`
+                  : `Begin the lesson now. Speak only in ${targetLanguage.promptName}. The very first spoken word must be in this language. Give a brief greeting and introduce yourself as ${teacher.name}, then follow the lesson flow in the session instructions. If this is the first lesson of the current roadmap milestone, teach the named topic, its use and sentence pattern with simple examples before conversation. Start with a recognition or guided-completion check, never a request for an original sentence. Otherwise include the short previous-lesson review when continuity data is present. Ask only one short question. Do not use any other language.`,
             },
           },
           wrapUpEvent: {
@@ -310,6 +322,7 @@ export class PrivateLessonService {
             safetyIdentifier(scope),
           )
         : basicPrivateLessonReport(claimed);
+      await this.options.courses?.recordLesson(scope, claimed, report, input.turns);
       const completed = await journal.complete(scope, id, report);
       await this.options.roadmaps?.recordEvidence(scope, claimed, report).catch(() => undefined);
       if (this.options.proficiency)
@@ -530,6 +543,7 @@ export class PrivateLessonService {
 
 function publicStoredLesson(lesson: StoredPrivateLesson) {
   return {
+    course: lesson.course ?? null,
     id: lesson.id,
     targetLanguageCode: lesson.targetLanguageCode,
     supportLanguageCode: lesson.supportLanguageCode,
@@ -558,6 +572,7 @@ function publicStoredLesson(lesson: StoredPrivateLesson) {
 function publicPlan(plan: PrivateLessonPlan) {
   const wrapUpLeadSeconds = Math.min(5, Math.max(3, Math.floor(plan.durationSeconds * 0.02)));
   return {
+    course: plan.course ?? null,
     id: plan.id,
     durationSeconds: plan.durationSeconds,
     wrapUpAfterSeconds: Math.max(0, plan.durationSeconds - wrapUpLeadSeconds),

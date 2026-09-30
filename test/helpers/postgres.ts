@@ -119,6 +119,7 @@ export async function createTestDatabase() {
       CREATE ROLE gotit_test_runtime LOGIN;
       GRANT USAGE ON SCHEMA product_gotit TO gotit_test_runtime;
       GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA product_gotit TO gotit_test_runtime;
+      ALTER DEFAULT PRIVILEGES IN SCHEMA product_gotit GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO gotit_test_runtime;
     `);
     runtimePool = new pg.Pool({
       connectionString: adminUrl.replace('://postgres@', '://gotit_test_runtime@'),

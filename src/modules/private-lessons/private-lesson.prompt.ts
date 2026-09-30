@@ -1,4 +1,5 @@
 import type { CefrLevel } from '../profile/profile.types.js';
+import type { CourseLessonContext } from '../courses/course.schemas.js';
 import { privateLessonTeachers } from './private-lesson.teachers.js';
 import type {
   privateLessonCorrectionModes,
@@ -21,6 +22,7 @@ export type PrivateLessonTarget = {
 };
 
 export type PrivateLessonPlan = {
+  course?: CourseLessonContext | null;
   id: string;
   durationSeconds: number;
   targetLanguageCode: string;
@@ -88,15 +90,17 @@ export function buildPrivateLessonPrompt(plan: PrivateLessonPlan) {
 - Use SUPPORT_LANGUAGE only for that single help response. Return to TARGET_LANGUAGE in the next response.`
     : '- No support language is configured. Never speak in a language other than TARGET_LANGUAGE.';
   const languagePolicy =
-    plan.lessonMode === 'absolute_beginner' && supportLanguage
-      ? `- This is an ABSOLUTE BEGINNER lesson. The learner has no prior knowledge of TARGET_LANGUAGE.
+    plan.course && supportLanguage && plan.lessonMode !== 'absolute_beginner'
+      ? `- Practice speech and examples in TARGET_LANGUAGE. Use SUPPORT_LANGUAGE (${supportLanguage.promptName}) for clear explanations, instructions and requested help when useful. Accept learner questions in either language. Increase target-language immersion as the learner shows understanding; never require unexplained language. Do not mistake this bilingual teaching choice for low proficiency.`
+      : plan.lessonMode === 'absolute_beginner' && supportLanguage
+        ? `- This is an ABSOLUTE BEGINNER lesson. The learner has no prior knowledge of TARGET_LANGUAGE.
 - TEACHING_LANGUAGE is SUPPORT_LANGUAGE: ${supportLanguage.promptName}.
 - Speak primarily in TEACHING_LANGUAGE so every instruction and explanation is understandable.
 - Introduce TARGET_LANGUAGE only in short, clearly isolated words, chunks, and model sentences.
 - Immediately give the meaning in TEACHING_LANGUAGE before or after each new TARGET_LANGUAGE phrase.
 - Never conduct a target-language-only conversation or assume the learner understands an unexplained TARGET_LANGUAGE instruction.
 - Gradually reuse learned phrases, but return to TEACHING_LANGUAGE whenever giving directions, feedback, or a new explanation.`
-      : `- Speak in TARGET_LANGUAGE from the very first spoken word through the final goodbye.
+        : `- Speak in TARGET_LANGUAGE from the very first spoken word through the final goodbye.
 - Every greeting, question, example, hint, correction, explanation, acknowledgement, recap, and clarification must be in TARGET_LANGUAGE.
 - Do not speak English or any other language unless it is TARGET_LANGUAGE or the explicit support-language exception below applies.
 - Do not mirror or switch to another language because of the learner's accent, background speech, hesitation, isolated words, or use of another language.
@@ -111,7 +115,7 @@ ${standardSupportLanguagePolicy}`;
 - Check understanding in TEACHING_LANGUAGE. End with a tiny role-play that uses only phrases taught during this lesson.`
       : '';
   const learnerSpeechPolicy =
-    plan.lessonMode === 'absolute_beginner'
+    plan.lessonMode === 'absolute_beginner' || plan.course
       ? '- The learner may speak either TARGET_LANGUAGE or TEACHING_LANGUAGE. Respond to the meaning, and gently bring the next practice step back to a taught TARGET_LANGUAGE phrase.'
       : '- Treat learner speech as TARGET_LANGUAGE only. When sounds are ambiguous, interpret them as TARGET_LANGUAGE; if they cannot form a plausible TARGET_LANGUAGE utterance, ask the learner to repeat instead of identifying or transcribing another language.';
   const translationHelpPolicy = supportLanguage
@@ -165,6 +169,7 @@ ${standardSupportLanguagePolicy}`;
       })),
       previousLesson: plan.continuity,
       learningRoadmap: plan.roadmap,
+      course: plan.course ?? null,
     },
     null,
     2,
@@ -205,6 +210,7 @@ ${beginnerTeachingPolicy}
 ${translationHelpPolicy}
 
 # Lesson flow
+- When course is supplied it sets today's scope: teach its objective and preserve the approved sequence. Begin with a brief recall informed by course.homework. Missing homework means offer a short recap, never punishment or a blocked lesson. Teach/model, guide practice, then elicit independent use without giving the answer. The last planned lesson in a unit uses its successTask. Stay within the approved curriculum instead of introducing unrelated calibration material. Adapt explanations, activity length and reading demands to course.preferences.ageGroup and literacy. Do not treat a child as an adult beginner. Support-language explanations are available throughout a course lesson; target-language examples and practice remain central.
 - Opening: greet briefly. When learningRoadmap.isFirstMilestoneLesson is true, the roadmap introduction below takes priority over previous-lesson recall. Otherwise, when previousLesson is present, begin with one short active-recall prompt based on its correction, vocabulary, or nextLessonPlan; when neither applies, ask an easy question about the topic.
 - Continuity: when previousLesson is present, explicitly continue its nextLessonPlan and revisit one prior difficulty before introducing new material. Do not repeat the entire previous lesson.
 - First roadmap lesson: when learningRoadmap.isFirstMilestoneLesson is true, teach before starting the conversation. In beginner-friendly TARGET_LANGUAGE, explain what the current grammarTopics mean, when they are used and when they are not used. Show the basic sentence pattern and name its parts in plain language, contrast the key forms where relevant, and give two short level-appropriate examples. Then ask one recognition or choice-based comprehension check. Do not assume the learner already knows the name of the topic.

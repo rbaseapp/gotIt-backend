@@ -67,7 +67,10 @@ export async function verifyRuntimeSchema(client, { strictRole = true } = {}) {
       'report',
       'started_at',
       'deleted_at',
+      'course_context',
     ],
+    learning_documents: ['application_id', 'application_user_id', 'id', 'kind', 'revision', 'document'],
+    learning_commands: ['application_id', 'application_user_id', 'event_id', 'fingerprint', 'document_id', 'response_document'],
     private_lesson_preferences: [
       'target_language_code',
       'correction_mode',

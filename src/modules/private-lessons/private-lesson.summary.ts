@@ -540,7 +540,14 @@ export class OpenAiPrivateLessonSummaryGenerator implements PrivateLessonSummary
                   correctionMode: plan.correctionMode,
                   vocabularyMode: plan.vocabularyMode,
                   previousLesson: plan.continuity,
-                  learningRoadmap: plan.roadmap,
+                  learningRoadmap: plan.course
+                    ? {
+                        communicationObjective: plan.course.objective,
+                        grammarTopics: [plan.grammarFocus],
+                        successTask: plan.course.successTask,
+                      }
+                    : plan.roadmap,
+                  course: plan.course ?? null,
                   targetVocabulary: plan.targets,
                   transcript: turns,
                 },
@@ -907,7 +914,7 @@ function normalizeRoadmapProgress(
   progress: PrivateLessonReport['roadmapProgress'],
   plan: PrivateLessonPlan,
 ): PrivateLessonReport['roadmapProgress'] {
-  if (!plan.roadmap) return null;
+  if (!plan.roadmap && !plan.course) return null;
   if (!progress)
     return {
       objectiveCompletionScore: 0,
@@ -924,6 +931,6 @@ function normalizeRoadmapProgress(
     progress.confidence !== 'low' &&
     progress.objectiveCompletionScore >= 70 &&
     progress.targetFormControlScore >= 60 &&
-    score >= plan.roadmap.successCriteria.targetScore;
+    score >= (plan.course ? 80 : plan.roadmap!.successCriteria.targetScore);
   return { ...progress, score, taskCompleted };
 }

@@ -24,6 +24,7 @@ import {
 } from './shared/middleware/require-entitlement.js';
 import { createWordPackRoutes } from './modules/word-packs/word-packs.routes.js';
 import { createPrivateLessonRoutes } from './modules/private-lessons/private-lesson.routes.js';
+import { createCourseRoutes } from './modules/courses/course.routes.js';
 import {
   privateLessonDemoCss,
   privateLessonDemoHtml,
@@ -127,6 +128,7 @@ export function createRoutes(dependencies: AppDependencies) {
         readingGeneration: dependencies.readingService?.available ?? false,
         speech: dependencies.speechService?.available ?? false,
         privateLessons: dependencies.privateLessonService?.available ?? false,
+        courses: dependencies.courseService?.available ?? false,
       },
       learningLanguages: profile.languages.map((l) => ({
         languageCode: l.languageCode,
@@ -163,6 +165,9 @@ export function createRoutes(dependencies: AppDependencies) {
       '/api/v1/private-lessons',
       createPrivateLessonRoutes(dependencies.privateLessonService, requirePractice),
     );
+  }
+  if (dependencies.courseService) {
+    router.use('/api/v1/courses', createCourseRoutes(dependencies.courseService, requirePractice));
   }
   if (dependencies.dashboardService) {
     router.use('/api/v1/dashboard', createDashboardRoutes(dependencies.dashboardService));

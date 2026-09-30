@@ -28,6 +28,9 @@ import { PixabayStudyImageProvider } from './modules/practice/pixabay-study-imag
 import { FallbackStudyImageProvider } from './modules/practice/study-image.provider.js';
 import { WordPackRepository } from './modules/word-packs/word-packs.repository.js';
 import { PrivateLessonService } from './modules/private-lessons/private-lesson.service.js';
+import { CourseService } from './modules/courses/course.service.js';
+import { PostgresLearningDocumentStore } from './modules/courses/course.repository.js';
+import { OpenAiCourseGenerator } from './modules/courses/course.provider.js';
 import { PostgresPrivateLessonRoadmapStore } from './modules/private-lessons/private-lesson.roadmap.js';
 import {
   PostgresPrivateLessonJournal,
@@ -176,7 +179,19 @@ const speechProvider =
         )
       : undefined;
 const speechService: SpeechService = new SpeechService(pool, practiceService, speechProvider);
+const courseService = new CourseService(
+  new PostgresLearningDocumentStore(pool),
+  profileService,
+  env.OPENAI_API_KEY && env.OPENAI_TRANSLATION_MODEL
+    ? new OpenAiCourseGenerator(
+        env.OPENAI_API_KEY,
+        env.OPENAI_TRANSLATION_MODEL,
+        env.OPENAI_REALTIME_TRANSCRIPTION_MODEL,
+      )
+    : undefined,
+);
 const privateLessonService = new PrivateLessonService({
+  courses: courseService,
   apiKey: env.OPENAI_REALTIME_API_KEY ?? env.OPENAI_API_KEY,
   model: env.OPENAI_REALTIME_MODEL,
   voice: env.OPENAI_REALTIME_VOICE,
@@ -222,6 +237,7 @@ const app = createApp({
   ),
   speechService,
   privateLessonService,
+  courseService,
   wordPackService: new WordPackRepository(pool),
   enforcePaidEntitlements: env.ENFORCE_PAID_ENTITLEMENTS,
   rateLimiter,

@@ -11,6 +11,7 @@ import type { ProfileServiceContract } from '../../modules/profile/profile.types
 import type { CoreAuthClient } from '../core/core-auth.client.js';
 import type { WordPackRepository } from '../../modules/word-packs/word-packs.repository.js';
 import type { PrivateLessonService } from '../../modules/private-lessons/private-lesson.service.js';
+import type { CourseService } from '../../modules/courses/course.service.js';
 
 export type AppDependencies = {
   logger: Logger;
@@ -26,6 +27,7 @@ export type AppDependencies = {
   speechService?: SpeechService;
   wordPackService?: WordPackRepository;
   privateLessonService?: PrivateLessonService;
+  courseService?: CourseService;
   enforcePaidEntitlements?: boolean;
   corsOrigins?: string[];
   trustProxyHops?: number;

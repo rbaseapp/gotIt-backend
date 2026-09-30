@@ -92,8 +92,8 @@ export class PostgresPrivateLessonJournal implements PrivateLessonJournal {
       `INSERT INTO product_gotit.private_lesson_sessions
        (id,application_id,application_user_id,target_language_code,support_language_code,level,topic,
         grammar_focus,focus_areas,custom_focus,correction_mode,vocabulary_mode,lesson_mode,continuity,teacher_voice,speech_rate,
-        planned_duration_seconds,target_words,roadmap_id,milestone_id)
-       VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10,$11,$12,$13,$14::jsonb,$15,$16,$17,$18::jsonb,$19,$20)`,
+        planned_duration_seconds,target_words,roadmap_id,milestone_id,course_context)
+       VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10,$11,$12,$13,$14::jsonb,$15,$16,$17,$18::jsonb,$19,$20,$21::jsonb)`,
       [
         plan.id,
         scope.applicationId,
@@ -115,6 +115,7 @@ export class PostgresPrivateLessonJournal implements PrivateLessonJournal {
         JSON.stringify(plan.targets),
         plan.roadmap?.roadmapId ?? null,
         plan.roadmap?.milestoneId ?? null,
+        plan.course ? JSON.stringify(plan.course) : null,
       ],
     );
   }
@@ -193,7 +194,7 @@ export class PostgresPrivateLessonJournal implements PrivateLessonJournal {
 }
 
 const selectFields = `SELECT s.id,s.target_language_code,s.support_language_code,s.level,s.topic,s.grammar_focus,
- s.focus_areas,s.custom_focus,s.correction_mode,s.vocabulary_mode,s.lesson_mode,s.continuity,s.roadmap_id,s.milestone_id,
+ s.focus_areas,s.custom_focus,s.correction_mode,s.vocabulary_mode,s.lesson_mode,s.continuity,s.roadmap_id,s.milestone_id,s.course_context,
  s.teacher_voice,s.speech_rate,s.planned_duration_seconds,s.target_words,s.status,s.started_at,s.ended_at,
  s.actual_duration_seconds,s.report,r.goal_title,m.milestone_key,m.communication_objective,m.grammar_topics,
  m.success_criteria,m.evidence_lesson_count
@@ -208,6 +209,7 @@ function storedLesson(row: Record<string, unknown>): StoredPrivateLesson {
   const rawReport =
     row.report && typeof row.report === 'object' ? (row.report as Record<string, unknown>) : null;
   return {
+    course: (row.course_context as PrivateLessonPlan['course']) ?? null,
     id: String(row.id),
     durationSeconds: Number(row.planned_duration_seconds),
     targetLanguageCode: String(row.target_language_code),

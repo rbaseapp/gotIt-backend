@@ -152,7 +152,7 @@ test(
           const packCall = (method: Parameters<typeof call>[0], url: string, body?: object) =>
             call(method, url, body, randomUUID(), 1);
           const catalog = await packCall('get', '/word-packs').expect(200);
-          assert.equal(catalog.body.packs.length, 3);
+          assert.equal(catalog.body.packs.length, 19);
           const pack = catalog.body.packs.find(
             (candidate: { slug: string }) => candidate.slug === 'business-beginner-1-en-he',
           );
@@ -928,7 +928,7 @@ test(
             client.release();
           }
           const inspection = await inspectProduction(db.runtimePool.options.connectionString);
-          assert.equal(inspection.productTableCount, 37);
+          assert.equal(inspection.productTableCount, 39);
           assert.deepEqual(inspection.v1, {
             learningRevision: true,
             captureReceipts: true,
@@ -1385,6 +1385,7 @@ test(
         'study images are reused across users for the same translated sense',
         async () => {
           const generationBaseline = studyImageGenerations;
+          const assetBaseline = (await db.adminPool.query('SELECT count(*)::integer count FROM product_gotit.study_image_assets')).rows[0].count as number;
           const imageResponses = [];
           const directPractices = new PracticeService(
             db.adminPool,
@@ -1456,7 +1457,7 @@ test(
                 'SELECT count(*)::integer count FROM product_gotit.study_image_assets',
               )
             ).rows[0].count,
-            1,
+            assetBaseline + 1,
           );
         },
       );

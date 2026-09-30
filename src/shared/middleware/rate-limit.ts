@@ -46,6 +46,7 @@ export function createRateLimit(
     try {
       const scope = req.gotitAuth;
       const expensive =
+        (req.method !== 'GET' && req.originalUrl.startsWith('/api/v1/courses/')) ||
         /^\/api\/v1\/(?:captures\/preview|reading\/preview|pronunciation\/assessments|learning-items\/[^/]+\/audio|import)$/u.test(
           req.originalUrl.split('?')[0]!,
         );
