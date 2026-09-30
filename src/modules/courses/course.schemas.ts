@@ -30,6 +30,21 @@ export const intakeReplySchema = z
     preferences: coursePreferencesSchema,
   })
   .strict();
+export const intakeQuestionsSchema = z
+  .object({
+    closing: text(140),
+    questions: z
+      .array(
+        z
+          .object({
+            question: text(120),
+            suggestions: z.array(text(70)).max(3),
+          })
+          .strict(),
+      )
+      .length(6),
+  })
+  .strict();
 export const courseUnitSchema = z
   .object({
     key: text(70).regex(/^[a-z0-9-]+$/),
@@ -87,6 +102,10 @@ export type CourseDocument = {
   messages: Array<{ role: 'learner' | 'tutor'; text: string; channel: 'text' | 'voice' }>;
   intakeAnswers?: Array<{ topic: string; text: string; channel: 'text' | 'voice' }>;
   suggestions: string[];
+  intakeQuestions?: z.infer<typeof intakeQuestionsSchema>['questions'];
+  intakeClosing?: string;
+  intakeStep?: number;
+  reportedAvailability?: string;
   versions: CourseVersion[];
   draftVersion: number | null;
   activeVersion: number | null;
@@ -160,6 +179,7 @@ export type HomeworkDocument = {
   title: string;
   source: { report: unknown; turns: Array<{ role: 'learner' | 'tutor'; text: string }> };
   content: z.infer<typeof homeworkContentSchema> | null;
+  qualityVersion?: number;
   progress: Array<{ attempts: HomeworkAttempt[]; hintUsed: boolean; done: boolean; draft: string }>;
 };
 export type LearningDocument = CourseDocument | HomeworkDocument;

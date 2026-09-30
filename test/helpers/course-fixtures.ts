@@ -185,16 +185,32 @@ export class FixtureGenerator implements CourseGenerator {
       ? await this.handler(name, data)
       : name === 'course_plan'
         ? plan
-        : name === 'course_intake'
+        : name === 'course_intake' || name === 'course_intake_revision'
           ? {
               message: 'מה חשוב לך ללמוד?',
               suggestions: ['לדבר', 'דקדוק', 'לא בטוח'],
               ready: true,
               preferences,
             }
-          : name === 'lesson_homework'
-            ? homeworkFixture().content
-            : { result: 'retry', feedback: 'Try matching the subject.' };
+          : name === 'course_intake_questions'
+            ? {
+                closing: 'סיימנו. אפשר לעבור על הפרטים לפני בניית התוכנית.',
+                questions: [
+                  'מה תרצה ללמוד לעשות בשפה החדשה?',
+                  'מה כבר למדת בשפה הזאת?',
+                  'בן כמה אתה, או לאיזו קבוצת גיל אתה שייך?',
+                  'איך נוח לך לקרוא ולכתוב בשפה החדשה?',
+                  'אילו נושאים מעניינים אותך?',
+                  'כמה דקות מתאים לך לשיעור וכמה פעמים בשבוע?',
+                ].map((question) => ({ question, suggestions: [] })),
+              }
+            : name === 'course_intake_questions_review'
+              ? { valid: true, feedback: 'Clear interview' }
+              : name === 'lesson_homework'
+                ? homeworkFixture().content
+                : name === 'lesson_homework_review'
+                  ? { valid: true, feedback: 'Clear and grounded' }
+                  : { result: 'retry', feedback: 'Try matching the subject.' };
     return schema.parse(result);
   }
   async transcribe() {
