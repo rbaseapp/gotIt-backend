@@ -84,7 +84,8 @@ export function buildCanonicalAssessment(
   const learnerText = learnerTurns.map((turn) => normalizeText(turn.text));
   const wordCount = learnerTurns.reduce((sum, turn) => sum + countWords(turn.text), 0);
   const taskLevel = taskLevelForPlan(plan);
-  const legacyTenPointScale = Math.max(...ASSESSMENT_SKILLS.map((skill) => rawSkills[skill].score)) <= 10;
+  const legacyTenPointScale =
+    Math.max(...ASSESSMENT_SKILLS.map((skill) => rawSkills[skill].score)) <= 10;
   const volumeQuality = qualityForVolume(wordCount, learnerTurns.length);
 
   const skills = Object.fromEntries(
@@ -94,7 +95,8 @@ export function buildCanonicalAssessment(
         learnerText.some((turn) => turn.includes(normalizeText(item.learnerQuote))),
       );
       const evidenceQuality = lowerQuality(raw.evidenceQuality, volumeQuality);
-      const dimensions = raw.dimensions ?? dimensionsFromLegacyScore(raw.score, legacyTenPointScale);
+      const dimensions =
+        raw.dimensions ?? dimensionsFromLegacyScore(raw.score, legacyTenPointScale);
       const dimensionScore = weightedDimensionScore(dimensions);
       const evidenceCount = evidence.length;
       const quality = evidenceCount === 0 ? lowerQuality(evidenceQuality, 'weak') : evidenceQuality;
@@ -126,7 +128,11 @@ export function buildCanonicalAssessment(
   const evidenceSufficient =
     wordCount >= 100 && usableSkills.length >= 3 && independentEvidenceCount >= 4;
   const overallScore = weightedOverallScore(skills);
-  const strongestQuality = qualityForOverall(wordCount, usableSkills.length, independentEvidenceCount);
+  const strongestQuality = qualityForOverall(
+    wordCount,
+    usableSkills.length,
+    independentEvidenceCount,
+  );
   const confidence = evidenceSufficient
     ? strongestQuality === 'strong'
       ? 'high'
@@ -195,7 +201,7 @@ export function taskLevelForPlan(plan: PrivateLessonPlan): CefrLevel {
   const independentStage =
     plan.roadmap?.milestoneKey === 'free-conversation' ||
     plan.roadmap?.milestoneKey === 'independent-mastery';
-  return independentStage ? nextLevel(baseLevel) ?? baseLevel : baseLevel;
+  return independentStage ? (nextLevel(baseLevel) ?? baseLevel) : baseLevel;
 }
 
 export function levelForScore(score: number): CefrLevel {
@@ -219,11 +225,7 @@ export function qualityWeight(quality: EvidenceQuality) {
   return { insufficient: 0.04, weak: 0.08, moderate: 0.16, strong: 0.25 }[quality];
 }
 
-function observedAbilityScore(
-  taskLevel: CefrLevel,
-  performance: number,
-  quality: EvidenceQuality,
-) {
+function observedAbilityScore(taskLevel: CefrLevel, performance: number, quality: EvidenceQuality) {
   if (quality === 'insufficient') return CEFR_SCORE[taskLevel];
   return clamp(Math.round(CEFR_SCORE[taskLevel] + (performance - 70) * 0.4), 0, 100);
 }
@@ -273,8 +275,7 @@ function qualityForOverall(
 ): EvidenceQuality {
   if (wordCount < 15) return 'insufficient';
   if (wordCount < 60 || usableSkillCount < 2) return 'weak';
-  if (wordCount < 140 || usableSkillCount < 4 || independentEvidenceCount < 7)
-    return 'moderate';
+  if (wordCount < 140 || usableSkillCount < 4 || independentEvidenceCount < 7) return 'moderate';
   return 'strong';
 }
 

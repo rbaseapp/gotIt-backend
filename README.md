@@ -138,6 +138,11 @@ returned opening and wrap-up events over the WebRTC data channel. At the time li
 waits for the recap and warm goodbye to finish playing before disconnecting, with a
 bounded fallback timeout. No lesson transcript or learning evidence is persisted in
 this POC.
+Course planning, per-lesson teaching briefs, homework and post-lesson reports use
+`OPENAI_PRIVATE_LESSON_MODEL` (deployment default `gpt-6-sol`) through the Responses
+API. The teaching brief supplies a short explanation, examples and practice checks
+to the Realtime tutor. `OPENAI_TRANSLATION_MODEL` remains assigned to contextual
+translation and other non-lesson tasks.
 Open `/demo/private-lesson` on the running backend for the standalone demo UI; it
 keeps the supplied Core bearer token in memory only and still enforces authentication
 when it creates the short-lived Realtime session.

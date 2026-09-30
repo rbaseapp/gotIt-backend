@@ -40,6 +40,12 @@ import { setupPayload } from './private-lesson.roadmap.js';
 import type { PrivateLessonProficiencyStore } from './private-lesson.proficiency.js';
 import type { PrivateLessonGoalKind } from './private-lesson.curriculum.js';
 import type { CourseService } from '../courses/course.service.js';
+import type { CourseGenerator } from '../courses/course.provider.js';
+import {
+  privateLessonBriefInput,
+  privateLessonBriefInstruction,
+  privateLessonBriefSchema,
+} from './private-lesson.content.js';
 
 const clientSecretSchema = z
   .object({
@@ -73,6 +79,7 @@ export interface PrivateLessonVocabularySource {
 
 export type PrivateLessonServiceOptions = {
   courses?: CourseService;
+  lessonContentGenerator?: Pick<CourseGenerator, 'generate'>;
   apiKey?: string;
   model: string;
   voice: string;
@@ -225,8 +232,19 @@ export class PrivateLessonService {
       plan = { ...plan, durationSeconds: allowance.lessonDurationSeconds! };
     }
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), this.requestTimeoutMs);
+    let timeout: ReturnType<typeof setTimeout> | undefined;
     try {
+      if (this.options.lessonContentGenerator) {
+        const teachingBrief = await this.options.lessonContentGenerator.generate(
+          scope,
+          privateLessonBriefSchema,
+          'private_lesson_brief',
+          privateLessonBriefInstruction,
+          privateLessonBriefInput(plan),
+        );
+        plan = { ...plan, teachingBrief };
+      }
+      timeout = setTimeout(() => controller.abort(), this.requestTimeoutMs);
       const instructions = buildPrivateLessonPrompt(plan);
       // Realtime response instructions replace (rather than append to) session
       // instructions. Preserve the full teaching policy and approved lesson data.
@@ -326,7 +344,7 @@ export class PrivateLessonService {
       if (reservedLessonId) await this.options.lessonAccess!.releaseLesson(reservedLessonId);
       throw privateLessonProviderError(error, controller.signal.aborted);
     } finally {
-      clearTimeout(timeout);
+      if (timeout) clearTimeout(timeout);
     }
   }
 

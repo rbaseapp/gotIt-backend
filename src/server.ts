@@ -181,19 +181,22 @@ const speechProvider =
         )
       : undefined;
 const speechService: SpeechService = new SpeechService(pool, practiceService, speechProvider);
+const privateLessonContentApiKey = env.OPENAI_API_KEY ?? env.OPENAI_REALTIME_API_KEY;
+const privateLessonContentGenerator = privateLessonContentApiKey
+  ? new OpenAiCourseGenerator(
+      privateLessonContentApiKey,
+      env.OPENAI_PRIVATE_LESSON_MODEL,
+      env.OPENAI_REALTIME_TRANSCRIPTION_MODEL,
+    )
+  : undefined;
 const courseService = new CourseService(
   new PostgresLearningDocumentStore(pool),
   profileService,
-  env.OPENAI_API_KEY && env.OPENAI_TRANSLATION_MODEL
-    ? new OpenAiCourseGenerator(
-        env.OPENAI_API_KEY,
-        env.OPENAI_TRANSLATION_MODEL,
-        env.OPENAI_REALTIME_TRANSCRIPTION_MODEL,
-      )
-    : undefined,
+  privateLessonContentGenerator,
 );
 const privateLessonService = new PrivateLessonService({
   courses: courseService,
+  lessonContentGenerator: privateLessonContentGenerator,
   apiKey: env.OPENAI_REALTIME_API_KEY ?? env.OPENAI_API_KEY,
   model: env.OPENAI_REALTIME_MODEL,
   voice: env.OPENAI_REALTIME_VOICE,
@@ -204,14 +207,13 @@ const privateLessonService = new PrivateLessonService({
   journal: new PostgresPrivateLessonJournal(pool),
   roadmaps: new PostgresPrivateLessonRoadmapStore(pool),
   proficiency: new PostgresPrivateLessonProficiencyStore(pool),
-  summaryGenerator:
-    env.OPENAI_API_KEY && env.OPENAI_TRANSLATION_MODEL
-      ? new OpenAiPrivateLessonSummaryGenerator(
-          env.OPENAI_API_KEY,
-          env.OPENAI_TRANSLATION_MODEL,
-          fetch,
-        )
-      : undefined,
+  summaryGenerator: privateLessonContentApiKey
+    ? new OpenAiPrivateLessonSummaryGenerator(
+        privateLessonContentApiKey,
+        env.OPENAI_PRIVATE_LESSON_MODEL,
+        fetch,
+      )
+    : undefined,
   lessonAccess: env.ENFORCE_ADDON_ENTITLEMENTS ? addonAccess : undefined,
 });
 const rateLimiter = new PostgresRateLimiter(pool);
