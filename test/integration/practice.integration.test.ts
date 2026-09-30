@@ -1465,6 +1465,172 @@ test(
           );
         },
       );
+      await t.test(
+        'smart drag success persists and the next round uses remaining words before recycling',
+        async () => {
+          const learner = randomUUID();
+          users.push(learner);
+          await db.adminPool.query(
+            'INSERT INTO core.application_users(id,application_id,email) VALUES($1,$2,$3)',
+            [learner, applicationId, 'drag-round@example.test'],
+          );
+          const captureWords = async (prefix: string) => {
+            const words: { id: string; meaning: string }[] = [];
+            for (let index = 0; index < 5; index++) {
+              const meaning = `${prefix} meaning ${index}`;
+              const response = await call(
+                'post',
+                '/captures',
+                {
+                  item: {
+                    sourceText: `${prefix} word ${index}`,
+                    sourceLanguageCode: 'en',
+                    translationLanguageCode: 'he',
+                    itemType: 'phrase',
+                  },
+                  translation: { text: meaning },
+                  context: { selectedText: `${prefix} word ${index}` },
+                  senseDecision: { mode: 'auto' },
+                },
+                randomUUID(),
+                2,
+              ).expect(201);
+              words.push({ id: response.body.capture.learningItemId, meaning });
+            }
+            return words;
+          };
+          const submitBoard = async (sessionId: string) => {
+            const board = await call(
+              'post',
+              `/practice/sessions/${sessionId}/exercises`,
+              {
+                count: 3,
+                exerciseType: 'matching',
+                kind: 'multiple_choice',
+                direction: 'source_to_translation',
+              },
+              randomUUID(),
+              2,
+            ).expect(201);
+            for (const exercise of board.body.exercises) {
+              const meaning = (
+                await db.adminPool.query(
+                  'SELECT translation_text FROM product_gotit.item_translations WHERE learning_item_id=$1 AND is_primary AND is_current',
+                  [exercise.learningItemId],
+                )
+              ).rows[0].translation_text;
+              const choice = board.body.matchingGroup.choices.find(
+                (candidate: { text: string }) => candidate.text === meaning,
+              );
+              assert.ok(choice);
+              const result = await call(
+                'post',
+                '/practice/attempts',
+                { exerciseId: exercise.id, choiceId: choice.id },
+                randomUUID(),
+                2,
+              ).expect(201);
+              assert.equal(result.body.attempt.result, 'correct');
+            }
+            return board.body.exercises.map(
+              (exercise: { learningItemId: string }) => exercise.learningItemId,
+            );
+          };
+
+          const roundWords = await captureWords('round');
+          await db.adminPool.query(
+            `UPDATE product_gotit.learning_items SET learning_status='mastered',review_stage=2,
+             overall_mastery_score=90,next_review_at=now()-interval '1 day'
+             WHERE id=ANY($1::uuid[])`,
+            [roundWords.slice(0, 3).map((word) => word.id)],
+          );
+          const roundSession = (
+            await call(
+              'post',
+              '/practice/sessions',
+              { sessionType: 'smart_review', learningItemIds: roundWords.map((word) => word.id) },
+              randomUUID(),
+              2,
+            ).expect(201)
+          ).body.session;
+          const solved = await submitBoard(roundSession.id);
+          assert.deepEqual(new Set(solved), new Set(roundWords.slice(0, 3).map((word) => word.id)));
+          const persisted = await db.adminPool.query(
+            'SELECT id,next_review_at FROM product_gotit.learning_items WHERE id=ANY($1::uuid[])',
+            [solved],
+          );
+          assert.equal(persisted.rows.length, 3);
+          assert.ok(persisted.rows.every((row) => row.next_review_at > new Date()));
+          const next = await call(
+            'post',
+            `/practice/sessions/${roundSession.id}/exercises`,
+            { count: 2 },
+            randomUUID(),
+            2,
+          ).expect(201);
+          assert.deepEqual(
+            new Set(
+              next.body.exercises.map(
+                (exercise: { learningItemId: string }) => exercise.learningItemId,
+              ),
+            ),
+            new Set(roundWords.slice(3).map((word) => word.id)),
+          );
+          await call(
+            'patch',
+            `/practice/sessions/${roundSession.id}`,
+            { status: 'completed' },
+            randomUUID(),
+            2,
+          ).expect(200);
+
+          await call(
+            'post',
+            '/learning-items/bulk',
+            {
+              ids: roundWords.slice(3).map((word) => word.id),
+              action: 'pause',
+            },
+            randomUUID(),
+            2,
+          ).expect(200);
+          const queueWords = await captureWords('queue');
+          const queueSession = (
+            await call(
+              'post',
+              '/practice/sessions',
+              { sessionType: 'smart_review', learningItemIds: queueWords.map((word) => word.id) },
+              randomUUID(),
+              2,
+            ).expect(201)
+          ).body.session;
+          const queueSolved = await submitBoard(queueSession.id);
+          const queued = await call(
+            'get',
+            '/learning/queue?limit=2',
+            undefined,
+            randomUUID(),
+            2,
+          ).expect(200);
+          assert.deepEqual(
+            new Set(queued.body.items.map((item: { id: string }) => item.id)),
+            new Set(queueWords.map((word) => word.id).filter((id) => !queueSolved.includes(id))),
+          );
+          const exhausted = await call(
+            'get',
+            '/learning/queue?limit=5',
+            undefined,
+            randomUUID(),
+            2,
+          ).expect(200);
+          assert.ok(
+            exhausted.body.items.some((item: { id: string }) => queueSolved.includes(item.id)),
+          );
+          assert.ok(
+            exhausted.body.items.every((item: { id: string }) => !solved.includes(item.id)),
+          );
+        },
+      );
     } finally {
       await db.dispose();
     }

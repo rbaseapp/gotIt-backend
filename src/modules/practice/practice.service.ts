@@ -181,6 +181,12 @@ export class PracticeService {
       await tx.query(
         `WITH candidates AS(SELECT li.*,
       (SELECT translation_text FROM product_gotit.item_translations t WHERE t.application_id=li.application_id AND t.application_user_id=li.application_user_id AND t.learning_item_id=li.id AND t.is_current AND is_primary) primary_translation,
+      EXISTS(SELECT 1 FROM product_gotit.practice_attempts recent
+        WHERE recent.application_id=li.application_id AND recent.application_user_id=li.application_user_id
+          AND recent.learning_item_id=li.id AND recent.exercise_type='matching'
+          AND recent.result='correct' AND recent.score>=85
+          AND COALESCE(recent.learning_revision,1)=li.learning_revision
+          AND (recent.created_at AT TIME ZONE $4)::date=(now() AT TIME ZONE $4)::date) recent_matching_success,
       (CASE WHEN li.next_review_at<=now() THEN 100+LEAST(100,EXTRACT(epoch FROM now()-li.next_review_at)/86400) ELSE 0 END
        +(100-li.overall_mastery_score)/2+CASE WHEN li.user_priority='high' THEN 30 ELSE 0 END
        +CASE WHEN li.manual_hard THEN 20 ELSE 0 END+COALESCE(li.system_difficulty,0)*20
@@ -222,7 +228,8 @@ export class PracticeService {
       (learning_status<>'new' OR new_rank<=GREATEST(0,$3-(SELECT count(DISTINCT a.learning_item_id) FROM product_gotit.practice_attempts a
        JOIN product_gotit.learning_items i ON i.application_id=a.application_id AND i.application_user_id=a.application_user_id AND i.id=a.learning_item_id
        WHERE a.application_id=$1 AND a.application_user_id=$2 AND (a.created_at AT TIME ZONE $4)::date=(now() AT TIME ZONE $4)::date AND a.result<>'skipped' AND NOT EXISTS(SELECT 1 FROM product_gotit.practice_attempts older WHERE older.application_id=a.application_id AND older.application_user_id=a.application_user_id AND older.learning_item_id=a.learning_item_id AND older.result<>'skipped' AND (older.created_at AT TIME ZONE $4)::date<(now() AT TIME ZONE $4)::date))))
-       AND (learning_status<>'mastered' OR next_review_at<=now()) ORDER BY queue_score DESC,created_at,id LIMIT $9`,
+       AND (learning_status<>'mastered' OR next_review_at<=now())
+       ORDER BY recent_matching_success,queue_score DESC,created_at,id LIMIT $9`,
         [
           ...scopeValues(scope),
           profile.defaultNewItemsPerDay,
@@ -799,7 +806,7 @@ export class PracticeService {
         if (!content) throw new AppError(409, 'READING_UNAVAILABLE', 'Reading was deleted');
         readingBody = content.body_text;
       }
-      const rows = (
+      let rows = (
         await tx.query(
           `SELECT li.*,ARRAY(SELECT translation_text FROM product_gotit.item_translations t WHERE t.application_id=li.application_id AND t.application_user_id=li.application_user_id AND t.learning_item_id=li.id AND t.is_current ORDER BY is_primary DESC,id) translations,
       COALESCE((SELECT sentence_text FROM product_gotit.item_occurrences o WHERE o.application_id=li.application_id AND o.application_user_id=li.application_user_id AND o.learning_item_id=li.id AND o.learning_revision=li.learning_revision AND sentence_text IS NOT NULL ORDER BY captured_at DESC,id LIMIT 1),
@@ -809,6 +816,33 @@ export class PracticeService {
         )
       ).rows;
       if (!rows.length) throw new AppError(409, 'NO_ELIGIBLE_ITEMS', 'No eligible learning items');
+      if (session.session_type === 'smart_review' && !input.learningItemIds) {
+        const issued = new Set(
+          (
+            await tx.query(
+              'SELECT DISTINCT learning_item_id FROM product_gotit.practice_exercises WHERE application_id=$1 AND application_user_id=$2 AND practice_session_id=$3',
+              [...scopeValues(scope), id],
+            )
+          ).rows.map((row) => row.learning_item_id as string),
+        );
+        const succeeded = new Set(
+          (
+            await tx.query(
+              `SELECT DISTINCT learning_item_id FROM product_gotit.practice_attempts
+               WHERE application_id=$1 AND application_user_id=$2 AND practice_session_id=$3
+                 AND result='correct' AND score>=85`,
+              [...scopeValues(scope), id],
+            )
+          ).rows.map((row) => row.learning_item_id as string),
+        );
+        // A new round uses unseen items before failed ones and successful ones.
+        // Retain the existing review-date order within each group; only recycle
+        // successes when the session's selected pool has been exhausted.
+        const rank = (itemId: string) => (!issued.has(itemId) ? 0 : succeeded.has(itemId) ? 2 : 1);
+        rows = [...rows].sort((a, b) => rank(a.id) - rank(b.id));
+      }
+      const startIndex =
+        session.session_type === 'smart_review' && !input.learningItemIds ? 0 : issuedCount;
       const choiceRows =
         session.session_type === 'smart_review'
           ? [
@@ -850,7 +884,7 @@ export class PracticeService {
           offset < rows.length && exerciseRows.length < Math.min(input.count, 6);
           offset++
         ) {
-          const candidate = rows[(issuedCount + offset) % rows.length]!;
+          const candidate = rows[(startIndex + offset) % rows.length]!;
           const answer = matchingReverse ? candidate.source_text : candidate.translations[0];
           if (
             answer &&
@@ -873,7 +907,7 @@ export class PracticeService {
       }
       const exercises = [];
       for (let index = 0; index < (matching ? exerciseRows.length : input.count); index++) {
-        const row = matching ? exerciseRows[index]! : rows[(issuedCount + index) % rows.length]!,
+        const row = matching ? exerciseRows[index]! : rows[(startIndex + index) % rows.length]!,
           translations = row.translations as string[];
         if (!translations.length)
           throw new AppError(409, 'ITEM_INCOMPLETE', 'Learning item has no accepted translation');
