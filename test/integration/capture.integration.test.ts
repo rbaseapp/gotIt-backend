@@ -173,7 +173,7 @@ test(
           const metadata = await database.adminPool.query(
             'SELECT count(*)::integer AS count FROM gotit_migrations.pgmigrations',
           );
-          assert.equal(metadata.rows[0].count, 22);
+          assert.equal(metadata.rows[0].count, 23);
           const catalog = await database.adminPool.query(`
             SELECT tp.slug,
               count(DISTINCT tr.id)::integer AS tracks,
@@ -190,24 +190,24 @@ test(
           assert.deepEqual(catalog.rows, [
             {
               slug: 'current-events',
-              tracks: 2,
-              packs: 4,
-              entries: 48,
-              levels: ['advanced', 'beginner'],
+              tracks: 3,
+              packs: 5,
+              entries: 52,
+              levels: ['advanced', 'beginner', 'intermediate'],
             },
             {
               slug: 'everyday-words',
-              tracks: 2,
-              packs: 4,
-              entries: 48,
-              levels: ['advanced', 'beginner'],
+              tracks: 3,
+              packs: 5,
+              entries: 52,
+              levels: ['advanced', 'beginner', 'intermediate'],
             },
             {
               slug: 'fruits-and-vegetables',
-              tracks: 2,
-              packs: 2,
-              entries: 24,
-              levels: ['advanced', 'beginner'],
+              tracks: 3,
+              packs: 3,
+              entries: 28,
+              levels: ['advanced', 'beginner', 'intermediate'],
             },
             {
               slug: 'software-development',
@@ -218,10 +218,10 @@ test(
             },
             {
               slug: 'sports',
-              tracks: 2,
-              packs: 2,
-              entries: 24,
-              levels: ['advanced', 'beginner'],
+              tracks: 3,
+              packs: 4,
+              entries: 32,
+              levels: ['advanced', 'beginner', 'intermediate'],
             },
           ]);
           const originalCore = await database.adminPool.query(
