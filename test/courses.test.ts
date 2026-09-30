@@ -684,8 +684,14 @@ test('homework generation repairs repeated questions instead of padding the prac
     generations++;
     const content = expandedHomeworkContent();
     if (generations === 1) content.tasks[2]!.prompt = content.tasks[0]!.prompt;
-    else
+    else {
       assert.match(String((data as { revisionFeedback: string }).revisionFeedback), /different/u);
+      assert.equal(
+        (data as { priorDraft: ReturnType<typeof expandedHomeworkContent> }).priorDraft.tasks[2]
+          ?.prompt,
+        content.tasks[0]!.prompt,
+      );
+    }
     return content;
   };
   const prepared = await service.prepareHomework(scope, homework.id, command(0));
@@ -740,6 +746,8 @@ test('independent review rejects a choice with no unique grammar answer', async 
   await assert.rejects(service.prepareHomework(scope, homework.id, command(0)));
   assert.equal((await service.homework(scope, homework.id)).content, null);
   assert.deepEqual(ai.calls, [
+    'lesson_homework',
+    'lesson_homework_review',
     'lesson_homework',
     'lesson_homework_review',
     'lesson_homework',
