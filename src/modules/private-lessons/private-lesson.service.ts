@@ -311,8 +311,10 @@ export class PrivateLessonService {
                       : `The learner is speaking only ${targetLanguage.englishName}. Transcribe the audio as ${targetLanguage.englishName}; do not interpret it as another language.`,
                 },
                 turn_detection: {
-                  type: 'semantic_vad',
-                  eagerness: 'medium',
+                  type: 'server_vad',
+                  threshold: 0.7,
+                  prefix_padding_ms: 400,
+                  silence_duration_ms: 700,
                   create_response: true,
                   interrupt_response: true,
                 },

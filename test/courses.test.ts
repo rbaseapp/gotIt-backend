@@ -53,7 +53,7 @@ test('live course interview uses lesson Realtime model with automatic speech tur
     session: {
       model: string;
       audio: {
-        input: { turn_detection: { type: string; create_response: boolean } };
+        input: { turn_detection: unknown };
         output: { voice: string };
       };
     };
@@ -70,8 +70,14 @@ test('live course interview uses lesson Realtime model with automatic speech tur
   const realtime = await service.realtimeSession(scope, course.id);
   assert.equal(realtime.clientSecret, 'ephemeral-secret');
   assert.equal(requestBody?.session.model, 'gpt-realtime-2.1');
-  assert.equal(requestBody?.session.audio.input.turn_detection.type, 'semantic_vad');
-  assert.equal(requestBody?.session.audio.input.turn_detection.create_response, false);
+  assert.deepEqual(requestBody?.session.audio.input.turn_detection, {
+    type: 'server_vad',
+    threshold: 0.7,
+    prefix_padding_ms: 400,
+    silence_duration_ms: 700,
+    create_response: false,
+    interrupt_response: true,
+  });
   assert.equal(requestBody?.session.audio.output.voice, 'marin');
   assert.match(realtime.openingEvent.response.instructions, /מה תרצה ללמוד/u);
   assert.doesNotMatch(JSON.stringify(realtime), /server-secret/u);

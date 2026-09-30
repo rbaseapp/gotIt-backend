@@ -384,6 +384,17 @@ test('private lesson creates a bounded personalized Realtime session', async () 
     (session.audio as { input: { noise_reduction: unknown } }).input.noise_reduction,
     { type: 'far_field' },
   );
+  assert.deepEqual(
+    (session.audio as { input: { turn_detection: unknown } }).input.turn_detection,
+    {
+      type: 'server_vad',
+      threshold: 0.7,
+      prefix_padding_ms: 400,
+      silence_duration_ms: 700,
+      create_response: true,
+      interrupt_response: true,
+    },
+  );
   assert.deepEqual((session.audio as { input: { transcription: unknown } }).input.transcription, {
     model: 'gpt-transcribe-test',
     language: 'en',
@@ -395,6 +406,7 @@ test('private lesson creates a bounded personalized Realtime session', async () 
     speed: 0.7,
   });
   assert.match(String(session.instructions), /job interviews/u);
+  assert.match(String(session.instructions), /Ignore brief background noises/u);
   assert.match(String(session.instructions), /Your name is Mike/u);
   assert.match(result.realtime.openingEvent.response.instructions, /introduce yourself as Mike/u);
   assert.match(String(session.instructions), /achieve/u);

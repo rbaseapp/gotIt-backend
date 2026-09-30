@@ -154,8 +154,10 @@ export class CourseService {
                 noise_reduction: { type: 'far_field' },
                 transcription: { model: this.realtime.transcriptionModel, language },
                 turn_detection: {
-                  type: 'semantic_vad',
-                  eagerness: 'medium',
+                  type: 'server_vad',
+                  threshold: 0.7,
+                  prefix_padding_ms: 400,
+                  silence_duration_ms: 700,
                   create_response: false,
                   interrupt_response: true,
                 },
