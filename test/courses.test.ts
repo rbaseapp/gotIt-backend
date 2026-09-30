@@ -1,12 +1,14 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { randomUUID } from 'node:crypto';
+import express from 'express';
 import {
   CourseService,
   publicCourse,
   publicHomework,
 } from '../src/modules/courses/course.service.js';
 import { OpenAiCourseGenerator } from '../src/modules/courses/course.provider.js';
+import { createCourseRoutes } from '../src/modules/courses/course.routes.js';
 import { homeworkContentSchema, intakeReplySchema } from '../src/modules/courses/course.schemas.js';
 import {
   nextCourseLesson,
@@ -815,6 +817,68 @@ test('homework generation restricts source quotes to saved lesson excerpts', asy
     (await service.homework(scope, homework.id)).content?.tasks[0]?.sourceQuote,
     'I am at home.',
   );
+});
+
+test('sparse saved excerpts can use taught report grammar without treating future course topics as taught', async () => {
+  const { store, service, ai } = setup();
+  const homework = homeworkFixture();
+  homework.content = null;
+  homework.progress = [];
+  homework.source.report = {
+    grammarPoints: [
+      {
+        topic: 'Present simple versus continuous',
+        example: 'Do you drive? Are you driving?',
+        explanation: 'Habit versus a temporary action',
+      },
+    ],
+    corrections: [
+      { original: 'Yes, I am.', corrected: 'Yes, I do.', explanation: 'Answer Do with do' },
+    ],
+    nextLessonPlan: 'Teach conditionals later',
+  };
+  store.seed(homework);
+  ai.handler = async (name, data) => {
+    if (name === 'lesson_homework_review') return { valid: true, feedback: 'Clear and grounded' };
+    const source = (data as { source: Record<string, unknown> }).source;
+    assert.equal((source.grammarPoints as unknown[]).length, 1);
+    assert.equal((source.corrections as unknown[]).length, 1);
+    assert.equal(source.nextLessonPlan, undefined);
+    assert.equal((data as Record<string, unknown>).lessonGrammar, undefined);
+    return expandedHomeworkContent();
+  };
+  assert.equal((await service.prepareHomework(scope, homework.id, command(0))).tasks.length, 12);
+});
+
+test('homework preparation keeps the connection open beyond the default socket idle timeout', async () => {
+  const app = express();
+  app.use(express.json());
+  app.use(
+    '/api/v1/courses',
+    createCourseRoutes(
+      {
+        async prepareHomework() {
+          await new Promise((resolve) => setTimeout(resolve, 90));
+          return { id: randomUUID() };
+        },
+      } as unknown as CourseService,
+      (req, _res, next) => {
+        req.gotitAuth = { ...scope, role: 'user' };
+        next();
+      },
+    ),
+  );
+  const server = app.listen(0);
+  server.setTimeout(20);
+  try {
+    const response = await request(server)
+      .post(`/api/v1/courses/homework/${randomUUID()}/prepare`)
+      .send(command(0))
+      .expect(200);
+    assert.ok(response.body.homework.id);
+  } finally {
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+  }
 });
 test('structured provider serializes transformed language schemas and rejects refusal/incomplete output', async () => {
   let calls = 0;

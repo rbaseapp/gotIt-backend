@@ -31,15 +31,17 @@ export function createCourseRoutes(service: CourseService, requireAccess: Reques
       ),
     }),
   );
-  router.post('/homework/:id/prepare', async (req, res) =>
+  router.post('/homework/:id/prepare', async (req, res) => {
+    // Homework can require generation and independent review before the first byte is sent.
+    req.setTimeout(225_000);
     res.json({
       homework: await service.prepareHomework(
         req.gotitAuth!,
         parseInput(uuidSchema, req.params.id),
         parseInput(commandSchema, req.body),
       ),
-    }),
-  );
+    });
+  });
   router.post('/homework/:id/actions', async (req, res) =>
     res.json({
       homework: await service.homeworkAction(
