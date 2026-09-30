@@ -161,7 +161,14 @@ test(
         'foreign-key failure rolls back receipt too',
       );
       assert.equal(draft.revision, 2);
-      await database.migrate('down');
+      const applied = await database.adminPool.query(
+        'SELECT name FROM gotit_migrations.pgmigrations ORDER BY name DESC',
+      );
+      const courseMigrationIndex = applied.rows.findIndex(({ name }: { name: string }) =>
+        name.includes('1789488019000_personal-courses'),
+      );
+      assert.ok(courseMigrationIndex >= 0);
+      for (let index = 0; index <= courseMigrationIndex; index++) await database.migrate('down');
       await database.migrate('down');
       const rolledBack = await database.adminPool.query(
         "SELECT to_regclass('product_gotit.learning_documents') AS relation",
