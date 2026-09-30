@@ -1,7 +1,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { randomUUID } from 'node:crypto';
-import { CourseService, publicHomework } from '../src/modules/courses/course.service.js';
+import {
+  CourseService,
+  publicCourse,
+  publicHomework,
+} from '../src/modules/courses/course.service.js';
 import { OpenAiCourseGenerator } from '../src/modules/courses/course.provider.js';
 import { intakeReplySchema } from '../src/modules/courses/course.schemas.js';
 import {
@@ -204,6 +208,173 @@ test('commands replay without another provider call and reject reusing a key for
   assert.equal(ai.calls.length, 1);
   await assert.rejects(service.turn(scope, course.id, { ...input, message: 'משהו אחר' }), conflict);
 });
+test('intake is six short localized questions and respects a stated 1-2 day schedule', async () => {
+  const { store, service, ai } = setup();
+  const started = await service.start(scope, {
+    targetLanguageCode: 'en',
+    supportLanguageCode: 'he',
+    eventId: randomUUID(),
+  });
+  assert.deepEqual(started.intakeProgress, { current: 1, answered: 0, total: 6 });
+  assert.match(started.messages[0]!.text, /[\u0590-\u05ff]/u);
+  assert.equal(JSON.stringify(started).includes('intakeQuestions'), false);
+  const answers = [
+    'אני רוצה לדבר בעבודה',
+    'למדתי קצת בעבר',
+    'אני בן 31',
+    'קורא וכותב בנוחות',
+    'מעניין אותי לדבר על עבודה',
+    '10 דקות, 1-2 פעמים בשבוע',
+  ];
+  let current = started;
+  for (const [index, answer] of answers.entries()) {
+    current = await service.turn(scope, started.id, {
+      ...command(current.revision),
+      mode: 'preferences',
+      channel: index === 1 ? 'voice' : 'text',
+      message: answer,
+    });
+    assert.equal(current.intakeProgress?.answered, index + 1);
+    assert.equal(current.ready, index === 5);
+    assert.equal(current.messages.at(-2)?.text, answer);
+  }
+  assert.equal(current.preferences.daysPerWeek, 2);
+  assert.equal(current.reportedAvailability, answers[5]);
+  assert.equal(current.messages.length, 13);
+  assert.equal(
+    new Set(current.messages.filter((item) => item.role === 'tutor').map((item) => item.text)).size,
+    7,
+  );
+  assert.equal(ai.calls.filter((name) => name === 'course_intake_questions').length, 1);
+  assert.equal(ai.calls.filter((name) => name === 'course_intake').length, 6);
+  assert.equal((await service.course(scope, started.id)).preferences.daysPerWeek, 2);
+  const corrected = await service.turn(scope, started.id, {
+    ...command(current.revision),
+    mode: 'preferences',
+    channel: 'text',
+    message: 'אני מעדיף ללמוד דקדוק',
+  });
+  assert.equal(corrected.intakeProgress?.answered, 6);
+  assert.equal(corrected.ready, true);
+  assert.equal(corrected.reportedAvailability, answers[5]);
+  assert.equal(
+    corrected.preferences.daysPerWeek,
+    2,
+    'an unrelated correction cannot reset availability',
+  );
+  const approved = await service.approvePreferences(scope, started.id, command(corrected.revision));
+  ai.handler = async (name, data) => {
+    assert.equal(name, 'course_plan');
+    const input = data as {
+      preferences: { daysPerWeek: number };
+      learnerAnswers: Array<{ topic: string; text: string; channel: string }>;
+      learnerCorrections: string[];
+    };
+    assert.equal(input.preferences.daysPerWeek, 2);
+    assert.deepEqual(input.learnerAnswers[2], {
+      topic: 'ageAndLiteracy',
+      text: answers[2],
+      channel: 'text',
+    });
+    assert.deepEqual(input.learnerAnswers[5], {
+      topic: 'schedule',
+      text: answers[5],
+      channel: 'text',
+    });
+    assert.deepEqual(input.learnerCorrections, ['אני מעדיף ללמוד דקדוק']);
+    return plan;
+  };
+  await service.plan(scope, started.id, command(approved.revision));
+  assert.equal(store.documents.size, 1);
+});
+test('intake rejects English questions for a Hebrew conversation before saving', async () => {
+  const { store, service, ai } = setup();
+  ai.handler = async (name) =>
+    name === 'course_intake_questions'
+      ? {
+          closing: 'Review your details.',
+          questions: [
+            'What is your goal?',
+            'What have you learned?',
+            'How old are you?',
+            'Can you read?',
+            'What interests you?',
+            'How often can you study?',
+          ].map((question) => ({ question, suggestions: [] })),
+        }
+      : { valid: true, feedback: 'Clear interview' };
+  await assert.rejects(
+    service.start(scope, {
+      targetLanguageCode: 'en',
+      supportLanguageCode: 'he',
+      eventId: randomUUID(),
+    }),
+    (error: unknown) => error instanceof AppError && error.code === 'COURSE_AI_UNAVAILABLE',
+  );
+  assert.equal(store.documents.size, 0);
+  assert.deepEqual(ai.calls, ['course_intake_questions', 'course_intake_questions']);
+});
+test('intake regenerates questions when the independent review finds repeated topics', async () => {
+  const { service, ai } = setup();
+  let generation = 0;
+  let review = 0;
+  ai.handler = async (name, data) => {
+    if (name === 'course_intake_questions') {
+      generation++;
+      if (generation === 2)
+        assert.match(String((data as { revisionFeedback: string }).revisionFeedback), /repeated/u);
+      return {
+        closing: 'אפשר לעבור על הפרטים.',
+        questions: [
+          'מה המטרה שלך?',
+          'מה כבר למדת?',
+          'מה הגיל שלך?',
+          'איך נוח לך לקרוא?',
+          'מה מעניין אותך?',
+          'כמה פעמים בשבוע מתאים לך?',
+        ].map((question) => ({ question, suggestions: [] })),
+      };
+    }
+    review++;
+    return review === 1
+      ? { valid: false, feedback: 'Questions 1 and 2 cover repeated topics.' }
+      : { valid: true, feedback: 'Clear interview' };
+  };
+  const started = await service.start(scope, {
+    targetLanguageCode: 'en',
+    supportLanguageCode: 'he',
+    eventId: randomUUID(),
+  });
+  assert.equal(started.intakeProgress?.total, 6);
+  assert.equal(generation, 2);
+  assert.equal(review, 2);
+});
+test('an existing unfinished intake is capped at six learner answers', async () => {
+  const { store, service, ai } = setup();
+  const course = courseFixture();
+  course.ready = false;
+  for (let index = 0; index < 5; index++) {
+    course.messages.push({ role: 'learner', text: `answer ${index}`, channel: 'text' });
+    course.messages.push({ role: 'tutor', text: `question ${index}`, channel: 'text' });
+  }
+  store.seed(course);
+  assert.deepEqual(publicCourse(course).intakeProgress, { current: 6, answered: 5, total: 6 });
+  ai.handler = async () => ({
+    message: 'אפשר לעבור על הפרטים.',
+    suggestions: ['עוד שאלה'],
+    ready: false,
+    preferences,
+  });
+  const result = await service.turn(scope, course.id, {
+    ...command(0),
+    mode: 'preferences',
+    channel: 'text',
+    message: 'תשובה שישית',
+  });
+  assert.equal(result.ready, true);
+  assert.deepEqual(result.suggestions, []);
+  assert.equal(result.intakeProgress, null);
+});
 test('course and homework access is isolated by application AND user', async () => {
   const { store, service } = setup();
   const course = courseFixture(),
@@ -274,6 +445,35 @@ test('homework hides private answers, accepts contractions and records independe
   assert.equal(result.tasks[0]?.attempts[0]?.independent, true);
   assert.equal(result.tasks[0]?.done, true);
   assert.equal(result.tasks[1]?.solution, null, 'future task remains private');
+});
+test('a choice only accepts its keyed displayed option even when legacy answer variants include another choice', async () => {
+  const { store, service } = setup();
+  const homework = homeworkFixture();
+  const choice = homework.content!.tasks[0]!;
+  choice.kind = 'choice';
+  choice.prompt = 'Is she busy? No, ____.';
+  choice.choices = ["she isn't", 'she is', 'I am'];
+  choice.expectedAnswer = "she isn't";
+  choice.acceptedAnswers = ["she isn't", 'she is'];
+  store.seed(homework);
+  const result = await service.homeworkAction(scope, homework.id, {
+    ...command(0),
+    taskIndex: 0,
+    action: 'answer',
+    answer: 'she is',
+    channel: 'text',
+  });
+  assert.equal(result.tasks[0]?.attempts[0]?.result, 'retry');
+  await assert.rejects(
+    service.homeworkAction(scope, homework.id, {
+      ...command(result.revision),
+      taskIndex: 0,
+      action: 'answer',
+      answer: 'they are',
+      channel: 'text',
+    }),
+    (error: unknown) => error instanceof AppError && error.statusCode === 400,
+  );
 });
 test('hints persist across resume, assisted answers do not become independent evidence, and future tasks cannot be submitted', async () => {
   const { store, service } = setup();
@@ -380,6 +580,82 @@ test('generated homework must cite actual lesson evidence', async () => {
   await assert.rejects(service.prepareHomework(scope, homework.id, command(0)));
   assert.equal((await service.homework(scope, homework.id)).content, null);
 });
+test('generation repairs an ambiguous short-answer task before saving', async () => {
+  const { store, service, ai } = setup();
+  const homework = homeworkFixture();
+  homework.content = null;
+  homework.progress = [];
+  store.seed(homework);
+  let generations = 0;
+  ai.handler = async (name, data) => {
+    if (name === 'lesson_homework_review') return { valid: true, feedback: 'Clear and grounded' };
+    const content = homeworkFixture().content!;
+    if (name === 'lesson_homework') {
+      generations++;
+      if (generations === 1) {
+        content.tasks[1]!.prompt = 'Choose the correct short answer: No, ____.';
+        content.tasks[1]!.choices = ["it isn't", 'she is', 'I am'];
+        content.tasks[1]!.expectedAnswer = "it isn't";
+        content.tasks[1]!.acceptedAnswers = ["it isn't"];
+      } else {
+        assert.match(
+          String((data as { revisionFeedback: string }).revisionFeedback),
+          /actual question/u,
+        );
+      }
+    }
+    return content;
+  };
+  const prepared = await service.prepareHomework(scope, homework.id, command(0));
+  assert.equal(generations, 2);
+  assert.equal(prepared.tasks[1]?.prompt, 'Change I to We: I am at home.');
+  assert.equal((await service.homework(scope, homework.id)).qualityVersion, 1);
+});
+test('independent review rejects a choice with no unique grammar answer', async () => {
+  const { store, service, ai } = setup();
+  const homework = homeworkFixture();
+  homework.content = null;
+  homework.progress = [];
+  store.seed(homework);
+  ai.handler = async (name) =>
+    name === 'lesson_homework_review'
+      ? { valid: false, feedback: 'Task 2 has two grammatically correct choices in this context.' }
+      : homeworkFixture().content;
+  await assert.rejects(service.prepareHomework(scope, homework.id, command(0)));
+  assert.equal((await service.homework(scope, homework.id)).content, null);
+  assert.deepEqual(ai.calls, [
+    'lesson_homework',
+    'lesson_homework_review',
+    'lesson_homework',
+    'lesson_homework_review',
+  ]);
+});
+test('unstarted legacy homework is refreshed while attempted homework remains stable', async () => {
+  const { store, service, ai } = setup();
+  const legacy = homeworkFixture();
+  legacy.content!.tasks[1]!.prompt = 'Choose the correct short answer: No, ____.';
+  store.seed(legacy);
+  assert.equal(publicHomework(legacy).needsRefresh, true);
+  const refreshed = await service.prepareHomework(scope, legacy.id, command(0));
+  assert.equal(refreshed.needsRefresh, false);
+  assert.equal(refreshed.tasks[1]?.prompt, 'Change I to We: I am at home.');
+  assert.deepEqual(ai.calls, ['lesson_homework', 'lesson_homework_review']);
+
+  const attempted = homeworkFixture();
+  attempted.progress[0]!.attempts.push({
+    answer: 'We is at home.',
+    channel: 'text',
+    result: 'retry',
+    feedback: 'Try again.',
+    independent: false,
+    createdAt: attempted.createdAt,
+  });
+  store.seed(attempted);
+  const resumed = await service.prepareHomework(scope, attempted.id, command(0));
+  assert.equal(resumed.revision, 0);
+  assert.equal(resumed.needsRefresh, false);
+  assert.equal(ai.calls.length, 2);
+});
 test('homework generation restricts source quotes to saved lesson excerpts', async () => {
   const store = new MemoryLearningStore();
   const homework = homeworkFixture();
@@ -393,14 +669,26 @@ test('homework generation restricts source quotes to saved lesson excerpts', asy
     'configured-transcriber',
     async (_url, options) => {
       const body = JSON.parse(String(options?.body));
-      assert.deepEqual(body.text.format.schema.properties.tasks.items.properties.sourceQuote.enum, [
-        'I am at home.',
-        'We are at home.',
-      ]);
+      if (body.text.format.name === 'lesson_homework')
+        assert.deepEqual(
+          body.text.format.schema.properties.tasks.items.properties.sourceQuote.enum,
+          ['I am at home.', 'We are at home.'],
+        );
       return Response.json({
         status: 'completed',
         output: [
-          { content: [{ type: 'output_text', text: JSON.stringify(homeworkFixture().content) }] },
+          {
+            content: [
+              {
+                type: 'output_text',
+                text: JSON.stringify(
+                  body.text.format.name === 'lesson_homework_review'
+                    ? { valid: true, feedback: 'Clear and grounded' }
+                    : homeworkFixture().content,
+                ),
+              },
+            ],
+          },
         ],
       });
     },
@@ -635,7 +923,7 @@ test('course HTTP routes enforce Core identity, entitlement, strict input and pr
 test('course session resolves approved language and objective before creating the Realtime session', async () => {
   const { store, service } = setup();
   const course = courseFixture();
-  const approved = { ...preferences, absoluteBeginner: false, supportLanguageCode: 'en' };
+  const approved = { ...preferences, absoluteBeginner: false, supportLanguageCode: 'he' };
   Object.assign(course, {
     activeVersion: 1,
     approvedPreferences: approved,
@@ -643,6 +931,7 @@ test('course session resolves approved language and objective before creating th
     versions: [{ version: 1, preferences: approved, plan, createdAt: course.createdAt }],
   });
   store.seed(course);
+  let sessionInstructions = '';
   const lessons = new PrivateLessonService({
     courses: service,
     apiKey: 'fixture-key',
@@ -657,6 +946,7 @@ test('course session resolves approved language and objective before creating th
     },
     fetchImpl: async (_url, options) => {
       const body = JSON.parse(String(options?.body));
+      sessionInstructions = body.session.instructions;
       assert.match(body.session.instructions, /course/);
       assert.equal(body.session.audio.input.transcription.language, undefined);
       return Response.json({ value: 'ek_fixture' });
@@ -671,10 +961,43 @@ test('course session resolves approved language and objective before creating th
   });
   const result = await lessons.createSession(scope, input);
   assert.equal(result.lesson.targetLanguageCode, 'en');
-  assert.equal(result.lesson.supportLanguageCode, 'en');
+  assert.equal(result.lesson.supportLanguageCode, 'he');
   assert.equal(result.lesson.durationSeconds, 600);
   assert.equal(result.lesson.lessonMode, 'standard');
   assert.equal(result.lesson.course?.objective, plan.units[0]!.lessons[0]!.objective);
   assert.equal(result.lesson.roadmap, null);
   assert.deepEqual(result.lesson.targetWords, []);
+  // response.create.instructions overrides the session prompt. Every application
+  // initiated turn must keep the complete approved context, not just a directive.
+  for (const event of [
+    result.realtime.openingEvent,
+    result.realtime.continuationEvent,
+    result.realtime.translationEvent,
+    result.realtime.wrapUpEvent,
+  ]) {
+    assert.ok(
+      event?.response.instructions.startsWith(
+        sessionInstructions + '\n\n# Current turn directive\n',
+      ),
+    );
+    assert.ok(event?.response.instructions.includes(plan.units[0]!.lessons[0]!.objective));
+  }
+  const opening = result.realtime.openingEvent.response.instructions.split(
+    '# Current turn directive\n',
+  )[1]!;
+  assert.match(opening, /Speak only in English/u);
+  assert.match(opening, /Explain the concept and when to use it/u);
+  assert.match(opening, /show a clear example/u);
+  assert.match(opening, /then ask one open understanding question/u);
+  assert.doesNotMatch(opening, /in Hebrew/u);
+  assert.match(sessionInstructions, /same language policy applies inside and outside a course/u);
+  assert.doesNotMatch(sessionInstructions, /Use SUPPORT_LANGUAGE .*when useful/u);
+  assert.match(
+    sessionInstructions,
+    /An empty targetVocabulary list does not cancel a course objective/u,
+  );
+  assert.match(sessionInstructions, /Avoid repetition loops/u);
+  assert.match(sessionInstructions, /Never end with praise alone/u);
+  assert.match(sessionInstructions, /when and why to use each form/u);
+  assert.match(sessionInstructions, /contrasting examples/u);
 });
