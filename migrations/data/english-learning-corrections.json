@@ -1,0 +1,434 @@
+[
+  {
+    "number": 54,
+    "source": "bathroom",
+    "before": "חדר אמבטיה",
+    "after": "שירותים; חדר אמבטיה"
+  },
+  {
+    "number": 140,
+    "source": "thing",
+    "before": "משהו",
+    "after": "דבר"
+  },
+  {
+    "number": 364,
+    "source": "couple",
+    "before": "כמה",
+    "after": "זוג; כמה"
+  },
+  {
+    "number": 604,
+    "source": "order",
+    "before": "פקודה",
+    "after": "סדר; פקודה"
+  },
+  {
+    "number": 819,
+    "source": "stage",
+    "before": "במה",
+    "after": "שלב; במה"
+  },
+  {
+    "number": 860,
+    "source": "operation",
+    "before": "ניתוח",
+    "after": "פעולה; ניתוח"
+  },
+  {
+    "number": 1001,
+    "source": "get up",
+    "before": "קום",
+    "after": "לקום"
+  },
+  {
+    "number": 1026,
+    "source": "wake up",
+    "before": "תתעורר",
+    "after": "להתעורר"
+  },
+  {
+    "number": 1051,
+    "source": "go out",
+    "before": "צא החוצה",
+    "after": "לצאת"
+  },
+  {
+    "number": 1076,
+    "source": "come back",
+    "before": "תחזור",
+    "after": "לחזור"
+  },
+  {
+    "number": 1101,
+    "source": "find out",
+    "before": "גלה",
+    "after": "לגלות"
+  },
+  {
+    "number": 1126,
+    "source": "look for",
+    "before": "חפש",
+    "after": "לחפש"
+  },
+  {
+    "number": 1151,
+    "source": "look after",
+    "before": "שמור על עצמך",
+    "after": "לטפל ב־"
+  },
+  {
+    "number": 1176,
+    "source": "take care of",
+    "before": "טפלי בזה",
+    "after": "לטפל ב־"
+  },
+  {
+    "number": 1201,
+    "source": "put on",
+    "before": "שים על",
+    "after": "ללבוש; לשים על"
+  },
+  {
+    "number": 1226,
+    "source": "take off",
+    "before": "-תמריא",
+    "after": "להוריד; להמריא"
+  },
+  {
+    "number": 1251,
+    "source": "turn on",
+    "before": "הפעל",
+    "after": "להפעיל; להדליק"
+  },
+  {
+    "number": 1276,
+    "source": "turn off",
+    "before": "כבה",
+    "after": "לכבות"
+  },
+  {
+    "number": 1301,
+    "source": "pick up",
+    "before": "תענה",
+    "after": "להרים; לאסוף"
+  },
+  {
+    "number": 1320,
+    "source": "living",
+    "before": "פרנסה",
+    "after": "חי; מחיה"
+  },
+  {
+    "number": 1351,
+    "source": "run out of",
+    "before": "נגמרים",
+    "after": "להיגמר; לאזול"
+  },
+  {
+    "number": 1376,
+    "source": "look forward to",
+    "before": "מצפה בקוצר רוח",
+    "after": "לצפות ל־"
+  },
+  {
+    "number": 1426,
+    "source": "be able to",
+    "before": "להיות מסוגל",
+    "after": "להיות מסוגל ל־"
+  },
+  {
+    "number": 1451,
+    "source": "used to",
+    "before": "היה לי",
+    "after": "נהג ל־"
+  },
+  {
+    "number": 1476,
+    "source": "have to",
+    "before": "חייבת",
+    "after": "חייב ל־"
+  },
+  {
+    "number": 1501,
+    "source": "be supposed to",
+    "before": "זה היה אמור לקרות",
+    "after": "אמור ל־"
+  },
+  {
+    "number": 1576,
+    "source": "as soon as",
+    "before": "ברגע ש",
+    "after": "ברגע ש־"
+  },
+  {
+    "number": 1579,
+    "source": "mental",
+    "before": "מטורף",
+    "after": "נפשי; מנטלי"
+  },
+  {
+    "number": 1629,
+    "source": "worried",
+    "before": "מדאיג",
+    "after": "מודאג"
+  },
+  {
+    "number": 1701,
+    "source": "for example",
+    "before": "לדוגמא",
+    "after": "למשל"
+  },
+  {
+    "number": 1751,
+    "source": "make sense",
+    "before": "הגיוני",
+    "after": "להיות הגיוני"
+  },
+  {
+    "number": 1776,
+    "source": "take a break",
+    "before": "קח הפסקה",
+    "after": "לעשות הפסקה"
+  },
+  {
+    "number": 1801,
+    "source": "pay attention",
+    "before": "שים לב",
+    "after": "לשים לב"
+  },
+  {
+    "number": 1826,
+    "source": "keep in touch",
+    "before": "שמור על קשר",
+    "after": "לשמור על קשר"
+  },
+  {
+    "number": 1851,
+    "source": "make a decision",
+    "before": "קבל החלטה",
+    "after": "לקבל החלטה"
+  },
+  {
+    "number": 1876,
+    "source": "take a look",
+    "before": "תסתכל",
+    "after": "להעיף מבט"
+  },
+  {
+    "number": 1951,
+    "source": "from time to time",
+    "before": "מפעם לפעם",
+    "after": "מדי פעם"
+  },
+  {
+    "number": 2001,
+    "source": "on behalf of",
+    "before": "בשם",
+    "after": "בשם; מטעם"
+  },
+  {
+    "number": 2026,
+    "source": "in terms of",
+    "before": "במונחים של",
+    "after": "מבחינת; במונחים של"
+  },
+  {
+    "number": 2076,
+    "source": "regardless of",
+    "before": "בלי קשר ל",
+    "after": "בלי קשר ל־"
+  },
+  {
+    "number": 2101,
+    "source": "as far as i know",
+    "before": "עד כמה שאני יודע",
+    "after": "למיטב ידיעתי"
+  },
+  {
+    "number": 2226,
+    "source": "at the same time",
+    "before": "באותו הזמן",
+    "after": "באותו זמן"
+  },
+  {
+    "number": 2251,
+    "source": "as opposed to",
+    "before": "בניגוד ל",
+    "after": "בניגוד ל־"
+  },
+  {
+    "number": 2268,
+    "source": "advance",
+    "before": "מקדמה",
+    "after": "התקדמות; מקדמה"
+  },
+  {
+    "number": 2301,
+    "source": "it depends on",
+    "before": "זה תלוי ב",
+    "after": "זה תלוי ב־"
+  },
+  {
+    "number": 2326,
+    "source": "make the most of",
+    "before": "להפיק את המירב של",
+    "after": "להפיק את המרב מ־"
+  },
+  {
+    "number": 2351,
+    "source": "come up with",
+    "before": "לבוא עם",
+    "after": "להעלות רעיון; להציע"
+  },
+  {
+    "number": 2376,
+    "source": "bring up",
+    "before": "העלה",
+    "after": "להעלות נושא; לגדל"
+  },
+  {
+    "number": 2401,
+    "source": "carry out",
+    "before": "הוצא לפועל",
+    "after": "לבצע"
+  },
+  {
+    "number": 2426,
+    "source": "figure out",
+    "before": "להבין",
+    "after": "להבין; לפענח"
+  },
+  {
+    "number": 2451,
+    "source": "rule out",
+    "before": "תשלול את זה",
+    "after": "לשלול"
+  },
+  {
+    "number": 2476,
+    "source": "point out",
+    "before": "ציין",
+    "after": "להצביע על; לציין"
+  },
+  {
+    "number": 2500,
+    "source": "toilet",
+    "before": "אסלה",
+    "after": "שירותים; אסלה"
+  },
+  {
+    "number": 2501,
+    "source": "break down",
+    "before": "התפרקו",
+    "after": "להתקלקל; לפרק"
+  },
+  {
+    "number": 2526,
+    "source": "set up",
+    "before": "הכן",
+    "after": "להקים; לארגן"
+  },
+  {
+    "number": 2551,
+    "source": "put up with",
+    "before": "להשלים עם",
+    "after": "לסבול; להשלים עם"
+  },
+  {
+    "number": 2576,
+    "source": "look into",
+    "before": "תבדוק את זה",
+    "after": "לבדוק; לחקור"
+  },
+  {
+    "number": 2601,
+    "source": "follow through",
+    "before": "בצע דרך",
+    "after": "להשלים עד הסוף"
+  },
+  {
+    "number": 2651,
+    "source": "given that",
+    "before": "בהתחשב בזה",
+    "after": "בהתחשב בכך ש־"
+  },
+  {
+    "number": 2676,
+    "source": "assuming that",
+    "before": "בהנחה ש",
+    "after": "בהנחה ש־"
+  },
+  {
+    "number": 2701,
+    "source": "even though",
+    "before": "למרות ש",
+    "after": "אף על פי ש־"
+  },
+  {
+    "number": 2716,
+    "source": "running",
+    "before": "פועל",
+    "after": "ריצה; פועל"
+  },
+  {
+    "number": 2726,
+    "source": "provided that",
+    "before": "בתנאי ש",
+    "after": "בתנאי ש־"
+  },
+  {
+    "number": 2751,
+    "source": "in contrast",
+    "before": "בניגוד",
+    "after": "לעומת זאת"
+  },
+  {
+    "number": 2776,
+    "source": "in addition to",
+    "before": "בנוסף ל",
+    "after": "בנוסף ל־"
+  },
+  {
+    "number": 2801,
+    "source": "on top of that",
+    "before": "בנוסף לכל זה",
+    "after": "נוסף על כך"
+  },
+  {
+    "number": 2826,
+    "source": "all things considered",
+    "before": "כל הדברים נחשבים",
+    "after": "בהתחשב בכל הדברים"
+  },
+  {
+    "number": 2857,
+    "source": "log",
+    "before": "בול עץ",
+    "after": "יומן; רישום; בול עץ"
+  },
+  {
+    "number": 2911,
+    "source": "pitch",
+    "before": "הגשה",
+    "after": "מגרש; הצעה; גובה צליל"
+  },
+  {
+    "number": 2926,
+    "source": "take into account",
+    "before": "קח בחשבון",
+    "after": "להביא בחשבון"
+  },
+  {
+    "number": 2951,
+    "source": "make up for",
+    "before": "מפצה על",
+    "after": "לפצות על"
+  },
+  {
+    "number": 2976,
+    "source": "get away with",
+    "before": "לברוח עם",
+    "after": "לצאת בלי עונש על"
+  }
+]

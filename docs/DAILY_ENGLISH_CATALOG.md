@@ -45,6 +45,17 @@ do not silently rewrite a learned sense in a migration.
 
 ## Rollout
 
+The learner-facing name is now **מסלול לימוד אנגלית** (English learning path),
+shown on the dedicated Web route `/english-learning`. The original migration is
+frozen because it was already published. Apply
+`1790800007000_english-learning-path` after it: this renames the topic and
+corrects 72 Hebrew catalog meanings. The original JSON remains the immutable
+input to migration `6000`; `migrations/data/english-learning-corrections.json`
+records each versioned correction. Existing installed learning-item meanings are
+not rewritten or regraded; the corrected meanings apply to future installations.
+The units are ordered by practical frequency, rather than falsely labeled as
+thematic chapters.
+
 Migration `1790800006000_daily-english-catalog` only inserts the new topic,
 three tracks, 60 packs and 3,000 entries. Run it with the dedicated migrator
 after backup and before backend deployment. The migration does not modify

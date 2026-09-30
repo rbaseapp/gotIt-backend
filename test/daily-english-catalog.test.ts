@@ -14,7 +14,19 @@ const tiers = JSON.parse(
   readFileSync(new URL('../migrations/data/daily-english-en-he.json', import.meta.url), 'utf8'),
 ) as Entry[][];
 
+// @ts-expect-error Node migrations are plain JavaScript without declaration files.
 const { up, down } = (await import('../migrations/1790800006000_daily-english-catalog.js')) as {
+  up(pgm: { sql(statement: string): void }): void;
+  down(pgm: { sql(statement: string): void }): void;
+};
+const corrections = JSON.parse(
+  readFileSync(
+    new URL('../migrations/data/english-learning-corrections.json', import.meta.url),
+    'utf8',
+  ),
+) as { number: number; source: string; before: string; after: string }[];
+// @ts-expect-error Node migrations are plain JavaScript without declaration files.
+const pathMigration = (await import('../migrations/1790800007000_english-learning-path.js')) as {
   up(pgm: { sql(statement: string): void }): void;
   down(pgm: { sql(statement: string): void }): void;
 };
@@ -40,11 +52,13 @@ test('daily English catalog has 3 disjoint 1,000-entry tracks in 50-entry units'
     }
   });
   assert.equal(seen.size, 3000);
-  assert.equal(tiers[0][0].en.toLowerCase(), 'good morning');
-  assert.ok(tiers[0].slice(0, 50).some(({ en }) => en.toLowerCase() === 'i'));
-  assert.ok(tiers[0].slice(0, 50).some(({ en }) => en.toLowerCase() === 'thank you'));
-  assert.ok(tiers[1].some(({ en }) => en === 'look forward to'));
-  assert.ok(tiers[2].some(({ en }) => en === 'take into account'));
+  const [basic, good, advanced] = tiers;
+  assert.ok(basic && good && advanced);
+  assert.equal(basic[0]?.en.toLowerCase(), 'good morning');
+  assert.ok(basic.slice(0, 50).some(({ en }) => en.toLowerCase() === 'i'));
+  assert.ok(basic.slice(0, 50).some(({ en }) => en.toLowerCase() === 'thank you'));
+  assert.ok(good.some(({ en }) => en === 'look forward to'));
+  assert.ok(advanced.some(({ en }) => en === 'take into account'));
 });
 
 test('catalog migration only inserts its 60 packs and refuses rollback with user progress', () => {
@@ -64,4 +78,27 @@ test('catalog migration only inserts its 60 packs and refuses rollback with user
   assert.match(rollback[0] ?? '', /user_word_packs/u);
   assert.match(rollback[0] ?? '', /learning_item_pack_entries/u);
   assert.match(rollback[0] ?? '', /RAISE EXCEPTION/u);
+});
+
+test('versioned path migration renames the topic and corrects the frozen catalog without changing saved learning items', () => {
+  assert.equal(corrections.length, 72);
+  for (const { number, source, before, after } of corrections) {
+    assert.ok(Number.isInteger(number) && number > 0 && number <= 3000);
+    const original = tiers[Math.floor((number - 1) / 1000)]?.[(number - 1) % 1000];
+    assert.equal(original?.en, source);
+    assert.equal(original?.he, before);
+    assert.notEqual(after, before);
+    assert.match(after, /[א-ת]/u);
+  }
+  const statements: string[] = [];
+  pathMigration.up({ sql: (statement) => statements.push(statement) });
+  assert.match(statements[0] ?? '', /english-learning-path-en-he/u);
+  assert.match(statements[1] ?? '', /English learning translation state mismatch/u);
+  assert.ok(statements.every((statement) => !statement.includes('learning_items')));
+  assert.ok(statements.every((statement) => !statement.includes('item_translations')));
+  const rollback: string[] = [];
+  pathMigration.down({ sql: (statement) => rollback.push(statement) });
+  assert.match(rollback[0] ?? '', /user_word_packs/u);
+  assert.match(rollback[0] ?? '', /learning_item_pack_entries/u);
+  assert.match(rollback.at(-1) ?? '', /daily-english/u);
 });

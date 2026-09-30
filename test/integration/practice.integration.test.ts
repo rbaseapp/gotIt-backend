@@ -258,7 +258,7 @@ test(
           const packCall = (method: Parameters<typeof call>[0], url: string, body?: object) =>
             call(method, url, body, randomUUID(), 1);
           const catalog = await packCall('get', '/word-packs').expect(200);
-          assert.equal(catalog.body.packs.length, 30);
+          assert.equal(catalog.body.packs.length, 90);
           for (const slug of [
             'colors-beginner-1-en-he',
             'animals-beginner-1-en-he',
@@ -345,7 +345,27 @@ test(
           (SELECT count(*)::int FROM product_gotit.word_tracks) tracks,
           (SELECT count(*)::int FROM product_gotit.word_packs) packs,
           (SELECT count(*)::int FROM product_gotit.word_pack_entries) entries`);
-          assert.deepEqual(totals.rows[0], { topics: 9, tracks: 20, packs: 30, entries: 282 });
+          assert.deepEqual(totals.rows[0], { topics: 10, tracks: 23, packs: 90, entries: 3282 });
+          const englishPath = await db.adminPool.query(`SELECT tp.title,
+            count(DISTINCT tr.id)::int tracks,
+            count(DISTINCT p.id)::int units,
+            count(e.id)::int entries
+            FROM product_gotit.word_topics tp
+            JOIN product_gotit.word_tracks tr ON tr.topic_id=tp.id
+            JOIN product_gotit.word_packs p ON p.track_id=tr.id
+            JOIN product_gotit.word_pack_entries e ON e.pack_id=p.id
+            WHERE tp.slug='english-learning-path-en-he'
+            GROUP BY tp.id`);
+          assert.deepEqual(englishPath.rows[0], {
+            title: 'מסלול לימוד אנגלית',
+            tracks: 3,
+            units: 60,
+            entries: 3000,
+          });
+          const bathroom = await db.adminPool
+            .query(`SELECT translation_text FROM product_gotit.word_pack_entries
+            WHERE id='d4000000-0000-4000-8000-000000000054'`);
+          assert.equal(bathroom.rows[0]?.translation_text, 'שירותים; חדר אמבטיה');
           const duplicates = await db.adminPool.query(`SELECT pack_id
           FROM product_gotit.word_pack_entries
           GROUP BY pack_id, normalized_source_text, normalized_translation_text
@@ -365,7 +385,7 @@ test(
           assert.equal(
             (await call('get', '/word-packs', undefined, randomUUID(), 1).expect(200)).body.packs
               .length,
-            30,
+            90,
           );
           for (const language of [
             'ar',
