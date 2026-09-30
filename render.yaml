@@ -32,6 +32,8 @@ services:
         value: gpt-6-luna
       - key: OPENAI_TRANSLATION_MODEL
         value: gpt-5.4-nano
+      - key: OPENAI_PRIVATE_LESSON_MODEL
+        value: gpt-6-sol
       - key: OPENAI_IMAGE_MODEL
         value: gpt-image-2.5-flare
       - key: OPENAI_REALTIME_MODEL

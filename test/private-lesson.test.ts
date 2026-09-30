@@ -3,6 +3,7 @@ import test from 'node:test';
 import pino from 'pino';
 import request from 'supertest';
 import { createApp } from '../src/app.js';
+import { OpenAiCourseGenerator } from '../src/modules/courses/course.provider.js';
 import { CoreAuthClient } from '../src/shared/core/core-auth.client.js';
 import { ProviderHttpError } from '../src/modules/enrichment/providers/http.js';
 import type { GotItProfile, ProfileServiceContract } from '../src/modules/profile/profile.types.js';
@@ -242,6 +243,114 @@ test('private lesson creates a bounded personalized Realtime session', async () 
   assert.doesNotMatch(JSON.stringify(result), /server-secret/u);
 });
 
+test('private lesson prepares Sol teaching content before opening Realtime', async () => {
+  let contentRequest: Record<string, unknown> | undefined;
+  let realtimeRequest: Record<string, unknown> | undefined;
+  const contentGenerator = new OpenAiCourseGenerator(
+    'content-secret',
+    'gpt-6-sol',
+    'gpt-transcribe-test',
+    async (_url, init) => {
+      contentRequest = JSON.parse(String(init?.body)) as Record<string, unknown>;
+      return Response.json({
+        status: 'completed',
+        output: [
+          {
+            content: [
+              {
+                type: 'output_text',
+                text: JSON.stringify({
+                  openingExplanation: 'Use the past simple to describe a finished event yesterday.',
+                  examples: [
+                    {
+                      targetText: 'I visited my friend yesterday.',
+                      meaningAndReason: 'Visited marks a completed past action.',
+                    },
+                    {
+                      targetText: 'I did not visit my friend yesterday.',
+                      meaningAndReason: 'Did not takes the base form visit.',
+                    },
+                  ],
+                  recognitionQuestion: 'Which sentence describes a finished visit yesterday?',
+                  guidedPrompt: 'Use yesterday and visited to describe seeing a friend.',
+                  independentPrompt: 'Tell me about a place you went last weekend.',
+                  correctionTip: 'After did not, use the base verb rather than the past form.',
+                }),
+              },
+            ],
+          },
+        ],
+      });
+    },
+  );
+  const service = new PrivateLessonService({
+    apiKey: 'realtime-secret',
+    model: 'gpt-realtime-test',
+    voice: 'marin',
+    transcriptionModel: 'gpt-transcribe-test',
+    profiles,
+    vocabulary,
+    lessonContentGenerator: contentGenerator,
+    fetchImpl: async (_url, init) => {
+      realtimeRequest = JSON.parse(String(init?.body)) as Record<string, unknown>;
+      return Response.json({ value: 'ek_demo' });
+    },
+  });
+
+  const result = await service.createSession(identity, {
+    targetLanguageCode: 'en',
+    supportLanguageCode: 'he',
+    lessonMode: 'standard',
+    grammarFocus: 'past simple',
+  });
+
+  assert.equal(contentRequest?.model, 'gpt-6-sol');
+  assert.deepEqual(contentRequest?.reasoning, { effort: 'medium' });
+  assert.equal(
+    (contentRequest?.text as { format: { name: string } }).format.name,
+    'private_lesson_brief',
+  );
+  assert.equal((realtimeRequest?.session as { model: string }).model, 'gpt-realtime-test');
+  assert.match(JSON.stringify(realtimeRequest?.session), /I visited my friend yesterday/u);
+  assert.match(result.realtime.openingEvent.response.instructions, /teachingBrief/u);
+  assert.doesNotMatch(JSON.stringify(result), /content-secret|realtime-secret/u);
+});
+
+test('private lesson does not open Realtime when teaching content generation fails', async () => {
+  let realtimeCalled = false;
+  const contentGenerator = new OpenAiCourseGenerator(
+    'content-secret',
+    'gpt-6-sol',
+    'gpt-transcribe-test',
+    async () => Response.json({ status: 'incomplete', output: [] }),
+  );
+  const service = new PrivateLessonService({
+    apiKey: 'realtime-secret',
+    model: 'gpt-realtime-test',
+    voice: 'marin',
+    transcriptionModel: 'gpt-transcribe-test',
+    profiles,
+    vocabulary,
+    lessonContentGenerator: contentGenerator,
+    fetchImpl: async () => {
+      realtimeCalled = true;
+      return Response.json({ value: 'ek_demo' });
+    },
+  });
+
+  await assert.rejects(
+    service.createSession(identity, { targetLanguageCode: 'en', lessonMode: 'standard' }),
+    (error: unknown) =>
+      Boolean(
+        error &&
+          typeof error === 'object' &&
+          'code' in error &&
+          error.code === 'COURSE_AI_UNAVAILABLE',
+      ),
+  );
+  assert.equal(realtimeCalled, false);
+});
+
 test('private lesson pins every spoken response to the selected target language', async () => {
   let requestBody: Record<string, unknown> | undefined;
   const service = makeService(async (_url, init) => {
@@ -306,7 +415,7 @@ test('absolute beginner lesson teaches through the support language and accepts 
   assert.match(String(session.instructions), /teach only 3-5 useful TARGET_LANGUAGE phrases/u);
   assert.match(
     result.realtime.openingEvent.response.instructions,
-    /Greet, introduce yourself as Rachel, and explain the plan in Hebrew/u,
+    /Begin with one short greeting in Spanish.*then give its meaning in Hebrew/u,
   );
 
   await assert.rejects(

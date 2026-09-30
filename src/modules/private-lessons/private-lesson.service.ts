@@ -39,6 +39,12 @@ import { setupPayload } from './private-lesson.roadmap.js';
 import type { PrivateLessonProficiencyStore } from './private-lesson.proficiency.js';
 import type { PrivateLessonGoalKind } from './private-lesson.curriculum.js';
 import type { CourseService } from '../courses/course.service.js';
+import type { CourseGenerator } from '../courses/course.provider.js';
+import {
+  privateLessonBriefInput,
+  privateLessonBriefInstruction,
+  privateLessonBriefSchema,
+} from './private-lesson.content.js';
 
 const clientSecretSchema = z
   .object({
@@ -72,6 +78,7 @@ export interface PrivateLessonVocabularySource {
 
 export type PrivateLessonServiceOptions = {
   courses?: CourseService;
+  lessonContentGenerator?: Pick<CourseGenerator, 'generate'>;
   apiKey?: string;
   model: string;
   voice: string;
@@ -213,6 +220,16 @@ export class PrivateLessonService {
         throw new AppError(503, 'COURSE_AI_UNAVAILABLE', 'Courses are unavailable');
       plan = await this.options.courses.prepareLesson(scope, plan, input.courseId, courseContext!);
     }
+    if (this.options.lessonContentGenerator) {
+      const teachingBrief = await this.options.lessonContentGenerator.generate(
+        scope,
+        privateLessonBriefSchema,
+        'private_lesson_brief',
+        privateLessonBriefInstruction,
+        privateLessonBriefInput(plan),
+      );
+      plan = { ...plan, teachingBrief };
+    }
     const instructions = buildPrivateLessonPrompt(plan);
     // Realtime response instructions replace (rather than append to) session
     // instructions. Preserve the full teaching policy and approved lesson data.
@@ -294,14 +311,14 @@ export class PrivateLessonService {
           ),
           wrapUpEvent: responseEvent(
             absoluteBeginner
-                ? `The lesson is ending now. In ${supportLanguage!.promptName}, briefly praise one success and recap the 3-5 ${targetLanguage.promptName} phrases learned today, saying each phrase slowly with its meaning. Do not introduce new material or ask another question. End warmly in ${supportLanguage!.promptName}. Keep the closing under 25 seconds.`
-                : `The lesson is ending now. Speak only in ${targetLanguage.promptName}. Do not ask another question. In three short parts, give one specific success, one correction with the correct form, and the target words worth reviewing. Then say a warm, encouraging goodbye in the same language. Do not use any other language. Keep the entire closing under 20 seconds.`,
+              ? `The lesson is ending now. In ${supportLanguage!.promptName}, briefly praise one success and recap the 3-5 ${targetLanguage.promptName} phrases learned today, saying each phrase slowly with its meaning. Do not introduce new material or ask another question. End warmly in ${supportLanguage!.promptName}. Keep the closing under 25 seconds.`
+              : `The lesson is ending now. Speak only in ${targetLanguage.promptName}. Do not ask another question. In three short parts, give one specific success, one correction with the correct form, and the target words worth reviewing. Then say a warm, encouraging goodbye in the same language. Do not use any other language. Keep the entire closing under 20 seconds.`,
           ),
           translationEvent: supportLanguage
             ? responseEvent(
                 absoluteBeginner
-                    ? `In ${supportLanguage.promptName}, explain the meaning of every ${targetLanguage.promptName} phrase from the tutor's most recent turn. Do not introduce new material or ask a new question. Then continue the absolute-beginner lesson using the configured bilingual method.`
-                    : `For this response only, translate the tutor's entire most recent speaking turn into ${supportLanguage.promptName}. Translate every sentence from that turn, from beginning to end; do not translate only its final sentence. Give only the complete translation and at most one brief clarification. Do not advance the lesson or ask a new question. After this response, resume speaking only in ${targetLanguage.promptName}.`,
+                  ? `In ${supportLanguage.promptName}, explain the meaning of every ${targetLanguage.promptName} phrase from the tutor's most recent turn. Do not introduce new material or ask a new question. Then continue the absolute-beginner lesson using the configured bilingual method.`
+                  : `For this response only, translate the tutor's entire most recent speaking turn into ${supportLanguage.promptName}. Translate every sentence from that turn, from beginning to end; do not translate only its final sentence. Give only the complete translation and at most one brief clarification. Do not advance the lesson or ask a new question. After this response, resume speaking only in ${targetLanguage.promptName}.`,
               )
             : null,
         },

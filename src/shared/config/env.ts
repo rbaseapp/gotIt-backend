@@ -19,6 +19,7 @@ const envSchema = z
       .transform((value) => value === 'true'),
     OPENAI_API_KEY: z.string().min(1).optional(),
     OPENAI_TRANSLATION_MODEL: z.string().min(1).max(200).optional(),
+    OPENAI_PRIVATE_LESSON_MODEL: z.string().min(1).max(200).default('gpt-6-sol'),
     OPENAI_IMAGE_MODEL: z.string().min(1).max(200).optional(),
     OPENAI_REALTIME_API_KEY: z.string().min(1).optional(),
     OPENAI_REALTIME_MODEL: z.string().min(1).max(200).default('gpt-realtime-2.1'),

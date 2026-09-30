@@ -100,7 +100,12 @@ async function recordSkill(
        FROM product_gotit.private_lesson_skill_profiles
        WHERE application_id=$1 AND application_user_id=$2 AND language_code=$3 AND skill=$4
        FOR UPDATE`,
-      [scope.applicationId, scope.applicationUserId, baseLanguage(lesson.targetLanguageCode), skill],
+      [
+        scope.applicationId,
+        scope.applicationUserId,
+        baseLanguage(lesson.targetLanguageCode),
+        skill,
+      ],
     )
   ).rows[0];
   const priorScore = existing ? Number(existing.ability_score) : assessment.score;
