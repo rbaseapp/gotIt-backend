@@ -152,7 +152,24 @@ test(
           const packCall = (method: Parameters<typeof call>[0], url: string, body?: object) =>
             call(method, url, body, randomUUID(), 1);
           const catalog = await packCall('get', '/word-packs').expect(200);
-          assert.equal(catalog.body.packs.length, 19);
+          assert.equal(catalog.body.packs.length, 30);
+          for (const slug of [
+            'colors-beginner-1-en-he',
+            'animals-beginner-1-en-he',
+            'household-items-beginner-1-en-he',
+            'household-items-beginner-2-en-he',
+            'business-intermediate-1-en-he',
+            'business-intermediate-2-en-he',
+            'sports-intermediate-2-en-he',
+          ]) {
+            const addedPack = catalog.body.packs.find(
+              (candidate: { slug: string }) => candidate.slug === slug,
+            );
+            assert.ok(addedPack, `missing ${slug}`);
+            const loaded = await packCall('get', `/word-packs/${addedPack.id}`).expect(200);
+            assert.equal(loaded.body.entries.length, addedPack.wordCount);
+            assert.ok(loaded.body.entries.length >= 4);
+          }
           const pack = catalog.body.packs.find(
             (candidate: { slug: string }) => candidate.slug === 'business-beginner-1-en-he',
           );
@@ -212,6 +229,88 @@ test(
             ids: packLibrary.body.items.map((item: { id: string }) => item.id),
             action: 'delete',
           }).expect(200);
+        },
+      );
+      await t.test(
+        'catalog loads only the matching learning and translation language',
+        async () => {
+          const totals = await db.adminPool.query(`SELECT
+          (SELECT count(*)::int FROM product_gotit.word_topics) topics,
+          (SELECT count(*)::int FROM product_gotit.word_tracks) tracks,
+          (SELECT count(*)::int FROM product_gotit.word_packs) packs,
+          (SELECT count(*)::int FROM product_gotit.word_pack_entries) entries`);
+          assert.deepEqual(totals.rows[0], { topics: 9, tracks: 20, packs: 30, entries: 282 });
+          const duplicates = await db.adminPool.query(`SELECT pack_id
+          FROM product_gotit.word_pack_entries
+          GROUP BY pack_id, normalized_source_text, normalized_translation_text
+          HAVING count(*) > 1`);
+          assert.equal(duplicates.rowCount, 0);
+          await call('get', '/profile', undefined, randomUUID(), 1).expect(200);
+          const update = async (source: string, translation: string) => {
+            const result = await db.adminPool.query(
+              `UPDATE product_gotit.user_profiles
+             SET default_source_language=$1, default_translation_language=$2
+             WHERE application_id=$3 AND application_user_id=$4`,
+              [source, translation, applicationId, users[1]],
+            );
+            assert.equal(result.rowCount, 1);
+          };
+          await update('en', 'he');
+          assert.equal(
+            (await call('get', '/word-packs', undefined, randomUUID(), 1).expect(200)).body.packs
+              .length,
+            30,
+          );
+          for (const language of [
+            'ar',
+            'es',
+            'fr',
+            'de',
+            'it',
+            'pt',
+            'pt-BR',
+            'ru',
+            'uk',
+            'pl',
+            'nl',
+            'tr',
+            'el',
+            'hi',
+            'zh-CN',
+            'zh-TW',
+            'ja',
+            'ko',
+            'vi',
+            'th',
+            'id',
+            'sv',
+            'da',
+            'no',
+            'fi',
+            'cs',
+            'ro',
+            'hu',
+          ]) {
+            await update(language, 'he');
+            const list = await call('get', '/word-packs', undefined, randomUUID(), 1).expect(200);
+            assert.equal(list.body.packs.length, 0, `${language} must not load English content`);
+            await update('en', language);
+            const targetList = await call('get', '/word-packs', undefined, randomUUID(), 1).expect(
+              200,
+            );
+            assert.equal(
+              targetList.body.packs.length,
+              0,
+              `${language} must not load Hebrew content`,
+            );
+          }
+          await update('he', 'en');
+          assert.equal(
+            (await call('get', '/word-packs', undefined, randomUUID(), 1).expect(200)).body.packs
+              .length,
+            0,
+          );
+          await update('en', 'he');
         },
       );
       let sessionId: string, exerciseId: string;
