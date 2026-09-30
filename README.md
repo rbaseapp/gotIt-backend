@@ -47,7 +47,7 @@ GotIt-owned increments in `migrations/` use
 `gotit_migrations.pgmigrations` and the shared migration advisory lock. They add
 capture/practice/reading receipts, semantic evidence revisions, learning
 preferences, `practice_exercises`, `api_rate_limits`, and a versioned topic/level
-word-pack catalog, lesson evidence, personal courses/homework, add-on cycles, notifications and a private lesson minute wallet. The resulting product schema has **47 tables**. The eight historical
+word-pack catalog, lesson evidence, personal courses/homework, add-on cycles, notifications, a private lesson minute wallet and guarded Realtime call tickets. The resulting product schema has **48 tables**. The eight historical
 GotIt migrations in Core remain immutable.
 
 For existing databases, first take a backup and review baseline/normalization
@@ -257,6 +257,25 @@ catalog, provisioner and migration plan for current subscribers are ready. Enabl
 the flag without current grants fails closed with `402 ADDON_REQUIRED`.
 
 ## HTTP, deployment and verification
+
+AI provider calls have per-user daily caps at the provider boundary: course generation
+(40), course transcription (40), private lesson briefs (60), private lesson reports (60),
+AI translations (100), image briefs (60), and generated images (20). Reading generation
+retains its separate trial/monthly quota. Cached translation and image results do not
+consume a daily AI cap. Only the affected AI feature is rejected when its cap is reached.
+
+Realtime lessons and course interviews use a one-use application ticket. The backend
+forwards SDP to OpenAI, records the call ID, permits one active voice call per user,
+and hangs up at the server-side deadline (lesson duration plus 30 seconds, or a
+ten-minute course interview plus 30 seconds). It allows 30 private lesson tickets
+and 20 course interview tickets per UTC day after provider credentials are issued.
+The frontend ends a call when the learner leaves; the backend sweeps overdue calls
+every ten seconds, including after a restart. Apply migration
+`1790800005000_realtime-call-guard` before deploying this backend commit. Deploy
+the frontend version that accepts `/api/v1/realtime/connect` first.
+
+Set a hard monthly spend limit and earlier alerts in each AI provider project as a
+separate financial backstop. The application cannot set a provider billing cap.
 
 `GET /api/v1/private-lessons?limit=50&courseId=<uuid>` מחזיר עד 50 שיעורים
 של הקורס המבוקש בלבד, בסדר מהחדש לישן. הסינון לפי בעלות ומזהה קורס מתבצע במסד

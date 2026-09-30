@@ -4,6 +4,7 @@ import { AppError } from '../../shared/errors/app-error.js';
 import { readProviderJson } from '../enrichment/providers/http.js';
 import type { ProfileScope } from '../profile/profile.types.js';
 import { validateWav } from '../speech/speech.service.js';
+import type { AiDailyQuota } from '../../shared/middleware/ai-daily-quota.js';
 
 export interface CourseGenerator {
   generate<T>(
@@ -21,6 +22,7 @@ export class OpenAiCourseGenerator implements CourseGenerator {
     private readonly model: string,
     private readonly transcriptionModel: string,
     private readonly fetchImpl: typeof fetch = fetch,
+    private readonly dailyQuota?: Pick<AiDailyQuota, 'consume'>,
   ) {}
   async generate<T>(
     scope: ProfileScope,
@@ -29,6 +31,10 @@ export class OpenAiCourseGenerator implements CourseGenerator {
     instruction: string,
     data: unknown,
   ): Promise<T> {
+    await this.dailyQuota?.consume(
+      scope,
+      name === 'private_lesson_brief' ? 'private_lesson_brief' : 'course_generation',
+    );
     const signal = AbortSignal.timeout(
       ['course_plan', 'lesson_homework'].includes(name) ? 100_000 : 65_000,
     );
@@ -98,6 +104,7 @@ export class OpenAiCourseGenerator implements CourseGenerator {
   async transcribe(scope: ProfileScope, encoded: string, language: string) {
     const audio = Buffer.from(encoded, 'base64');
     validateWav(audio);
+    await this.dailyQuota?.consume(scope, 'course_transcription');
     const form = new FormData();
     form.set('file', new Blob([new Uint8Array(audio)], { type: 'audio/wav' }), 'answer.wav');
     form.set('model', this.transcriptionModel);

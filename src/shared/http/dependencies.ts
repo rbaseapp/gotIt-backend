@@ -14,6 +14,7 @@ import type { PrivateLessonService } from '../../modules/private-lessons/private
 import type { CourseService } from '../../modules/courses/course.service.js';
 import type { AddonAccessContract } from '../../modules/addons/addon-access.js';
 import type { MinuteWallet } from '../../modules/private-lessons/minute-wallet.js';
+import type { PostgresRealtimeCallGuard } from '../../modules/private-lessons/realtime-call-guard.js';
 import type { NotificationService } from '../../modules/notifications/notification.service.js';
 
 export type AppDependencies = {
@@ -33,6 +34,7 @@ export type AppDependencies = {
   courseService?: CourseService;
   addonAccess?: AddonAccessContract;
   minuteWallet?: MinuteWallet;
+  realtimeCallGuard?: Pick<PostgresRealtimeCallGuard, 'connect' | 'end'>;
   enforceAddonEntitlements?: boolean;
   notificationService?: NotificationService;
   enforcePaidEntitlements?: boolean;

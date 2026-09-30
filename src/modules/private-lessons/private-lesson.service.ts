@@ -4,6 +4,8 @@ import { z } from 'zod';
 import { AppError } from '../../shared/errors/app-error.js';
 import type { AddonAccessContract } from '../addons/addon-access.js';
 import type { MinuteWallet } from './minute-wallet.js';
+import type { AiDailyQuota } from '../../shared/middleware/ai-daily-quota.js';
+import { REALTIME_CONNECT_PATH, type RealtimeCallGuard } from './realtime-call-guard.js';
 import {
   ProviderHttpError,
   providerFailureCode,
@@ -97,6 +99,8 @@ export type PrivateLessonServiceOptions = {
   requestTimeoutMs?: number;
   lessonAccess?: AddonAccessContract;
   minuteWallet?: MinuteWallet;
+  realtimeCallGuard?: RealtimeCallGuard;
+  dailyQuota?: Pick<AiDailyQuota, 'consume'>;
 };
 
 export class PrivateLessonService {
@@ -238,18 +242,34 @@ export class PrivateLessonService {
     const childCourse = plan.course?.preferences.ageGroup === 'child';
     if (childCourse)
       plan = { ...plan, teacherVoice: childCourseTeacherVoice, correctionMode: 'recast' };
+    const ticketId = this.options.realtimeCallGuard
+      ? await this.options.realtimeCallGuard.reserve(
+          scope,
+          'private_lesson',
+          plan.durationSeconds,
+          plan.id,
+        )
+      : null;
     let reservedLessonId: string | null = null;
-    if (this.options.minuteWallet && (scope as ProfileScope & { role?: string }).role !== 'admin') {
-      if (!accessToken) throw new AppError(401, 'UNAUTHORIZED', 'Access token is required');
-      await this.options.minuteWallet.reserve(scope, plan.id, plan.durationSeconds, accessToken);
-      reservedLessonId = plan.id;
-    } else if (
-      this.options.lessonAccess &&
-      (scope as ProfileScope & { role?: string }).role !== 'admin'
-    ) {
-      const allowance = await this.options.lessonAccess.reserveLesson(scope, plan.id);
-      reservedLessonId = plan.id;
-      plan = { ...plan, durationSeconds: allowance.lessonDurationSeconds! };
+    try {
+      if (
+        this.options.minuteWallet &&
+        (scope as ProfileScope & { role?: string }).role !== 'admin'
+      ) {
+        if (!accessToken) throw new AppError(401, 'UNAUTHORIZED', 'Access token is required');
+        await this.options.minuteWallet.reserve(scope, plan.id, plan.durationSeconds, accessToken);
+        reservedLessonId = plan.id;
+      } else if (
+        this.options.lessonAccess &&
+        (scope as ProfileScope & { role?: string }).role !== 'admin'
+      ) {
+        const allowance = await this.options.lessonAccess.reserveLesson(scope, plan.id);
+        reservedLessonId = plan.id;
+        plan = { ...plan, durationSeconds: allowance.lessonDurationSeconds! };
+      }
+    } catch (error) {
+      if (ticketId) await this.options.realtimeCallGuard!.cancel(ticketId);
+      throw error;
     }
     const controller = new AbortController();
     let timeout: ReturnType<typeof setTimeout> | undefined;
@@ -338,16 +358,19 @@ export class PrivateLessonService {
 
       if (!input.courseId) await this.options.roadmaps?.savePreferences(scope, input, plan);
       await this.options.journal?.create(scope, plan);
+      if (ticketId) await this.options.realtimeCallGuard!.issue(ticketId, secret.value);
       return {
         lesson: publicPlan(plan),
         realtime: {
-          clientSecret: secret.value,
+          clientSecret: ticketId ?? secret.value,
           expiresAt:
             secret.expires_at === undefined
               ? null
               : new Date(secret.expires_at * 1000).toISOString(),
           model: this.options.model,
-          connectionUrl: 'https://api.openai.com/v1/realtime/calls',
+          connectionUrl: ticketId
+            ? REALTIME_CONNECT_PATH
+            : 'https://api.openai.com/v1/realtime/calls',
           openingEvent: responseEvent(
             childCourse
               ? `Begin a child-friendly lesson now. Introduce yourself as ${teacher.name}. Follow the language policy and today's approved course objective. Give one short concrete model, explain it simply, then ask one short spoken understanding question about a fresh situation without giving its answer. Wait for the child's answer before the next step. Use imitation only when the objective or a sound requires it.`
@@ -381,6 +404,7 @@ export class PrivateLessonService {
         },
       };
     } catch (error) {
+      if (ticketId) await this.options.realtimeCallGuard!.cancel(ticketId);
       if (reservedLessonId) {
         if (this.options.minuteWallet) await this.options.minuteWallet.release(reservedLessonId);
         else await this.options.lessonAccess!.releaseLesson(reservedLessonId);
@@ -396,6 +420,8 @@ export class PrivateLessonService {
     const existing = await journal.get(scope, id);
     if (!existing) throw privateLessonNotFound();
     if (existing.status === 'completed' && existing.report) return publicStoredLesson(existing);
+    if (this.options.summaryGenerator)
+      await this.options.dailyQuota?.consume(scope, 'private_lesson_report');
 
     const claimed = await journal.claim(scope, id, input.actualDurationSeconds);
     if (!claimed) {

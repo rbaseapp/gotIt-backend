@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import type { ProfileScope } from '../profile/profile.types.js';
 
 export type StudyImageInput = {
   sourceText: string;
@@ -7,6 +8,7 @@ export type StudyImageInput = {
   translationLanguageCode: string;
   context: string | null;
   visual?: StudyImageVisualBrief;
+  scope?: ProfileScope;
 };
 
 export type StudyImageVisualBrief = {
@@ -84,6 +86,7 @@ export class FallbackStudyImageProvider implements StudyImageProvider {
         sourceLanguageCode: input.sourceLanguageCode,
         translationLanguageCode: input.translationLanguageCode,
         context: input.context,
+        scope: input.scope,
       })) ??
       literalStudyImageBrief(input);
     const resolved = { ...input, visual };

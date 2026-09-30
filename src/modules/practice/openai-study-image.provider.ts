@@ -1,4 +1,6 @@
 import { createHash } from 'node:crypto';
+import type { ProfileScope } from '../profile/profile.types.js';
+import type { AiDailyQuota } from '../../shared/middleware/ai-daily-quota.js';
 import { z } from 'zod';
 import type {
   GeneratedStudyImage,
@@ -37,6 +39,7 @@ export class OpenAiStudyImageProvider implements StudyImageProvider {
     private readonly apiKey: string,
     private readonly model = 'gpt-image-2.5-flare',
     private readonly request: typeof fetch = fetch,
+    private readonly dailyQuota?: Pick<AiDailyQuota, 'consume'>,
   ) {
     this.id = `openai:v2-isolated:${model}`;
   }
@@ -54,15 +57,19 @@ export class OpenAiStudyImageProvider implements StudyImageProvider {
     const key = createHash('sha256').update(JSON.stringify(input)).digest('hex');
     const existing = this.pending.get(key);
     if (existing) return existing;
-    const generation = this.generateOnce(input).finally(() => this.pending.delete(key));
+    const generation = this.generateOnce(input, raw.scope).finally(() => this.pending.delete(key));
     this.pending.set(key, generation);
     return generation;
   }
 
-  private async generateOnce(input: StudyImageInput): Promise<GeneratedStudyImage | null> {
+  private async generateOnce(
+    input: StudyImageInput,
+    scope?: ProfileScope,
+  ): Promise<GeneratedStudyImage | null> {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 90_000);
     try {
+      if (scope) await this.dailyQuota?.consume(scope, 'study_image_generation');
       const prompt = [
         'Create a lightweight educational spot illustration for a language-learning card.',
         'Depict only the resolved lexical meaning in the visual brief below.',

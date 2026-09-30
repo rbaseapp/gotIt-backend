@@ -17,6 +17,7 @@ import { AzureSpeechProvider } from './modules/speech/azure-speech.provider.js';
 import { GoogleSpeechProvider } from './modules/speech/google-speech.provider.js';
 import { policySchema } from './modules/learning/learning.policy.js';
 import { PostgresRateLimiter } from './shared/middleware/rate-limit.js';
+import { AiDailyQuota } from './shared/middleware/ai-daily-quota.js';
 import { createApp } from './app.js';
 import { env } from './shared/config/env.js';
 import { CoreAuthClient } from './shared/core/core-auth.client.js';
@@ -43,6 +44,7 @@ import { OpenAiPrivateLessonSummaryGenerator } from './modules/private-lessons/p
 import { PostgresPrivateLessonProficiencyStore } from './modules/private-lessons/private-lesson.proficiency.js';
 import { PostgresAddonAccess } from './modules/addons/addon-access.js';
 import { PostgresMinuteWallet } from './modules/private-lessons/minute-wallet.js';
+import { PostgresRealtimeCallGuard } from './modules/private-lessons/realtime-call-guard.js';
 
 const logger = createLogger(env.LOG_LEVEL);
 const pool = createPool(env.DATABASE_URL);
@@ -116,6 +118,12 @@ const coreAuthClient = new CoreAuthClient({
   timeoutMs: env.CORE_AUTH_TIMEOUT_MS,
 });
 const minuteWallet = new PostgresMinuteWallet(pool, coreAuthClient);
+const rateLimiter = new PostgresRateLimiter(pool);
+const aiDailyQuota = new AiDailyQuota(rateLimiter);
+const realtimeApiKey = env.OPENAI_REALTIME_API_KEY ?? env.OPENAI_API_KEY;
+const realtimeCallGuard = realtimeApiKey
+  ? new PostgresRealtimeCallGuard(pool, realtimeApiKey, minuteWallet)
+  : undefined;
 
 const profileRepository = new ProfileRepository(pool);
 const profileService = new ProfileService(profileRepository);
@@ -138,7 +146,7 @@ const notificationService = new NotificationService(
   ),
   env.NOTIFICATION_VAPID_PUBLIC_KEY,
 );
-const enrichment = createEnrichment(env);
+const enrichment = createEnrichment(env, [], aiDailyQuota);
 const learningPolicy = policySchema.parse(
   env.LEARNING_POLICY_JSON ? JSON.parse(env.LEARNING_POLICY_JSON) : {},
 );
@@ -156,13 +164,19 @@ const studyImageProviders = [
           env.OPENAI_API_KEY,
           env.OPENAI_IMAGE_MODEL ?? 'gpt-image-2.5-flare',
           fetch,
+          aiDailyQuota,
         ),
       ]
     : []),
 ];
 const studyImageBriefResolver =
   env.OPENAI_API_KEY && env.OPENAI_TRANSLATION_MODEL
-    ? new OpenAiStudyImageBriefResolver(env.OPENAI_API_KEY, env.OPENAI_TRANSLATION_MODEL, fetch)
+    ? new OpenAiStudyImageBriefResolver(
+        env.OPENAI_API_KEY,
+        env.OPENAI_TRANSLATION_MODEL,
+        fetch,
+        aiDailyQuota,
+      )
     : undefined;
 const practiceService: PracticeService = new PracticeService(
   pool,
@@ -211,6 +225,8 @@ const privateLessonContentGenerator = privateLessonContentApiKey
       privateLessonContentApiKey,
       env.OPENAI_PRIVATE_LESSON_MODEL,
       env.OPENAI_REALTIME_TRANSCRIPTION_MODEL,
+      fetch,
+      aiDailyQuota,
     )
   : undefined;
 const courseService = new CourseService(
@@ -222,6 +238,7 @@ const courseService = new CourseService(
         apiKey: (env.OPENAI_REALTIME_API_KEY ?? env.OPENAI_API_KEY)!,
         model: env.OPENAI_REALTIME_MODEL,
         transcriptionModel: env.OPENAI_REALTIME_TRANSCRIPTION_MODEL,
+        callGuard: realtimeCallGuard,
       }
     : undefined,
 );
@@ -247,8 +264,9 @@ const privateLessonService = new PrivateLessonService({
     : undefined,
   lessonAccess: env.ENFORCE_ADDON_ENTITLEMENTS ? addonAccess : undefined,
   minuteWallet,
+  realtimeCallGuard,
+  dailyQuota: aiDailyQuota,
 });
-const rateLimiter = new PostgresRateLimiter(pool);
 const readingGenerator =
   env.OPENAI_API_KEY && env.AI_READING_MODEL
     ? new OpenAiReadingGenerator(env.OPENAI_API_KEY, env.AI_READING_MODEL, fetch)
@@ -278,6 +296,7 @@ const app = createApp({
   courseService,
   addonAccess,
   minuteWallet,
+  realtimeCallGuard,
   enforceAddonEntitlements: env.ENFORCE_ADDON_ENTITLEMENTS,
   wordPackService: new WordPackRepository(pool),
   enforcePaidEntitlements: env.ENFORCE_PAID_ENTITLEMENTS,
@@ -308,6 +327,21 @@ const cleanup = setInterval(() => {
   void rateLimiter.cleanup().catch(() => logger.warn('Request limit cleanup failed'));
 }, 60000);
 cleanup.unref();
+let realtimeSweepActive = false;
+const sweepRealtime = async () => {
+  if (draining || realtimeSweepActive || !realtimeCallGuard) return;
+  realtimeSweepActive = true;
+  try {
+    await realtimeCallGuard.sweep();
+  } catch {
+    logger.error('Realtime call cleanup failed');
+  } finally {
+    realtimeSweepActive = false;
+  }
+};
+const realtimeTimer = setInterval(() => void sweepRealtime(), 10_000);
+realtimeTimer.unref();
+void sweepRealtime();
 let notificationRunActive = false;
 const runNotifications = async () => {
   if (draining || notificationRunActive) return;
@@ -333,6 +367,7 @@ async function shutdown(signal: string) {
   if (draining) return;
   draining = true;
   clearInterval(cleanup);
+  clearInterval(realtimeTimer);
   clearInterval(notificationTimer);
   logger.info({ signal }, 'Shutting down GotIt backend');
   const deadline = setTimeout(() => {

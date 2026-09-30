@@ -415,6 +415,52 @@ test('private lesson reserves its selected minute duration and releases it only 
   assert.deepEqual(releases, [reservations[1]!.id]);
 });
 
+test('private lesson returns only a one-use application ticket and cancels it on provider failure', async () => {
+  const ticket = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+  const events: string[] = [];
+  const realtimeCallGuard = {
+    async reserve(_scope: typeof identity, feature: string) {
+      assert.equal(feature, 'private_lesson');
+      events.push('reserve');
+      return ticket;
+    },
+    async issue(_ticket: string, secret: string) {
+      assert.equal(secret, 'ek_demo');
+      events.push('issue');
+    },
+    async cancel() {
+      events.push('cancel');
+    },
+  };
+  const options = {
+    apiKey: 'server-secret',
+    model: 'gpt-realtime-test',
+    voice: 'marin',
+    transcriptionModel: 'gpt-transcribe-test',
+    profiles,
+    vocabulary,
+    realtimeCallGuard,
+  };
+  const opened = await new PrivateLessonService({
+    ...options,
+    fetchImpl: async () => Response.json({ value: 'ek_demo' }),
+  }).createSession(identity, { targetLanguageCode: 'en' });
+  assert.equal(opened.realtime.clientSecret, ticket);
+  assert.equal(opened.realtime.connectionUrl, '/api/v1/realtime/connect');
+  assert.doesNotMatch(JSON.stringify(opened), /ek_demo/u);
+  assert.deepEqual(events, ['reserve', 'issue']);
+
+  await assert.rejects(
+    new PrivateLessonService({
+      ...options,
+      fetchImpl: async () => {
+        throw new Error('upstream');
+      },
+    }).createSession(identity, { targetLanguageCode: 'en' }),
+  );
+  assert.deepEqual(events, ['reserve', 'issue', 'reserve', 'cancel']);
+});
+
 test('private lesson creates a bounded personalized Realtime session', async () => {
   let requestBody: Record<string, unknown> | undefined;
   let requestHeaders: Headers | undefined;

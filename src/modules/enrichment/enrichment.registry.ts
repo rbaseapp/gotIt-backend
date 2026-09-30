@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { candidateSchema, languageSchema, textSchema } from '../capture/capture.validation.js';
 import type { EnrichmentInput, EnrichmentProvider, ModelProfile } from './enrichment.types.js';
 import { providerFailureCode, type ProviderFailureCode } from './providers/http.js';
+import type { AiDailyQuota } from '../../shared/middleware/ai-daily-quota.js';
 
 const outputSchema = z
   .object({
@@ -44,6 +45,7 @@ export class EnrichmentRegistry {
     providers: EnrichmentProvider[] = [],
     profiles: ModelProfile[] = [],
     private readonly routes: Partial<Record<'auto' | 'dictionary' | 'ai', RouteConfig>> = {},
+    private readonly dailyQuota?: Pick<AiDailyQuota, 'consume'>,
   ) {
     for (const provider of providers) {
       if (!/^[a-z][a-z0-9_]{0,99}$/u.test(provider.id) || this.providers.has(provider.id))
@@ -107,6 +109,8 @@ export class EnrichmentRegistry {
       for (let attempt = 1; attempt <= maxAttempts; attempt++) {
         const remaining = routeEnd - Date.now();
         if (remaining <= 0) break;
+        if (provider.kind === 'ai' && provider.id !== 'openai' && input.scope)
+          await this.dailyQuota?.consume(input.scope, 'ai_translation');
         attempted = true;
         const started = Date.now();
         const controller = new AbortController();

@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, text as expressText } from 'express';
 import { createCaptureRoutes, createLearningItemRoutes } from './modules/capture/capture.routes.js';
 import { createProfileRoutes } from './modules/profile/profile.routes.js';
 import { createLibraryRoutes, createTagRoutes } from './modules/library/library.routes.js';
@@ -14,6 +14,10 @@ import {
   createSpeechItemRoutes,
 } from './modules/speech/speech.routes.js';
 import { createRateLimit } from './shared/middleware/rate-limit.js';
+import {
+  REALTIME_CONNECT_PATH,
+  REALTIME_END_PATH,
+} from './modules/private-lessons/realtime-call-guard.js';
 import { API_ROUTES } from './shared/http/api-catalog.js';
 import { AppError } from './shared/errors/app-error.js';
 import type { AppDependencies } from './shared/http/dependencies.js';
@@ -104,6 +108,29 @@ export function createRoutes(dependencies: AppDependencies) {
     });
   });
 
+  if (dependencies.realtimeCallGuard) {
+    const ticket = (authorization: string | undefined) => {
+      const value = authorization?.match(/^Bearer ([\da-f-]{36})$/iu)?.[1];
+      if (!value) throw new AppError(401, 'UNAUTHORIZED', 'Voice ticket is required');
+      return value;
+    };
+    router.post(
+      REALTIME_CONNECT_PATH,
+      expressText({ type: 'application/sdp', limit: '16kb' }),
+      async (req, res) => {
+        const answer = await dependencies.realtimeCallGuard!.connect(
+          ticket(req.get('authorization')),
+          typeof req.body === 'string' ? req.body : '',
+        );
+        res.set('Cache-Control', 'no-store').type('application/sdp').send(answer);
+      },
+    );
+    router.post(REALTIME_END_PATH, async (req, res) => {
+      await dependencies.realtimeCallGuard!.end(ticket(req.get('authorization')));
+      res.status(204).end();
+    });
+  }
+
   router.use('/api/v1', ...authenticate);
   const requireVocabularyWrite = createRequireEntitlementMiddleware(
     dependencies.coreAuthClient,
@@ -132,13 +159,17 @@ export function createRoutes(dependencies: AppDependencies) {
         dependencies.enforcePaidEntitlements === true,
       );
   const requireLesson = dependencies.minuteWallet
-    ? (_req: import('express').Request, _res: import('express').Response, next: import('express').NextFunction) => next()
+    ? (
+        _req: import('express').Request,
+        _res: import('express').Response,
+        next: import('express').NextFunction,
+      ) => next()
     : dependencies.enforceAddonEntitlements
-    ? requireBoth(
-        requirePractice,
-        createRequireAddonMiddleware(dependencies.addonAccess!, 'private_lessons'),
-      )
-    : requirePractice;
+      ? requireBoth(
+          requirePractice,
+          createRequireAddonMiddleware(dependencies.addonAccess!, 'private_lessons'),
+        )
+      : requirePractice;
   const requireCourse = dependencies.enforceAddonEntitlements
     ? requireBoth(requirePractice, createRequireAddonMiddleware(dependencies.addonAccess!, 'ai'))
     : requirePractice;
@@ -163,7 +194,10 @@ export function createRoutes(dependencies: AppDependencies) {
   );
   if (dependencies.minuteWallet)
     router.get('/api/v1/private-lesson-minutes', async (req, res) => {
-      res.json({ ...(await dependencies.minuteWallet!.balance(req.gotitAuth!, req.gotitCoreAccessToken!)), requestId: req.id });
+      res.json({
+        ...(await dependencies.minuteWallet!.balance(req.gotitAuth!, req.gotitCoreAccessToken!)),
+        requestId: req.id,
+      });
     });
   router.get('/api/v1/capabilities', async (req, res) => {
     const profile = await dependencies.profileService.getProfile(req.gotitAuth!);

@@ -15,6 +15,10 @@ import {
 } from './course.repository.js';
 import type { CourseGenerator } from './course.provider.js';
 import {
+  REALTIME_CONNECT_PATH,
+  type RealtimeCallGuard,
+} from '../private-lessons/realtime-call-guard.js';
+import {
   coursePlanSchema,
   intakeReplySchema,
   intakeQuestionsSchema,
@@ -98,6 +102,7 @@ export class CourseService {
       model: string;
       transcriptionModel: string;
       fetchImpl?: typeof fetch;
+      callGuard?: RealtimeCallGuard;
     },
   ) {}
   get available() {
@@ -135,54 +140,65 @@ export class CourseService {
       throw new AppError(409, 'COURSE_VOICE_UNAVAILABLE', 'The live interview is unavailable');
     const question = course.messages.at(-1);
     if (question?.role !== 'tutor') throw courseConflict();
-    const language = new Intl.Locale(course.preferences.supportLanguageCode).language;
-    const signal = AbortSignal.timeout(20_000);
-    const response = await (this.realtime.fetchImpl ?? fetch)(
-      'https://api.openai.com/v1/realtime/client_secrets',
-      {
-        method: 'POST',
-        signal,
-        headers: {
-          authorization: `Bearer ${this.realtime.apiKey}`,
-          'content-type': 'application/json',
-        },
-        body: JSON.stringify({
-          session: {
-            type: 'realtime',
-            model: this.realtime.model,
-            output_modalities: ['audio'],
-            instructions: `You are the learner's live course teacher. Speak only in ${intakeLanguageName(language)}. Read the exact supplied server question naturally, without adding, changing or answering it. Wait silently for the learner. The server will supply each next question.`,
-            audio: {
-              input: {
-                noise_reduction: { type: 'far_field' },
-                transcription: { model: this.realtime.transcriptionModel, language },
-                turn_detection: {
-                  type: 'server_vad',
-                  threshold: 0.7,
-                  prefix_padding_ms: 400,
-                  silence_duration_ms: 700,
-                  create_response: false,
-                  interrupt_response: true,
-                },
-              },
-              output: { voice: 'marin', speed: 1 },
-            },
+    const ticketId = this.realtime.callGuard
+      ? await this.realtime.callGuard.reserve(scope, 'course_interview', 600)
+      : null;
+    try {
+      const language = new Intl.Locale(course.preferences.supportLanguageCode).language;
+      const signal = AbortSignal.timeout(20_000);
+      const response = await (this.realtime.fetchImpl ?? fetch)(
+        'https://api.openai.com/v1/realtime/client_secrets',
+        {
+          method: 'POST',
+          signal,
+          headers: {
+            authorization: `Bearer ${this.realtime.apiKey}`,
+            'content-type': 'application/json',
           },
-        }),
-      },
-    );
-    if (!response.ok)
-      throw new AppError(503, 'COURSE_VOICE_UNAVAILABLE', 'The live interview could not start');
-    const secret = z
-      .object({ value: z.string().min(1), expires_at: z.number().optional() })
-      .parse(await response.json());
-    return {
-      clientSecret: secret.value,
-      expiresAt: secret.expires_at ? new Date(secret.expires_at * 1000).toISOString() : null,
-      model: this.realtime.model,
-      connectionUrl: 'https://api.openai.com/v1/realtime/calls' as const,
-      openingEvent: courseSpokenQuestion(question.text, language),
-    };
+          body: JSON.stringify({
+            session: {
+              type: 'realtime',
+              model: this.realtime.model,
+              output_modalities: ['audio'],
+              instructions: `You are the learner's live course teacher. Speak only in ${intakeLanguageName(language)}. Read the exact supplied server question naturally, without adding, changing or answering it. Wait silently for the learner. The server will supply each next question.`,
+              audio: {
+                input: {
+                  noise_reduction: { type: 'far_field' },
+                  transcription: { model: this.realtime.transcriptionModel, language },
+                  turn_detection: {
+                    type: 'server_vad',
+                    threshold: 0.7,
+                    prefix_padding_ms: 400,
+                    silence_duration_ms: 700,
+                    create_response: false,
+                    interrupt_response: true,
+                  },
+                },
+                output: { voice: 'marin', speed: 1 },
+              },
+            },
+          }),
+        },
+      );
+      if (!response.ok)
+        throw new AppError(503, 'COURSE_VOICE_UNAVAILABLE', 'The live interview could not start');
+      const secret = z
+        .object({ value: z.string().min(1), expires_at: z.number().optional() })
+        .parse(await response.json());
+      if (ticketId) await this.realtime.callGuard!.issue(ticketId, secret.value);
+      return {
+        clientSecret: ticketId ?? secret.value,
+        expiresAt: secret.expires_at ? new Date(secret.expires_at * 1000).toISOString() : null,
+        model: this.realtime.model,
+        connectionUrl: ticketId
+          ? REALTIME_CONNECT_PATH
+          : 'https://api.openai.com/v1/realtime/calls',
+        openingEvent: courseSpokenQuestion(question.text, language),
+      };
+    } catch (error) {
+      if (ticketId) await this.realtime.callGuard!.cancel(ticketId);
+      throw error;
+    }
   }
   async homework(scope: ProfileScope, id: string) {
     const document = await this.store.get(scope, id);

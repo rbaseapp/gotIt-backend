@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { createHash } from 'node:crypto';
 import type { EnrichmentInput, EnrichmentProvider, ModelProfile } from '../enrichment.types.js';
+import type { AiDailyQuota } from '../../../shared/middleware/ai-daily-quota.js';
 import { readProviderJson } from './http.js';
 
 const responseSchema = z
@@ -152,6 +153,7 @@ export class OpenAIProvider implements EnrichmentProvider {
   constructor(
     private readonly apiKey: string,
     private readonly fetchImpl: typeof fetch = fetch,
+    private readonly dailyQuota?: Pick<AiDailyQuota, 'consume'>,
   ) {
     if (!apiKey) throw new Error('OpenAI API key is required');
   }
@@ -160,7 +162,18 @@ export class OpenAIProvider implements EnrichmentProvider {
     if (!profile.model) throw new Error('OpenAI model is required');
     const maxCandidates = input.maxCandidates ?? 5;
     const cacheKey = createHash('sha256')
-      .update(JSON.stringify({ model: profile.model, input: { ...input, maxCandidates } }))
+      .update(
+        JSON.stringify({
+          model: profile.model,
+          input: {
+            sourceText: input.sourceText,
+            sourceLanguageCode: input.sourceLanguageCode,
+            translationLanguageCode: input.translationLanguageCode,
+            sentenceText: input.sentenceText,
+            maxCandidates,
+          },
+        }),
+      )
       .digest('hex');
     const cached = this.cache.get(cacheKey);
     if (cached && cached.expiresAt > Date.now()) {
@@ -169,6 +182,7 @@ export class OpenAIProvider implements EnrichmentProvider {
       return cached.output;
     }
     if (cached) this.cache.delete(cacheKey);
+    if (input.scope) await this.dailyQuota?.consume(input.scope, 'ai_translation');
     const response = await this.fetchImpl('https://api.openai.com/v1/responses', {
       method: 'POST',
       signal,

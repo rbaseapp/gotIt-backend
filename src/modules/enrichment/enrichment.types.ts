@@ -1,4 +1,5 @@
 import type { Candidate } from '../capture/capture.validation.js';
+import type { ProfileScope } from '../profile/profile.types.js';
 
 export type ProviderKind = 'translation_api' | 'dictionary' | 'ai';
 export type EnrichmentInput = {
@@ -8,6 +9,7 @@ export type EnrichmentInput = {
   sentenceText: string | null;
   /** AI providers use one candidate for the fast path and up to five on demand. */
   maxCandidates?: 1 | 5;
+  scope?: ProfileScope;
 };
 export type ProviderCapabilities = {
   detection: boolean;

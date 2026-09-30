@@ -66,6 +66,7 @@ export class CaptureService {
             translationLanguageCode,
             sentenceText: input.context?.sentenceText ?? null,
             maxCandidates: method === 'ai' && input.translationDetail === 'compact' ? 1 : 5,
+            scope,
           },
           async (trace) => {
             runId = await this.repository.recordEnrichment(scope, trace, translationLanguageCode);

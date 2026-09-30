@@ -1,4 +1,6 @@
 import { createHash } from 'node:crypto';
+import type { ProfileScope } from '../profile/profile.types.js';
+import type { AiDailyQuota } from '../../shared/middleware/ai-daily-quota.js';
 import { z } from 'zod';
 import type {
   StudyImageBriefResolver,
@@ -107,6 +109,7 @@ export class OpenAiStudyImageBriefResolver implements StudyImageBriefResolver {
     private readonly apiKey: string,
     private readonly model: string,
     private readonly request: typeof fetch = fetch,
+    private readonly dailyQuota?: Pick<AiDailyQuota, 'consume'>,
   ) {
     this.id = `openai-brief:v1:${model}`;
   }
@@ -126,7 +129,7 @@ export class OpenAiStudyImageBriefResolver implements StudyImageBriefResolver {
     if (cached) this.cache.delete(key);
     const existing = this.pending.get(key);
     if (existing) return existing;
-    const work = this.resolveOnce(input)
+    const work = this.resolveOnce(input, raw.scope)
       .then((brief) => {
         if (brief) {
           if (this.cache.size >= 1_000) this.cache.delete(this.cache.keys().next().value!);
@@ -141,8 +144,10 @@ export class OpenAiStudyImageBriefResolver implements StudyImageBriefResolver {
 
   private async resolveOnce(
     input: Omit<StudyImageInput, 'visual'>,
+    scope?: ProfileScope,
   ): Promise<StudyImageVisualBrief | null> {
     try {
+      if (scope) await this.dailyQuota?.consume(scope, 'study_image_brief');
       const response = await this.request('https://api.openai.com/v1/responses', {
         method: 'POST',
         headers: {

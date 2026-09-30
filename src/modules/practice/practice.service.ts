@@ -609,6 +609,7 @@ export class PracticeService {
         ),
       };
     const generated = await this.imageProvider.generate({
+      scope,
       sourceText: item.source_text,
       translationText: item.translation_text,
       sourceLanguageCode: item.source_language_code,

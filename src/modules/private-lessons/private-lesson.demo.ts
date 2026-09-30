@@ -249,6 +249,13 @@ function stopLesson(message) {
   window.clearTimeout(wrapTimeoutId);
   window.clearTimeout(stopTimeoutId);
   window.clearTimeout(hardStopTimeoutId);
+  if (activeSession && activeSession.realtime.connectionUrl === '/api/v1/realtime/connect') {
+    fetch('/api/v1/realtime/end', {
+      method: 'POST',
+      headers: { Authorization: 'Bearer ' + activeSession.realtime.clientSecret },
+      keepalive: true,
+    }).catch(function () {});
+  }
   if (dataChannel) dataChannel.close();
   if (peerConnection) peerConnection.close();
   if (localStream) localStream.getTracks().forEach(function (track) { track.stop(); });
@@ -260,6 +267,7 @@ function stopLesson(message) {
   translateButton.disabled = true;
   setStatus(message || 'השיעור נעצר.');
   stopButton.disabled = true;
+  activeSession = null;
 }
 
 function renderLesson(lesson) {

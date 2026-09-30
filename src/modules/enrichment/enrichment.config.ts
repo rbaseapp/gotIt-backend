@@ -4,6 +4,7 @@ import { GoogleCloudTranslationProvider } from './providers/google-cloud.js';
 import { OpenAIProvider } from './providers/openai.js';
 import { SelectionProofs } from './selection-proof.js';
 import type { EnrichmentProvider, ModelProfile } from './enrichment.types.js';
+import type { AiDailyQuota } from '../../shared/middleware/ai-daily-quota.js';
 
 export const routingSchema = z
   .object({
@@ -46,6 +47,7 @@ export function createEnrichment(
     GOOGLE_TRANSLATION_LANGUAGES_JSON?: string;
   },
   additionalProviders: EnrichmentProvider[] = [],
+  dailyQuota?: Pick<AiDailyQuota, 'consume'>,
 ) {
   if (!settings.ENRICHMENT_PROFILES_JSON) {
     if (settings.OPENAI_TRANSLATION_MODEL && !settings.OPENAI_API_KEY)
@@ -55,7 +57,8 @@ export function createEnrichment(
   const googleTranslationEnabled = Boolean(
     settings.GOOGLE_TRANSLATION_API || settings.GOOGLE_TRANSLATE_API_KEY,
   );
-  if (settings.OPENAI_API_KEY) providers.push(new OpenAIProvider(settings.OPENAI_API_KEY));
+  if (settings.OPENAI_API_KEY)
+    providers.push(new OpenAIProvider(settings.OPENAI_API_KEY, fetch, dailyQuota));
   if (googleTranslationEnabled) {
     if (!settings.GOOGLE_TRANSLATE_API_KEY)
       throw new Error('Configured Google translation requires credentials');
@@ -101,7 +104,7 @@ export function createEnrichment(
   if (profiles.length && !settings.ENRICHMENT_SIGNING_SECRET)
     throw new Error('Configured enrichment requires a GotIt signing secret');
   return {
-    registry: new EnrichmentRegistry(providers, profiles, routes),
+    registry: new EnrichmentRegistry(providers, profiles, routes, dailyQuota),
     proofs: new SelectionProofs(settings.ENRICHMENT_SIGNING_SECRET),
   };
 }

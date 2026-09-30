@@ -43,6 +43,8 @@ export const API_ROUTES = [
   ['GET', '/learning/queue'],
   ['GET', '/learning/config'],
   ['POST', '/private-lessons/realtime-sessions'],
+  ['POST', '/realtime/connect'],
+  ['POST', '/realtime/end'],
   ['GET', '/private-lessons/setup'],
   ['PUT', '/private-lessons/preferences'],
   ['POST', '/private-lessons/roadmaps'],

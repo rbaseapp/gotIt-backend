@@ -5,7 +5,11 @@ import { createApp } from '../src/app.js';
 import { CoreAuthClient } from '../src/shared/core/core-auth.client.js';
 import { createLogger } from '../src/shared/logger/logger.js';
 import { validateOrigins } from '../src/shared/middleware/cors.js';
-function fixture(allowed = true, unavailable = false) {
+function fixture(
+  allowed = true,
+  unavailable = false,
+  realtimeCallGuard?: Parameters<typeof createApp>[0]['realtimeCallGuard'],
+) {
   let authCalls = 0;
   const app = createApp({
     logger: createLogger('silent'),
@@ -49,9 +53,42 @@ function fixture(allowed = true, unavailable = false) {
         return { allowed, retryAfter: 60 };
       },
     },
+    realtimeCallGuard,
   });
   return { app, authCalls: () => authCalls };
 }
+test('one-use voice ticket route accepts SDP while ordinary authenticated routes remain available', async () => {
+  const events: string[] = [];
+  const f = fixture(true, false, {
+    async connect(ticket, sdp) {
+      events.push(`connect:${ticket}:${sdp}`);
+      return 'v=0\r\no=provider\r\n';
+    },
+    async end(ticket) {
+      events.push(`end:${ticket}`);
+    },
+  });
+  const ticket = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+  const response = await request(f.app)
+    .post('/api/v1/realtime/connect')
+    .set('Authorization', `Bearer ${ticket}`)
+    .set('Content-Type', 'application/sdp')
+    .send('v=0\r\no=browser\r\n')
+    .expect(200);
+  assert.equal(response.text, 'v=0\r\no=provider\r\n');
+  await request(f.app)
+    .post('/api/v1/realtime/end')
+    .set('Authorization', `Bearer ${ticket}`)
+    .expect(204);
+  await request(f.app)
+    .post('/api/v1/realtime/connect')
+    .set('Content-Type', 'application/sdp')
+    .send('v=0\r\n')
+    .expect(401);
+  assert.deepEqual(events, [`connect:${ticket}:v=0\r\no=browser\r\n`, `end:${ticket}`]);
+  assert.equal(f.authCalls(), 0);
+  await request(f.app).get('/api/v1/profile').set('Authorization', 'Bearer fake').expect(200);
+});
 test('exact CORS origins permit authenticated requests and preflight; foreign/null origins, headers and methods are rejected before auth', async () => {
   const f = fixture();
   await request(f.app)
