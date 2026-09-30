@@ -20,6 +20,7 @@ import {
 } from '../private-lessons/realtime-call-guard.js';
 import {
   coursePlanSchema,
+  MAX_HOMEWORK_TASKS,
   intakeReplySchema,
   intakeQuestionsSchema,
   homeworkContentSchema,
@@ -958,7 +959,7 @@ export class CourseService {
           homeworkTaskSchema.extend({ sourceQuote: z.enum(sourceQuotes as [string, ...string[]]) }),
         )
         .min(12)
-        .max(18),
+        .max(MAX_HOMEWORK_TASKS),
     });
     let content: z.infer<typeof homeworkContentSchema> | null = null;
     let feedback = '';

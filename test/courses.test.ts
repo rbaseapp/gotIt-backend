@@ -9,7 +9,11 @@ import {
 } from '../src/modules/courses/course.service.js';
 import { OpenAiCourseGenerator } from '../src/modules/courses/course.provider.js';
 import { createCourseRoutes } from '../src/modules/courses/course.routes.js';
-import { homeworkContentSchema, intakeReplySchema } from '../src/modules/courses/course.schemas.js';
+import {
+  homeworkActionSchema,
+  homeworkContentSchema,
+  intakeReplySchema,
+} from '../src/modules/courses/course.schemas.js';
 import {
   nextCourseLesson,
   syllabusFor,
@@ -672,6 +676,48 @@ test('daily homework rejects the old two-minute size and duration', () => {
     false,
   );
 });
+test('homework accepts answers after task six through the last generated task', async () => {
+  const { store, service } = setup();
+  for (const taskIndex of [6, 17]) {
+    const homework = homeworkFixture();
+    homework.id = randomUUID();
+    const content = expandedHomeworkContent();
+    homework.content = {
+      ...content,
+      tasks: Array.from({ length: Math.max(12, taskIndex + 1) }, (_, index) => ({
+        ...content.tasks[index % content.tasks.length]!,
+        prompt: `Situation ${index + 1}: Change I to We: I am at home.`,
+      })),
+    };
+    homework.progress = homework.content.tasks.map((_, index) => ({
+      attempts: [],
+      hintUsed: false,
+      done: index < taskIndex,
+      draft: '',
+    }));
+    store.seed(homework);
+    const input = {
+      ...command(0),
+      taskIndex,
+      action: 'answer' as const,
+      answer: 'We are at home.',
+      channel: 'voice' as const,
+    };
+    assert.equal(homeworkActionSchema.safeParse(input).success, true);
+    const result = await service.homeworkAction(scope, homework.id, input);
+    assert.equal(result.tasks[taskIndex]?.done, true);
+    assert.equal(result.revision, 1);
+  }
+  assert.equal(
+    homeworkActionSchema.safeParse({
+      ...command(0),
+      taskIndex: 18,
+      action: 'answer',
+      answer: 'We are at home.',
+    }).success,
+    false,
+  );
+});
 test('homework generation repairs repeated questions instead of padding the practice', async () => {
   const { store, service, ai } = setup();
   const homework = homeworkFixture();
@@ -1112,6 +1158,26 @@ test('course HTTP routes enforce Core identity, entitlement, strict input and pr
     })
     .expect(400);
   assert.equal((await service.homework(scope, homework.id)).revision, 0);
+  homework.content = expandedHomeworkContent();
+  homework.progress = homework.content.tasks.map((_, index) => ({
+    attempts: [],
+    hintUsed: false,
+    done: index < 6,
+    draft: '',
+  }));
+  store.seed(homework);
+  const laterAnswer = await request(app)
+    .post(`/api/v1/courses/homework/${homework.id}/actions`)
+    .set('Authorization', 'Bearer fixture')
+    .send({
+      ...command(0),
+      taskIndex: 6,
+      action: 'answer',
+      answer: 'We are at home.',
+      channel: 'voice',
+    })
+    .expect(200);
+  assert.equal(laterAnswer.body.homework.tasks[6].done, true);
   await request(app).delete(`/api/v1/courses/${course.id}`).expect(401);
   await request(app)
     .delete(`/api/v1/courses/${course.id}`)

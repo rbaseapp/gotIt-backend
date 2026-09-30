@@ -144,12 +144,13 @@ export const homeworkTaskSchema = z
     acceptedAnswers: z.array(text(500)).min(1).max(10),
   })
   .strict();
+export const MAX_HOMEWORK_TASKS = 18;
 export const homeworkContentSchema = z
   .object({
     title: text(160),
     objective: text(350),
     estimatedMinutes: z.number().int().min(10).max(20),
-    tasks: z.array(homeworkTaskSchema).min(12).max(18),
+    tasks: z.array(homeworkTaskSchema).min(12).max(MAX_HOMEWORK_TASKS),
   })
   .strict();
 export type HomeworkTask = z.infer<typeof homeworkTaskSchema>;
@@ -200,7 +201,11 @@ export const courseTurnSchema = commandSchema.extend({
   answerIndex: z.number().int().min(0).max(5).optional(),
 });
 export const homeworkActionSchema = commandSchema.extend({
-  taskIndex: z.number().int().min(0).max(5),
+  taskIndex: z
+    .number()
+    .int()
+    .min(0)
+    .max(MAX_HOMEWORK_TASKS - 1),
   action: z.enum(['answer', 'hint', 'skip', 'draft']),
   answer: z.string().max(1500).default(''),
   channel: z.enum(['text', 'voice']).default('text'),
