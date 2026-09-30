@@ -1,5 +1,5 @@
 import { Router, type RequestHandler } from 'express';
-import { parseInput, uuidSchema } from '../capture/capture.validation.js';
+import { parseInput, uuidSchema, languageSchema } from '../capture/capture.validation.js';
 import { pageSchema } from '../library/library.validation.js';
 import {
   attemptSchema,
@@ -12,9 +12,12 @@ import type { PracticeService } from './practice.service.js';
 export function createPracticeRoutes(service: PracticeService, requirePlay: RequestHandler) {
   const router = Router();
   router.get('/sessions', async (req, res) => {
-    const page = parseInput(pageSchema, req.query);
+    const page = parseInput(
+      pageSchema.extend({ sourceLanguageCode: languageSchema.optional() }),
+      req.query,
+    );
     res.json({
-      ...(await service.sessions(req.gotitAuth!, page.limit, page.cursor)),
+      ...(await service.sessions(req.gotitAuth!, page.limit, page.cursor, page.sourceLanguageCode)),
       requestId: req.id,
     });
   });
@@ -85,8 +88,14 @@ export function createLearningRoutes(service: PracticeService) {
     res.json({ policy: service.policy, algorithmVersion: service.version, requestId: _req.id }),
   );
   router.get('/queue', async (req, res) => {
-    const page = parseInput(pageSchema.omit({ cursor: true }), req.query);
-    res.json({ ...(await service.queue(req.gotitAuth!, page.limit)), requestId: req.id });
+    const page = parseInput(
+      pageSchema.omit({ cursor: true }).extend({ sourceLanguageCode: languageSchema.optional() }),
+      req.query,
+    );
+    res.json({
+      ...(await service.queue(req.gotitAuth!, page.limit, page.sourceLanguageCode)),
+      requestId: req.id,
+    });
   });
   return router;
 }

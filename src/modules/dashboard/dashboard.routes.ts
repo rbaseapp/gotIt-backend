@@ -1,21 +1,31 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { parseInput } from '../capture/capture.validation.js';
+import { languageSchema } from '../capture/capture.validation.js';
 import type { DashboardService } from './dashboard.service.js';
 export function createDashboardRoutes(service: DashboardService) {
   const router = Router();
+  router.get('/languages', async (req, res) =>
+    res.json({ ...(await service.languages(req.gotitAuth!)), requestId: req.id }),
+  );
   router.get('/', async (req, res) => {
     const input = parseInput(
       z
         .object({
           recentPage: z.coerce.number().int().min(1).max(100000).default(1),
           recentLimit: z.coerce.number().int().min(1).max(20).default(6),
+          sourceLanguageCode: languageSchema.optional(),
         })
         .strict(),
       req.query,
     );
     res.json({
-      ...(await service.dashboard(req.gotitAuth!, input.recentPage, input.recentLimit)),
+      ...(await service.dashboard(
+        req.gotitAuth!,
+        input.recentPage,
+        input.recentLimit,
+        input.sourceLanguageCode,
+      )),
       requestId: req.id,
     });
   });

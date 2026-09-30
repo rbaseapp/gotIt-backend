@@ -146,12 +146,12 @@ export class PracticeService {
         this.speechAvailable(language, s as 'listening' | 'pronunciation'),
     );
   }
-  async queue(scope: ProfileScope, count = 20) {
+  async queue(scope: ProfileScope, count = 20, languageCode?: string) {
     const profile = await this.profiles.getProfile(scope);
     return withTransaction(
       this.pool,
       async (tx) => {
-        const rows = await this.queueRows(tx, scope, profile, count);
+        const rows = await this.queueRows(tx, scope, profile, count, undefined, languageCode);
         return {
           items: rows.map((r) => ({
             id: r.id,
@@ -176,8 +176,9 @@ export class PracticeService {
     profile: GotItProfile,
     count: number,
     eligibleIds?: string[],
+    languageCode?: string,
   ) {
-    return (
+    const rows = (
       await tx.query(
         `WITH candidates AS(SELECT li.*,
       (SELECT translation_text FROM product_gotit.item_translations t WHERE t.application_id=li.application_id AND t.application_user_id=li.application_user_id AND t.learning_item_id=li.id AND t.is_current AND is_primary) primary_translation,
@@ -223,12 +224,15 @@ export class PracticeService {
       row_number() OVER(PARTITION BY learning_status ORDER BY created_at,id) new_rank
       FROM product_gotit.learning_items li WHERE application_id=$1 AND application_user_id=$2
         AND user_status='active' AND deleted_at IS NULL
-        AND ($10::uuid[] IS NULL OR li.id=ANY($10::uuid[])))
+        AND ($10::uuid[] IS NULL OR li.id=ANY($10::uuid[]))
+        AND ($11::text IS NULL OR li.source_language_code=$11)), eligible AS (
       SELECT * FROM candidates WHERE primary_translation IS NOT NULL AND
       (learning_status<>'new' OR new_rank<=GREATEST(0,$3-(SELECT count(DISTINCT a.learning_item_id) FROM product_gotit.practice_attempts a
        JOIN product_gotit.learning_items i ON i.application_id=a.application_id AND i.application_user_id=a.application_user_id AND i.id=a.learning_item_id
        WHERE a.application_id=$1 AND a.application_user_id=$2 AND (a.created_at AT TIME ZONE $4)::date=(now() AT TIME ZONE $4)::date AND a.result<>'skipped' AND NOT EXISTS(SELECT 1 FROM product_gotit.practice_attempts older WHERE older.application_id=a.application_id AND older.application_user_id=a.application_user_id AND older.learning_item_id=a.learning_item_id AND older.result<>'skipped' AND (older.created_at AT TIME ZONE $4)::date<(now() AT TIME ZONE $4)::date))))
-       AND (learning_status<>'mastered' OR next_review_at<=now())
+       AND (learning_status<>'mastered' OR next_review_at<=now()))
+       SELECT * FROM eligible WHERE $11::text IS NOT NULL OR source_language_code=(
+         SELECT source_language_code FROM eligible ORDER BY recent_matching_success,queue_score DESC,created_at,id LIMIT 1)
        ORDER BY recent_matching_success,queue_score DESC,created_at,id LIMIT $9`,
         [
           ...scopeValues(scope),
@@ -240,9 +244,11 @@ export class PracticeService {
           this.policy.masteryThreshold,
           count,
           eligibleIds ?? null,
+          languageCode ?? null,
         ],
       )
     ).rows;
+    return rows;
   }
   private async resolveSessionScope(
     tx: DatabaseTransaction,
@@ -370,7 +376,10 @@ export class PracticeService {
         scopeSnapshot = resolved.snapshot;
         ids = resolved.ids;
       }
-      if (!ids) ids = (await this.queueRows(tx, scope, profile, input.count)).map((r) => r.id);
+      if (!ids)
+        ids = (
+          await this.queueRows(tx, scope, profile, input.count, undefined, input.sourceLanguageCode)
+        ).map((r) => r.id);
       if (!ids.length) throw new AppError(409, 'NO_ELIGIBLE_ITEMS', 'No eligible learning items');
       const items = (
         await tx.query(
@@ -379,6 +388,12 @@ export class PracticeService {
         )
       ).rows;
       if (items.length !== ids.length) throw itemNotFound();
+      const languages = new Set(items.map((item) => item.source_language_code));
+      if (
+        languages.size > 1 ||
+        (input.sourceLanguageCode && !languages.has(input.sourceLanguageCode))
+      )
+        throw new AppError(400, 'VALIDATION_ERROR', 'A session must contain one source language');
       if (
         ['listening_spelling', 'pronunciation'].includes(input.sessionType) &&
         items.some(
@@ -681,15 +696,19 @@ export class PracticeService {
         : null,
     };
   }
-  async sessions(scope: ProfileScope, limit: number, cursor?: string) {
+  async sessions(scope: ProfileScope, limit: number, cursor?: string, languageCode?: string) {
     return withTransaction(
       this.pool,
       async (tx) => {
         const totalCount = Number(
           (
             await tx.query(
-              'SELECT count(*)::integer AS count FROM product_gotit.practice_sessions WHERE application_id=$1 AND application_user_id=$2',
-              scopeValues(scope),
+              `SELECT count(*)::integer AS count FROM product_gotit.practice_sessions session
+               WHERE session.application_id=$1 AND session.application_user_id=$2
+                 AND ($3::text IS NULL OR EXISTS(SELECT 1 FROM product_gotit.learning_items item
+                   WHERE item.application_id=$1 AND item.application_user_id=$2
+                     AND item.id=(session.selection->'itemIds'->>0)::uuid AND item.source_language_code=$3))`,
+              [...scopeValues(scope), languageCode ?? null],
             )
           ).rows[0]?.count ?? 0,
         );
@@ -697,12 +716,15 @@ export class PracticeService {
           await tx.query(
             `SELECT session.* FROM product_gotit.practice_sessions session
              WHERE session.application_id=$1 AND session.application_user_id=$2
+               AND ($5::text IS NULL OR EXISTS(SELECT 1 FROM product_gotit.learning_items item
+                 WHERE item.application_id=$1 AND item.application_user_id=$2
+                   AND item.id=(session.selection->'itemIds'->>0)::uuid AND item.source_language_code=$5))
                AND ($3::uuid IS NULL OR (session.started_at,session.id)<(
                  SELECT cursor.started_at,cursor.id FROM product_gotit.practice_sessions cursor
                  WHERE cursor.application_id=$1 AND cursor.application_user_id=$2 AND cursor.id=$3
                ))
              ORDER BY session.started_at DESC,session.id DESC LIMIT $4`,
-            [...scopeValues(scope), cursor ?? null, limit + 1],
+            [...scopeValues(scope), cursor ?? null, limit + 1, languageCode ?? null],
           )
         ).rows;
         return {

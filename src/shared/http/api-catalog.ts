@@ -65,6 +65,7 @@ export const API_ROUTES = [
   ['POST', '/courses/homework/:id/prepare'],
   ['POST', '/courses/homework/:id/actions'],
   ['GET', '/dashboard'],
+  ['GET', '/dashboard/languages'],
   ['GET', '/dashboard/activity'],
   ['GET', '/gamification'],
   ['POST', '/reading/preview'],

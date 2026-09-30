@@ -147,6 +147,86 @@ test(
         ids.push(captured.body.capture.learningItemId);
       }
       await t.test(
+        'vocabulary, queue, dashboard and sessions stay in one source language',
+        async () => {
+          const french = await call('post', '/captures', {
+            item: {
+              sourceText: 'bonjour',
+              sourceLanguageCode: 'fr',
+              translationLanguageCode: 'he',
+              itemType: 'word',
+            },
+            translation: { text: 'hello' },
+            context: { selectedText: 'bonjour' },
+            senseDecision: { mode: 'auto' },
+          }).expect(201);
+          const frenchId = french.body.capture.learningItemId;
+          const languages = await call('get', '/dashboard/languages').expect(200);
+          assert.ok(
+            languages.body.languages.some((entry: { code: string }) => entry.code === 'fr'),
+          );
+          const library = await call('get', '/learning-items?sourceLanguageCode=fr').expect(200);
+          assert.deepEqual(
+            library.body.items.map((item: { id: string }) => item.id),
+            [frenchId],
+          );
+          const queue = await call('get', '/learning/queue?sourceLanguageCode=fr').expect(200);
+          assert.deepEqual(
+            queue.body.items.map((item: { id: string }) => item.id),
+            [frenchId],
+          );
+          const dashboard = await call('get', '/dashboard?sourceLanguageCode=fr').expect(200);
+          assert.equal(dashboard.body.counts.total, 1);
+          assert.equal(dashboard.body.counts.new, 1);
+          assert.equal(
+            (await call('get', '/dashboard?sourceLanguageCode=en').expect(200)).body.counts.total,
+            3,
+          );
+          await call('post', '/practice/sessions', {
+            sessionType: 'recall',
+            learningItemIds: [ids[0], frenchId],
+          }).expect(400);
+          await call('post', '/practice/sessions', {
+            sessionType: 'recall',
+            learningItemIds: [frenchId],
+            sourceLanguageCode: 'en',
+          }).expect(400);
+          const session = await call('post', '/practice/sessions', {
+            sessionType: 'recall',
+            sourceLanguageCode: 'fr',
+            count: 10,
+          }).expect(201);
+          assert.equal(session.body.session.itemCount, 1);
+          assert.equal(
+            (await call('get', '/practice/sessions?sourceLanguageCode=fr').expect(200)).body
+              .totalCount,
+            1,
+          );
+          assert.equal(
+            (await call('get', '/practice/sessions?sourceLanguageCode=en').expect(200)).body
+              .totalCount,
+            0,
+          );
+          const automatic = await call('post', '/practice/sessions', {
+            sessionType: 'smart_review',
+            count: 10,
+          }).expect(201);
+          const cards = await call(
+            'get',
+            `/practice/sessions/${automatic.body.session.id}/study`,
+          ).expect(200);
+          assert.equal(
+            new Set(
+              cards.body.cards.map(
+                (card: { sourceLanguageCode: string }) => card.sourceLanguageCode,
+              ),
+            ).size,
+            1,
+          );
+          await call('delete', `/learning-items/${frenchId}`).expect(200);
+        },
+      );
+      await t.test(
         'word packs preview selective additions, filter the library, and scope every selected word',
         async () => {
           const packCall = (method: Parameters<typeof call>[0], url: string, body?: object) =>
@@ -1443,7 +1523,9 @@ test(
           const { migrate } = await import(
             new URL('../../scripts/migrate.js', import.meta.url).href
           );
-          await db.adminPool.query('REVOKE REFERENCES ON TABLE core.application_users FROM gotit_migrator');
+          await db.adminPool.query(
+            'REVOKE REFERENCES ON TABLE core.application_users FROM gotit_migrator',
+          );
           await db.adminPool.query('REVOKE USAGE ON SCHEMA core FROM gotit_migrator');
           assert.equal(
             (

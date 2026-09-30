@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { uuidSchema, textSchema } from '../capture/capture.validation.js';
+import { uuidSchema, textSchema, languageSchema } from '../capture/capture.validation.js';
 export const sessionTypes = [
   'smart_review',
   'flashcards',
@@ -26,6 +26,7 @@ export const sessionSchema = z
     learningItemIds: itemIds.optional(),
     readingId: uuidSchema.optional(),
     scope: sessionScopeSchema.optional(),
+    sourceLanguageCode: languageSchema.optional(),
     count: z.number().int().min(1).max(100).default(10),
   })
   .strict()
