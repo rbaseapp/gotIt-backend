@@ -64,5 +64,21 @@ services:
         sync: false
       - key: AZURE_SPEECH_LANGUAGES_JSON
         sync: false
+      - key: NOTIFICATION_SMTP_HOST
+        sync: false
+      - key: NOTIFICATION_SMTP_PORT
+        sync: false
+      - key: NOTIFICATION_SMTP_USER
+        sync: false
+      - key: NOTIFICATION_SMTP_PASSWORD
+        sync: false
+      - key: NOTIFICATION_EMAIL_FROM
+        sync: false
+      - key: NOTIFICATION_VAPID_SUBJECT
+        sync: false
+      - key: NOTIFICATION_VAPID_PUBLIC_KEY
+        sync: false
+      - key: NOTIFICATION_VAPID_PRIVATE_KEY
+        sync: false
 # Migration administrator credentials belong in a separate one-off migration job.
 # Provider credentials remain secret Render values and are never bundled with clients.
