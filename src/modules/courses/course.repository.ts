@@ -15,6 +15,7 @@ const scopeValues = (scope: ProfileScope) => [scope.applicationId, scope.applica
 export interface LearningDocumentStore {
   get(scope: ProfileScope, id: string): Promise<LearningDocument | null>;
   list(scope: ProfileScope, kind: 'course' | 'homework'): Promise<LearningDocument[]>;
+  deleteCourse(scope: ProfileScope, id: string): Promise<boolean>;
   replay(
     scope: ProfileScope,
     eventId: string,
@@ -47,6 +48,20 @@ export class PostgresLearningDocumentStore implements LearningDocumentStore {
         [...scopeValues(scope), kind],
       )
     ).rows.map((row) => row.document as LearningDocument);
+  }
+  async deleteCourse(scope: ProfileScope, id: string) {
+    return withTransaction(this.pool, async (tx) => {
+      const deleted = await tx.query(
+        "DELETE FROM product_gotit.learning_documents WHERE application_id=$1 AND application_user_id=$2 AND id=$3 AND kind='course' RETURNING id",
+        [...scopeValues(scope), id],
+      );
+      if (!deleted.rowCount) return false;
+      await tx.query(
+        "DELETE FROM product_gotit.learning_documents WHERE application_id=$1 AND application_user_id=$2 AND kind='homework' AND document->'course'->>'courseId'=$3",
+        [...scopeValues(scope), id],
+      );
+      return true;
+    });
   }
   async replay(scope: ProfileScope, eventId: string, fingerprint: string) {
     const row = (

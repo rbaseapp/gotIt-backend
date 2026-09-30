@@ -126,6 +126,9 @@ export class CourseService {
     if (document?.kind !== 'course') throw courseNotFound();
     return document;
   }
+  async deleteCourse(scope: ProfileScope, id: string) {
+    if (!(await this.store.deleteCourse(scope, id))) throw courseNotFound();
+  }
   async realtimeSession(scope: ProfileScope, id: string) {
     const course = await this.course(scope, id);
     if (!this.realtime || course.approvedPreferences || course.ready)

@@ -56,9 +56,16 @@ export function createCourseRoutes(service: CourseService, requireAccess: Reques
       ),
     }),
   );
+  router.delete('/:id', async (req, res) => {
+    await service.deleteCourse(req.gotitAuth!, parseInput(uuidSchema, req.params.id));
+    res.status(204).end();
+  });
   router.post('/:id/realtime-session', async (req, res) =>
     res.status(201).json({
-      realtime: await service.realtimeSession(req.gotitAuth!, parseInput(uuidSchema, req.params.id)),
+      realtime: await service.realtimeSession(
+        req.gotitAuth!,
+        parseInput(uuidSchema, req.params.id),
+      ),
     }),
   );
   router.post('/:id/turns', async (req, res) =>

@@ -143,6 +143,19 @@ export class MemoryLearningStore implements LearningDocumentStore {
         .map(([, d]) => d),
     );
   }
+  async deleteCourse(scope: ProfileScope, id: string) {
+    const key = this.key(scope, id);
+    if (this.documents.get(key)?.kind !== 'course') return false;
+    this.documents.delete(key);
+    for (const [documentKey, document] of this.documents)
+      if (
+        documentKey.startsWith(this.key(scope, '')) &&
+        document.kind === 'homework' &&
+        document.course?.courseId === id
+      )
+        this.documents.delete(documentKey);
+    return true;
+  }
   async replay(scope: ProfileScope, event: string, fingerprint: string) {
     const receipt = this.receipts.get(this.key(scope, event));
     if (!receipt) return null;

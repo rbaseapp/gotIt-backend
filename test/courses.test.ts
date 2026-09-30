@@ -43,6 +43,36 @@ const setup = () => {
 };
 const conflict = (error: unknown) => error instanceof AppError && error.statusCode === 409;
 
+test('deleting a course removes only its own course and homework documents', async () => {
+  const { store, service } = setup();
+  const target = courseFixture();
+  const other = { ...courseFixture(), id: randomUUID() };
+  const linked = {
+    ...homeworkFixture(),
+    course: { courseId: target.id } as NonNullable<ReturnType<typeof homeworkFixture>['course']>,
+  };
+  const retained = {
+    ...homeworkFixture(),
+    course: { courseId: other.id } as NonNullable<ReturnType<typeof homeworkFixture>['course']>,
+  };
+  for (const document of [target, other, linked, retained]) store.seed(document);
+  const stranger = { ...scope, applicationUserId: randomUUID() };
+  await assert.rejects(
+    () => service.deleteCourse(stranger, target.id),
+    (error: unknown) => error instanceof AppError && error.statusCode === 404,
+  );
+  assert.ok(await store.get(scope, target.id));
+  await service.deleteCourse(scope, target.id);
+  assert.equal(await store.get(scope, target.id), null);
+  assert.equal(await store.get(scope, linked.id), null);
+  assert.ok(await store.get(scope, other.id));
+  assert.ok(await store.get(scope, retained.id));
+  await assert.rejects(
+    () => service.deleteCourse(scope, target.id),
+    (error: unknown) => error instanceof AppError && error.statusCode === 404,
+  );
+});
+
 test('live course interview uses lesson Realtime model with automatic speech turns and no autonomous replies', async () => {
   const store = new MemoryLearningStore();
   const course = courseFixture();
@@ -996,12 +1026,18 @@ test('course HTTP routes enforce Core identity, entitlement, strict input and pr
     })
     .expect(400);
   assert.equal((await service.homework(scope, homework.id)).revision, 0);
-  assert.equal(API_ROUTES.filter(({ path }) => path.startsWith('/api/v1/courses')).length, 13);
+  await request(app).delete(`/api/v1/courses/${course.id}`).expect(401);
+  await request(app)
+    .delete(`/api/v1/courses/${course.id}`)
+    .set('Authorization', 'Bearer fixture')
+    .expect(204);
+  assert.equal(await store.get(scope, course.id), null);
+  assert.equal(API_ROUTES.filter(({ path }) => path.startsWith('/api/v1/courses')).length, 14);
   assert.equal(
     new Set(API_ROUTES.map(({ method, path }) => `${method} ${path}`)).size,
     API_ROUTES.length,
   );
-  assert.equal(API_ROUTES.length, 75);
+  assert.equal(API_ROUTES.length, 76);
 });
 
 test('course session resolves approved language and objective before creating the Realtime session', async () => {

@@ -53,6 +53,7 @@ export const API_ROUTES = [
   ['POST', '/courses/intake'],
   ['POST', '/courses/transcribe'],
   ['GET', '/courses/:id'],
+  ['DELETE', '/courses/:id'],
   ['POST', '/courses/:id/realtime-session'],
   ['POST', '/courses/:id/turns'],
   ['PUT', '/courses/:id/preferences'],

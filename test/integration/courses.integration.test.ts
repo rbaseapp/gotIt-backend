@@ -180,6 +180,11 @@ test(
         'foreign-key failure rolls back receipt too',
       );
       assert.equal(draft.revision, 2);
+      assert.equal(await store.deleteCourse(stranger, initial.id), false);
+      assert.equal(await store.deleteCourse(scope, initial.id), true);
+      assert.equal(await store.get(scope, initial.id), null);
+      assert.equal(await store.get(scope, lesson.id), null, 'linked homework is removed');
+      assert.equal(await store.deleteCourse(scope, initial.id), false);
       const applied = await database.adminPool.query(
         'SELECT name FROM gotit_migrations.pgmigrations ORDER BY name DESC',
       );
