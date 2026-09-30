@@ -780,12 +780,21 @@ test('unstarted legacy homework is refreshed while attempted homework remains st
   assert.equal(resumed.needsRefresh, false);
   assert.equal(ai.calls.length, 2);
 });
-test('homework generation restricts source quotes to saved lesson excerpts', async () => {
+test('homework generation accepts saved report examples and corrected forms as evidence', async () => {
   const store = new MemoryLearningStore();
   const homework = homeworkFixture();
   homework.content = null;
   homework.progress = [];
   homework.source.turns.push({ role: 'learner', text: 'We are at home.' });
+  homework.source.report = {
+    grammarPoints: [
+      { topic: 'Present simple', example: 'Do you drive?', explanation: 'Ask about a habit.' },
+    ],
+    corrections: [
+      { original: 'Yes, I am.', corrected: 'Yes, I do.', explanation: 'Answer do with do.' },
+    ],
+    nextLessonPlan: 'Teach future forms later.',
+  };
   store.seed(homework);
   const provider = new OpenAiCourseGenerator(
     'test-key',
@@ -796,7 +805,7 @@ test('homework generation restricts source quotes to saved lesson excerpts', asy
       if (body.text.format.name === 'lesson_homework')
         assert.deepEqual(
           body.text.format.schema.properties.tasks.items.properties.sourceQuote.enum,
-          ['I am at home.', 'We are at home.'],
+          ['I am at home.', 'We are at home.', 'Do you drive?', 'Yes, I do.'],
         );
       return Response.json({
         status: 'completed',
@@ -808,7 +817,12 @@ test('homework generation restricts source quotes to saved lesson excerpts', asy
                 text: JSON.stringify(
                   body.text.format.name === 'lesson_homework_review'
                     ? { valid: true, feedback: 'Clear and grounded' }
-                    : expandedHomeworkContent(),
+                    : {
+                        ...expandedHomeworkContent(),
+                        tasks: expandedHomeworkContent().tasks.map((task, index) =>
+                          index === 0 ? { ...task, sourceQuote: 'Do you drive?' } : task,
+                        ),
+                      },
                 ),
               },
             ],
@@ -823,7 +837,7 @@ test('homework generation restricts source quotes to saved lesson excerpts', asy
   assert.equal(prepared.tasks.length, 12);
   assert.equal(
     (await service.homework(scope, homework.id)).content?.tasks[0]?.sourceQuote,
-    'I am at home.',
+    'Do you drive?',
   );
 });
 
