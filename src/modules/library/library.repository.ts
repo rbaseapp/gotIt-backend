@@ -31,6 +31,7 @@ const projectedMastery = `CASE WHEN li.mastery_source='user' THEN li.overall_mas
     AND progress.learning_item_id=li.id AND progress.attempt_count>0
 ),li.overall_mastery_score) END`;
 const fields = `li.id,li.source_text AS "sourceText",li.source_language_code AS "sourceLanguageCode",
+  li.phonetic_text AS "phoneticText",li.phonetic_scheme AS "phoneticScheme",
   li.translation_language_code AS "translationLanguageCode",li.item_type AS "itemType",li.user_status AS "userStatus",
   li.learning_status AS "learningStatus",li.user_priority AS "userPriority",li.manual_hard AS "manualHard",
   (${projectedMastery})::float8 AS "overallMasteryScore",li.review_stage AS "reviewStage",

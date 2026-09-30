@@ -147,6 +147,32 @@ test(
         ids.push(captured.body.capture.learningItemId);
       }
       await t.test(
+        'library returns scoped pronunciation guides for the vocabulary list',
+        async () => {
+          await db.adminPool.query(
+            `UPDATE product_gotit.learning_items SET phonetic_text=$4,phonetic_scheme=$5
+             WHERE application_id=$1 AND application_user_id=$2 AND id=$3`,
+            [applicationId, users[0], ids[0], 'הֶלוֹ', 'transliteration:he'],
+          );
+          const owned = await call('get', '/learning-items?search=hello').expect(200);
+          assert.equal(owned.body.items[0]?.phoneticText, 'הֶלוֹ');
+          assert.equal(owned.body.items[0]?.phoneticScheme, 'transliteration:he');
+          const foreign = await call(
+            'get',
+            '/learning-items?search=hello',
+            undefined,
+            randomUUID(),
+            1,
+          ).expect(200);
+          assert.equal(foreign.body.items.length, 0);
+          await db.adminPool.query(
+            `UPDATE product_gotit.learning_items SET phonetic_text=NULL,phonetic_scheme=NULL
+             WHERE application_id=$1 AND application_user_id=$2 AND id=$3`,
+            [applicationId, users[0], ids[0]],
+          );
+        },
+      );
+      await t.test(
         'vocabulary, queue, dashboard and sessions stay in one source language',
         async () => {
           const french = await call('post', '/captures', {
