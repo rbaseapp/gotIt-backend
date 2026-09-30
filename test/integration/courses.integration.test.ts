@@ -169,8 +169,6 @@ test(
       );
       assert.ok(courseMigrationIndex >= 0);
       for (let index = 0; index <= courseMigrationIndex; index++) await database.migrate('down');
-      await database.migrate('down');
-      await database.migrate('down');
       const rolledBack = await database.adminPool.query(
         "SELECT to_regclass('product_gotit.learning_documents') AS relation",
       );
