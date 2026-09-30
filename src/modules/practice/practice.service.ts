@@ -182,12 +182,11 @@ export class PracticeService {
       await tx.query(
         `WITH candidates AS(SELECT li.*,
       (SELECT translation_text FROM product_gotit.item_translations t WHERE t.application_id=li.application_id AND t.application_user_id=li.application_user_id AND t.learning_item_id=li.id AND t.is_current AND is_primary) primary_translation,
-      EXISTS(SELECT 1 FROM product_gotit.practice_attempts recent
+      (SELECT max(recent.created_at) FROM product_gotit.practice_attempts recent
         WHERE recent.application_id=li.application_id AND recent.application_user_id=li.application_user_id
           AND recent.learning_item_id=li.id AND recent.exercise_type='matching'
           AND recent.result='correct' AND recent.score>=85
-          AND COALESCE(recent.learning_revision,1)=li.learning_revision
-          AND (recent.created_at AT TIME ZONE $4)::date=(now() AT TIME ZONE $4)::date) recent_matching_success,
+          AND COALESCE(recent.learning_revision,1)=li.learning_revision) last_matching_success_at,
       (CASE WHEN li.next_review_at<=now() THEN 100+LEAST(100,EXTRACT(epoch FROM now()-li.next_review_at)/86400) ELSE 0 END
        +(100-li.overall_mastery_score)/2+CASE WHEN li.user_priority='high' THEN 30 ELSE 0 END
        +CASE WHEN li.manual_hard THEN 20 ELSE 0 END+COALESCE(li.system_difficulty,0)*20
@@ -232,8 +231,8 @@ export class PracticeService {
        WHERE a.application_id=$1 AND a.application_user_id=$2 AND (a.created_at AT TIME ZONE $4)::date=(now() AT TIME ZONE $4)::date AND a.result<>'skipped' AND NOT EXISTS(SELECT 1 FROM product_gotit.practice_attempts older WHERE older.application_id=a.application_id AND older.application_user_id=a.application_user_id AND older.learning_item_id=a.learning_item_id AND older.result<>'skipped' AND (older.created_at AT TIME ZONE $4)::date<(now() AT TIME ZONE $4)::date))))
        AND (learning_status<>'mastered' OR next_review_at<=now()))
        SELECT * FROM eligible WHERE $11::text IS NOT NULL OR source_language_code=(
-         SELECT source_language_code FROM eligible ORDER BY recent_matching_success,queue_score DESC,created_at,id LIMIT 1)
-       ORDER BY recent_matching_success,queue_score DESC,created_at,id LIMIT $9`,
+         SELECT source_language_code FROM eligible ORDER BY last_matching_success_at NULLS FIRST,queue_score DESC,created_at,id LIMIT 1)
+       ORDER BY last_matching_success_at NULLS FIRST,queue_score DESC,created_at,id LIMIT $9`,
         [
           ...scopeValues(scope),
           profile.defaultNewItemsPerDay,

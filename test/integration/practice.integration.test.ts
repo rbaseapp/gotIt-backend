@@ -1833,6 +1833,24 @@ test(
             new Set(queued.body.items.map((item: { id: string }) => item.id)),
             new Set(queueWords.map((word) => word.id).filter((id) => !queueSolved.includes(id))),
           );
+          // The same successful board must not regain priority when the learner's
+          // calendar day changes while other selected words remain untouched.
+          await db.adminPool.query(
+            `UPDATE product_gotit.practice_attempts SET created_at=now()-interval '2 days'
+             WHERE learning_item_id=ANY($1::uuid[]) AND exercise_type='matching' AND result='correct'`,
+            [queueSolved],
+          );
+          const nextDayQueue = await call(
+            'get',
+            '/learning/queue?limit=2',
+            undefined,
+            randomUUID(),
+            2,
+          ).expect(200);
+          assert.deepEqual(
+            new Set(nextDayQueue.body.items.map((item: { id: string }) => item.id)),
+            new Set(queueWords.map((word) => word.id).filter((id) => !queueSolved.includes(id))),
+          );
           const exhausted = await call(
             'get',
             '/learning/queue?limit=5',
