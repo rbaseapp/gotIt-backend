@@ -111,6 +111,22 @@ export function homeworkFixture(): HomeworkDocument {
     progress: [0, 1].map(() => ({ attempts: [], hintUsed: false, done: false, draft: '' })),
   };
 }
+export function expandedHomeworkContent() {
+  const original = homeworkFixture().content!;
+  return {
+    ...original,
+    estimatedMinutes: 12,
+    tasks: Array.from({ length: 12 }, (_, index) => ({
+      ...original.tasks[index % original.tasks.length]!,
+      prompt:
+        index === 0
+          ? original.tasks[0]!.prompt
+          : index === 1
+            ? 'Which sentence says our group is at home?'
+            : `Situation ${index + 1}: Change I to We: I am at home.`,
+    })),
+  };
+}
 export class MemoryLearningStore implements LearningDocumentStore {
   documents = new Map<string, LearningDocument>();
   receipts = new Map<string, { fingerprint: string; document: LearningDocument }>();
@@ -187,16 +203,17 @@ export class FixtureGenerator implements CourseGenerator {
         ? plan
         : name === 'course_intake' || name === 'course_intake_revision'
           ? {
-              message: (data as { step?: number }).step === undefined
-                ? 'מה חשוב לך ללמוד?'
-                : [
-                    'נשמע שהמטרה חשובה לך. מה כבר יצא לך ללמוד?',
-                    'יש לך קצת רקע. בן כמה אתה, והאם נוח לך לקרוא?',
-                    'תודה ששיתפת. אילו נושאים מעניינים אותך?',
-                    'מעניין! איך נוח לך ללמוד ולתרגל?',
-                    'מה יתאים לך מבחינת אורך שיעור וזמן בשבוע?',
-                    'תודה, בוא נעבור יחד על הפרטים לפני בניית הקורס.',
-                  ][(data as { step: number }).step],
+              message:
+                (data as { step?: number }).step === undefined
+                  ? 'מה חשוב לך ללמוד?'
+                  : [
+                      'נשמע שהמטרה חשובה לך. מה כבר יצא לך ללמוד?',
+                      'יש לך קצת רקע. בן כמה אתה, והאם נוח לך לקרוא?',
+                      'תודה ששיתפת. אילו נושאים מעניינים אותך?',
+                      'מעניין! איך נוח לך ללמוד ולתרגל?',
+                      'מה יתאים לך מבחינת אורך שיעור וזמן בשבוע?',
+                      'תודה, בוא נעבור יחד על הפרטים לפני בניית הקורס.',
+                    ][(data as { step: number }).step],
               suggestions: ['לדבר', 'דקדוק', 'לא בטוח'],
               ready: true,
               preferences,
@@ -216,7 +233,7 @@ export class FixtureGenerator implements CourseGenerator {
             : name === 'course_intake_questions_review'
               ? { valid: true, feedback: 'Clear interview' }
               : name === 'lesson_homework'
-                ? homeworkFixture().content
+                ? expandedHomeworkContent()
                 : name === 'lesson_homework_review'
                   ? { valid: true, feedback: 'Clear and grounded' }
                   : { result: 'retry', feedback: 'Try matching the subject.' };

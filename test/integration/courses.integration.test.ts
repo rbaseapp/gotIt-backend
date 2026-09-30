@@ -154,7 +154,8 @@ test(
         revision: 0,
         eventId: randomUUID(),
       });
-      assert.equal(preparedHomework.tasks.length, 2);
+      assert.equal(preparedHomework.tasks.length, 12);
+      assert.equal(preparedHomework.estimatedMinutes, 12);
       const draft = await service.homeworkAction(scope, lesson.id, {
         revision: preparedHomework.revision,
         eventId: randomUUID(),

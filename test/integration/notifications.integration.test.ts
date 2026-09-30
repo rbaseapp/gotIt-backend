@@ -54,6 +54,14 @@ test(
         { channel: 'email', occurrence_key: '2026-09-30' },
         { channel: 'push', occurrence_key: '2026-09-30' },
       ]);
+      // Keep the historical claim clock aligned with the fixture rows even
+      // when this test runs after the hard-coded reminder date.
+      await db.runtimePool.query(
+        `UPDATE product_gotit.notification_deliveries
+         SET created_at='2026-09-30T15:05:00Z',next_attempt_at='2026-09-30T15:05:00Z'
+         WHERE application_id=$1 AND application_user_id=$2`,
+        [scope.applicationId, scope.applicationUserId],
+      );
       const first = await repository.claim(new Date('2026-09-30T15:05:00Z'));
       assert.ok(first);
       await repository.finish(first!.id, 'sent');

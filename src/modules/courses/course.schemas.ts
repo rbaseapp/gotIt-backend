@@ -148,8 +148,8 @@ export const homeworkContentSchema = z
   .object({
     title: text(160),
     objective: text(350),
-    estimatedMinutes: z.number().int().min(2).max(10),
-    tasks: z.array(homeworkTaskSchema).min(2).max(6),
+    estimatedMinutes: z.number().int().min(10).max(20),
+    tasks: z.array(homeworkTaskSchema).min(12).max(18),
   })
   .strict();
 export type HomeworkTask = z.infer<typeof homeworkTaskSchema>;

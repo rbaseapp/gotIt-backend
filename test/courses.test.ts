@@ -7,7 +7,7 @@ import {
   publicHomework,
 } from '../src/modules/courses/course.service.js';
 import { OpenAiCourseGenerator } from '../src/modules/courses/course.provider.js';
-import { intakeReplySchema } from '../src/modules/courses/course.schemas.js';
+import { homeworkContentSchema, intakeReplySchema } from '../src/modules/courses/course.schemas.js';
 import {
   nextCourseLesson,
   syllabusFor,
@@ -17,6 +17,7 @@ import {
   MemoryLearningStore,
   FixtureGenerator,
   courseFixture,
+  expandedHomeworkContent,
   homeworkFixture,
   scope,
   preferences,
@@ -49,15 +50,17 @@ test('live course interview uses lesson Realtime model with automatic speech tur
   course.approvedPreferences = null;
   course.messages = [{ role: 'tutor', text: 'מה תרצה ללמוד?', channel: 'text' }];
   store.seed(course);
-  let requestBody: {
-    session: {
-      model: string;
-      audio: {
-        input: { turn_detection: unknown };
-        output: { voice: string };
-      };
-    };
-  } | undefined;
+  let requestBody:
+    | {
+        session: {
+          model: string;
+          audio: {
+            input: { turn_detection: unknown };
+            output: { voice: string };
+          };
+        };
+      }
+    | undefined;
   const service = new CourseService(store, profiles, new FixtureGenerator(), {
     apiKey: 'server-secret',
     model: 'gpt-realtime-2.1',
@@ -621,12 +624,43 @@ test('generated homework must cite actual lesson evidence', async () => {
   homework.progress = [];
   store.seed(homework);
   ai.handler = async () => {
-    const content = homeworkFixture().content!;
+    const content = expandedHomeworkContent();
     content.tasks[0]!.sourceQuote = 'This was never taught';
     return content;
   };
   await assert.rejects(service.prepareHomework(scope, homework.id, command(0)));
   assert.equal((await service.homework(scope, homework.id)).content, null);
+});
+test('daily homework rejects the old two-minute size and duration', () => {
+  const short = homeworkFixture().content!;
+  assert.equal(homeworkContentSchema.safeParse(short).success, false);
+  assert.equal(homeworkContentSchema.safeParse(expandedHomeworkContent()).success, true);
+  assert.equal(
+    homeworkContentSchema.safeParse({ ...expandedHomeworkContent(), estimatedMinutes: 3 }).success,
+    false,
+  );
+});
+test('homework generation repairs repeated questions instead of padding the practice', async () => {
+  const { store, service, ai } = setup();
+  const homework = homeworkFixture();
+  homework.content = null;
+  homework.progress = [];
+  store.seed(homework);
+  let generations = 0;
+  ai.handler = async (name, data) => {
+    if (name === 'lesson_homework_review') return { valid: true, feedback: 'Clear and grounded' };
+    generations++;
+    const content = expandedHomeworkContent();
+    if (generations === 1) content.tasks[2]!.prompt = content.tasks[0]!.prompt;
+    else
+      assert.match(String((data as { revisionFeedback: string }).revisionFeedback), /different/u);
+    return content;
+  };
+  const prepared = await service.prepareHomework(scope, homework.id, command(0));
+  assert.equal(generations, 2);
+  assert.equal(prepared.tasks.length, 12);
+  assert.equal(prepared.estimatedMinutes, 12);
+  assert.deepEqual(ai.calls, ['lesson_homework', 'lesson_homework', 'lesson_homework_review']);
 });
 test('generation repairs an ambiguous short-answer task before saving', async () => {
   const { store, service, ai } = setup();
@@ -637,7 +671,7 @@ test('generation repairs an ambiguous short-answer task before saving', async ()
   let generations = 0;
   ai.handler = async (name, data) => {
     if (name === 'lesson_homework_review') return { valid: true, feedback: 'Clear and grounded' };
-    const content = homeworkFixture().content!;
+    const content = expandedHomeworkContent();
     if (name === 'lesson_homework') {
       generations++;
       if (generations === 1) {
@@ -656,8 +690,10 @@ test('generation repairs an ambiguous short-answer task before saving', async ()
   };
   const prepared = await service.prepareHomework(scope, homework.id, command(0));
   assert.equal(generations, 2);
-  assert.equal(prepared.tasks[1]?.prompt, 'Change I to We: I am at home.');
-  assert.equal((await service.homework(scope, homework.id)).qualityVersion, 1);
+  assert.equal(prepared.tasks[1]?.prompt, 'Which sentence says our group is at home?');
+  assert.equal(prepared.tasks.length, 12);
+  assert.equal(prepared.estimatedMinutes, 12);
+  assert.equal((await service.homework(scope, homework.id)).qualityVersion, 2);
 });
 test('independent review rejects a choice with no unique grammar answer', async () => {
   const { store, service, ai } = setup();
@@ -668,7 +704,7 @@ test('independent review rejects a choice with no unique grammar answer', async 
   ai.handler = async (name) =>
     name === 'lesson_homework_review'
       ? { valid: false, feedback: 'Task 2 has two grammatically correct choices in this context.' }
-      : homeworkFixture().content;
+      : expandedHomeworkContent();
   await assert.rejects(service.prepareHomework(scope, homework.id, command(0)));
   assert.equal((await service.homework(scope, homework.id)).content, null);
   assert.deepEqual(ai.calls, [
@@ -686,7 +722,7 @@ test('unstarted legacy homework is refreshed while attempted homework remains st
   assert.equal(publicHomework(legacy).needsRefresh, true);
   const refreshed = await service.prepareHomework(scope, legacy.id, command(0));
   assert.equal(refreshed.needsRefresh, false);
-  assert.equal(refreshed.tasks[1]?.prompt, 'Change I to We: I am at home.');
+  assert.equal(refreshed.tasks[1]?.prompt, 'Which sentence says our group is at home?');
   assert.deepEqual(ai.calls, ['lesson_homework', 'lesson_homework_review']);
 
   const attempted = homeworkFixture();
@@ -732,7 +768,7 @@ test('homework generation restricts source quotes to saved lesson excerpts', asy
                 text: JSON.stringify(
                   body.text.format.name === 'lesson_homework_review'
                     ? { valid: true, feedback: 'Clear and grounded' }
-                    : homeworkFixture().content,
+                    : expandedHomeworkContent(),
                 ),
               },
             ],
@@ -744,7 +780,7 @@ test('homework generation restricts source quotes to saved lesson excerpts', asy
   const service = new CourseService(store, profiles, provider);
   const prepared = await service.prepareHomework(scope, homework.id, command(0));
   assert.equal(prepared.revision, 1);
-  assert.equal(prepared.tasks.length, 2);
+  assert.equal(prepared.tasks.length, 12);
   assert.equal(
     (await service.homework(scope, homework.id)).content?.tasks[0]?.sourceQuote,
     'I am at home.',
