@@ -254,6 +254,9 @@ test('child course uses Rachel and short spoken checks while adult course keeps 
       );
       assert.match(result.realtime.continuationEvent.response.instructions, /specific feedback/u);
       assert.match(result.realtime.wrapUpEvent.response.instructions, /one specific success/u);
+      assert.match(result.realtime.wrapUpEvent.response.instructions, /time is up/u);
+      assert.match(result.realtime.wrapUpEvent.response.instructions, /continue next time/u);
+      assert.match(result.realtime.wrapUpEvent.response.instructions, /final sentence completely/u);
     } else {
       assert.equal(result.lesson.teacherVoice, 'male');
       assert.equal(result.lesson.correctionMode, 'deep_explanation');
@@ -1857,7 +1860,7 @@ test('standard grammar lesson keeps Hebrew instruction and English practice thro
   );
   assert.match(
     result.realtime.wrapUpEvent.response.instructions,
-    /Say every practice example in (American )?English.*without replacing it with a translation/u,
+    /say it in (American )?English.*and explain its meaning separately/u,
   );
   assert.match(
     result.realtime.translationEvent!.response.instructions,

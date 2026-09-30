@@ -355,12 +355,12 @@ export class PrivateLessonService {
           ),
           wrapUpEvent: responseEvent(
             childCourse
-              ? `The child's lesson is ending now. Follow the configured language policy. Name one specific success, briefly model one useful phrase to remember, and say a warm goodbye. Do not ask another question or introduce new material. Keep this short.`
+              ? `The child's lesson time is up. Follow the configured language policy. Say kindly that time is up, name one specific success, encourage the child, and invite them to continue next time. Finish your final sentence completely. Do not ask another question or introduce new material. Keep this short.`
               : absoluteBeginner
-                ? `The lesson is ending now. In ${supportLanguage!.promptName}, briefly praise one success and recap the 3-5 ${targetLanguage.promptName} phrases learned today, saying each phrase slowly with its meaning. Do not introduce new material or ask another question. End warmly in ${supportLanguage!.promptName}. Keep the closing under 25 seconds.`
+                ? `The lesson time is up. In ${supportLanguage!.promptName}, say this politely, praise one specific success, and invite the learner to continue next time. You may repeat one useful ${targetLanguage.promptName} phrase with its meaning. Finish your final sentence completely. Do not introduce new material or ask another question. Keep the closing under 25 seconds.`
                 : supportTeaching
-                  ? `The lesson is ending now. In ${supportLanguage!.promptName}, name one specific success and recap the ${targetLanguage.promptName} words and sentences learned today. Say every practice example in ${targetLanguage.promptName} and explain its meaning separately, without replacing it with a translation. Do not introduce new material or ask another question. End warmly in ${supportLanguage!.promptName}. Keep the closing under 25 seconds.`
-                  : `The lesson is ending now. Speak only in ${targetLanguage.promptName}. Do not ask another question. In three short parts, give one specific success, one correction with the correct form, and the target words worth reviewing. Then say a warm, encouraging goodbye in the same language. Do not use any other language. Keep the entire closing under 20 seconds.`,
+                  ? `The lesson time is up. In ${supportLanguage!.promptName}, say this politely, name one specific success, offer a brief encouraging word, and invite the learner to continue next time. If you repeat a practice example, say it in ${targetLanguage.promptName} and explain its meaning separately. Finish your final sentence completely. Do not introduce new material or ask another question. Keep the closing under 25 seconds.`
+                  : `The lesson time is up. Speak only in ${targetLanguage.promptName}. Politely say that time is up, mention one specific success, offer encouragement, and invite the learner to continue next time. Finish your final sentence completely. Do not ask another question or introduce new material. Do not use any other language. Keep the entire closing under 20 seconds.`,
           ),
           translationEvent: supportLanguage
             ? responseEvent(
