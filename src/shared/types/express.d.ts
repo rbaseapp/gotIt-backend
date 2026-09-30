@@ -14,6 +14,7 @@ declare global {
         role: 'user' | 'admin';
       };
       gotitCoreAccessToken?: string;
+      gotitVerifiedEmail?: string;
       gotitBillingStatus?: CoreBillingStatus;
     }
   }

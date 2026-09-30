@@ -46,6 +46,14 @@ const envSchema = z
       .regex(/^[a-z0-9-]{2,50}$/u)
       .optional(),
     AZURE_SPEECH_LANGUAGES_JSON: z.string().min(1).max(16000).optional(),
+    NOTIFICATION_SMTP_HOST: z.string().min(1).max(255).optional(),
+    NOTIFICATION_SMTP_PORT: z.coerce.number().int().min(1).max(65535).optional(),
+    NOTIFICATION_SMTP_USER: z.string().min(1).optional(),
+    NOTIFICATION_SMTP_PASSWORD: z.string().min(1).optional(),
+    NOTIFICATION_EMAIL_FROM: z.string().email().optional(),
+    NOTIFICATION_VAPID_SUBJECT: z.string().url().optional(),
+    NOTIFICATION_VAPID_PUBLIC_KEY: z.string().min(1).optional(),
+    NOTIFICATION_VAPID_PRIVATE_KEY: z.string().min(1).optional(),
     CORS_ORIGINS: z
       .string()
       .max(8000)
@@ -67,6 +75,30 @@ const envSchema = z
     LEARNING_POLICY_JSON: z.string().max(8000).optional(),
   })
   .superRefine((v, ctx) => {
+    const smtp = [v.NOTIFICATION_SMTP_HOST, v.NOTIFICATION_SMTP_PORT, v.NOTIFICATION_EMAIL_FROM];
+    if (smtp.some(Boolean) && !smtp.every(Boolean))
+      ctx.addIssue({
+        code: 'custom',
+        path: ['NOTIFICATION_SMTP_HOST'],
+        message: 'SMTP host, port and sender are required together',
+      });
+    if (Boolean(v.NOTIFICATION_SMTP_USER) !== Boolean(v.NOTIFICATION_SMTP_PASSWORD))
+      ctx.addIssue({
+        code: 'custom',
+        path: ['NOTIFICATION_SMTP_USER'],
+        message: 'SMTP username and password are required together',
+      });
+    const vapid = [
+      v.NOTIFICATION_VAPID_SUBJECT,
+      v.NOTIFICATION_VAPID_PUBLIC_KEY,
+      v.NOTIFICATION_VAPID_PRIVATE_KEY,
+    ];
+    if (vapid.some(Boolean) && !vapid.every(Boolean))
+      ctx.addIssue({
+        code: 'custom',
+        path: ['NOTIFICATION_VAPID_SUBJECT'],
+        message: 'All VAPID settings are required together',
+      });
     if (v.OPENAI_TRANSLATION_MODEL && !v.OPENAI_API_KEY)
       ctx.addIssue({
         code: 'custom',

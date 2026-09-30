@@ -22,6 +22,23 @@ export async function verifyRuntimeSchema(client, { strictRole = true } = {}) {
     ],
     item_translations: ['is_current'],
     user_profiles: ['learning_preferences', 'default_source_language'],
+    notification_preferences: [
+      'practice_email',
+      'practice_push',
+      'system_email',
+      'system_push',
+      'reminder_hour',
+      'verified_email',
+    ],
+    push_subscriptions: ['application_id', 'application_user_id', 'endpoint', 'p256dh', 'auth'],
+    notification_deliveries: [
+      'kind',
+      'channel',
+      'occurrence_key',
+      'status',
+      'attempts',
+      'lease_until',
+    ],
     user_language_proficiencies: [
       'estimated_level_lower',
       'estimated_level_upper',
@@ -244,7 +261,7 @@ export async function verifyRuntimeSchema(client, { strictRole = true } = {}) {
     schema: 'ok',
     privileges: 'ok',
     role: strictRole ? 'product-only' : 'not-enforced',
-    operationalTables: 14,
+    operationalTables: 17,
   };
 }
 

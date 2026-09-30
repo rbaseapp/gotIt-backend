@@ -12,6 +12,7 @@ import type { CoreAuthClient } from '../core/core-auth.client.js';
 import type { WordPackRepository } from '../../modules/word-packs/word-packs.repository.js';
 import type { PrivateLessonService } from '../../modules/private-lessons/private-lesson.service.js';
 import type { CourseService } from '../../modules/courses/course.service.js';
+import type { NotificationService } from '../../modules/notifications/notification.service.js';
 
 export type AppDependencies = {
   logger: Logger;
@@ -28,6 +29,7 @@ export type AppDependencies = {
   wordPackService?: WordPackRepository;
   privateLessonService?: PrivateLessonService;
   courseService?: CourseService;
+  notificationService?: NotificationService;
   enforcePaidEntitlements?: boolean;
   corsOrigins?: string[];
   trustProxyHops?: number;

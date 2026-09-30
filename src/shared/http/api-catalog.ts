@@ -1,6 +1,11 @@
 export const API_ROUTES = [
   ['GET', '/profile'],
   ['PATCH', '/profile'],
+  ['GET', '/notifications/preferences'],
+  ['GET', '/notifications/config'],
+  ['PATCH', '/notifications/preferences'],
+  ['POST', '/notifications/push-subscriptions'],
+  ['DELETE', '/notifications/push-subscriptions'],
   ['GET', '/capabilities'],
   ['POST', '/captures/preview'],
   ['POST', '/captures'],
