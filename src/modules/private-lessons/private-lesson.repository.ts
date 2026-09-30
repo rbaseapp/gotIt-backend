@@ -37,7 +37,7 @@ export type PrivateLessonReportFailureCode =
 export interface PrivateLessonJournal {
   create(scope: ProfileScope, plan: PrivateLessonPlan): Promise<void>;
   get(scope: ProfileScope, id: string): Promise<StoredPrivateLesson | null>;
-  list(scope: ProfileScope, limit: number): Promise<StoredPrivateLesson[]>;
+  list(scope: ProfileScope, limit: number, courseId?: string): Promise<StoredPrivateLesson[]>;
   claim(scope: ProfileScope, id: string, duration: number): Promise<StoredPrivateLesson | null>;
   complete(
     scope: ProfileScope,
@@ -131,13 +131,14 @@ export class PostgresPrivateLessonJournal implements PrivateLessonJournal {
     return row ? storedLesson(row) : null;
   }
 
-  async list(scope: ProfileScope, limit: number) {
+  async list(scope: ProfileScope, limit: number, courseId?: string) {
     const rows = (
       await this.pool.query(
         `${selectFields} WHERE s.application_id=$1 AND s.application_user_id=$2 AND s.deleted_at IS NULL
            AND s.status<>'active'
+           AND ($4::uuid IS NULL OR s.course_context->>'courseId'=$4::text)
          ORDER BY s.started_at DESC,s.id DESC LIMIT $3`,
-        [scope.applicationId, scope.applicationUserId, limit],
+        [scope.applicationId, scope.applicationUserId, limit, courseId ?? null],
       )
     ).rows;
     return rows.map(storedLesson);

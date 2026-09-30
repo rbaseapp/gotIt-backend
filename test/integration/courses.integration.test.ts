@@ -119,6 +119,24 @@ test(
       assert.equal(loaded?.course?.courseId, course.id);
       assert.equal(loaded?.course?.objective, plan.units[0]!.lessons[0]!.objective);
       const report = basicPrivateLessonReport(prepared);
+      await journal.complete(scope, lesson.id, report);
+      const otherCourseId = randomUUID();
+      const otherLesson = {
+        ...prepared,
+        id: randomUUID(),
+        course: { ...prepared.course!, courseId: otherCourseId },
+      };
+      await journal.create(scope, otherLesson);
+      await journal.complete(scope, otherLesson.id, report);
+      assert.deepEqual(
+        (await journal.list(scope, 1, course.id)).map((item) => item.id),
+        [lesson.id],
+        'course filter is applied before the limit',
+      );
+      assert.deepEqual(
+        (await journal.list(scope, 1, otherCourseId)).map((item) => item.id),
+        [otherLesson.id],
+      );
       report.grammarPoints = [
         { topic: 'be', explanation: 'Introducing yourself', example: 'I am at home.' },
       ];

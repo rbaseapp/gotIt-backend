@@ -42,12 +42,20 @@ import {
 } from '../src/modules/private-lessons/private-lesson.curriculum.js';
 import {
   privateLessonInputSchema,
+  privateLessonListSchema,
   privateLessonPreferencesInputSchema,
   privateLessonRoadmapInputSchema,
 } from '../src/modules/private-lessons/private-lesson.validation.js';
+
 import { PostgresPrivateLessonRoadmapStore } from '../src/modules/private-lessons/private-lesson.roadmap.js';
 import { taskLevelForPlan } from '../src/modules/private-lessons/private-lesson.assessment.js';
 import type { AddonAccessContract } from '../src/modules/addons/addon-access.js';
+
+test('lesson history accepts a scoped course filter and rejects invalid IDs', () => {
+  const courseId = '10000000-0000-4000-8000-000000000001';
+  assert.deepEqual(privateLessonListSchema.parse({ limit: '50', courseId }), { limit: 50, courseId });
+  assert.equal(privateLessonListSchema.safeParse({ courseId: 'invalid' }).success, false);
+});
 
 const assessment = privateLessonReportSchema.shape.assessment.parse({
   overallLevel: 'B1' as const,

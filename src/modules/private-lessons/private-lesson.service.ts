@@ -433,8 +433,8 @@ export class PrivateLessonService {
     }
   }
 
-  async listSessions(scope: ProfileScope, limit: number) {
-    return { lessons: (await this.requireJournal().list(scope, limit)).map(publicStoredLesson) };
+  async listSessions(scope: ProfileScope, limit: number, courseId?: string) {
+    return { lessons: (await this.requireJournal().list(scope, limit, courseId)).map(publicStoredLesson) };
   }
 
   async getSession(scope: ProfileScope, id: string) {

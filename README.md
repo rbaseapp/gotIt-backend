@@ -242,6 +242,10 @@ the flag without current grants fails closed with `402 ADDON_REQUIRED`.
 
 ## HTTP, deployment and verification
 
+`GET /api/v1/private-lessons?limit=50&courseId=<uuid>` מחזיר עד 50 שיעורים
+של הקורס המבוקש בלבד, בסדר מהחדש לישן. הסינון לפי בעלות ומזהה קורס מתבצע במסד
+לפני החלת המגבלה; השמטת `courseId` שומרת על רשימת השיעורים הכללית.
+
 ### Practice reminders and system messages
 
 `GET/PATCH /api/v1/notifications/preferences` manages four independent, initially

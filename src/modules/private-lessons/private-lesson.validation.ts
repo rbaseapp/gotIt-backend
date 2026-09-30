@@ -173,7 +173,10 @@ export const privateLessonCompletionSchema = z
   });
 
 export const privateLessonListSchema = z
-  .object({ limit: z.coerce.number().int().min(1).max(50).default(20) })
+  .object({
+    limit: z.coerce.number().int().min(1).max(50).default(20),
+    courseId: z.uuid().optional(),
+  })
   .strict();
 
 export type PrivateLessonCompletionInput = z.output<typeof privateLessonCompletionSchema>;
