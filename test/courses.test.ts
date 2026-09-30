@@ -38,6 +38,114 @@ const setup = () => {
 };
 const conflict = (error: unknown) => error instanceof AppError && error.statusCode === 409;
 
+test('six text and voice answers survive correction and shape the approved plan', async () => {
+  const { store, service, ai } = setup();
+  const course = courseFixture();
+  course.ready = false;
+  course.intakeAnswers = [];
+  course.messages = [{ role: 'tutor', text: 'What is your goal?', channel: 'text' }];
+  store.seed(course);
+  ai.handler = async (name, raw) => {
+    const data = raw as {
+      preferences: typeof preferences;
+      answers?: Array<{ topic: string; text: string; channel: string }>;
+      correctedTopic?: string;
+      learnerAnswers?: Array<{ topic: string; text: string; channel: string }>;
+    };
+    if (name === 'course_plan') {
+      assert.equal(data.learnerAnswers?.[0]?.text, 'Speak with customers');
+      assert.equal(data.learnerAnswers?.[1]?.channel, 'text');
+      assert.equal(data.learnerAnswers?.[5]?.text, 'Two days a week');
+      assert.equal(data.preferences.goal, 'Speak with customers');
+      assert.equal(data.preferences.daysPerWeek, 2);
+      return plan;
+    }
+    const proposed = structuredClone(data.preferences);
+    if (data.correctedTopic === 'goal') proposed.goal = 'Speak with customers';
+    else {
+      switch (data.answers?.length) {
+        case 0:
+          proposed.goal = 'Speak on trips';
+          break;
+        case 1:
+          proposed.experience = 'Some basics';
+          break;
+        case 3:
+          proposed.interests = ['travel', 'food'];
+          break;
+        case 5:
+          proposed.daysPerWeek = 2;
+          break;
+      }
+    }
+    return {
+      message: data.answers?.length === 6 ? 'Review your details' : 'Next question',
+      suggestions: ['Example'],
+      ready: true,
+      preferences: proposed,
+    };
+  };
+  let saved = await service.course(scope, course.id);
+  for (let index = 0; index < 6; index++) {
+    const message = [
+      'Speak on trips',
+      'Some basics',
+      'Adult and comfortable reading',
+      'Travel and food',
+      'Short practical lessons',
+      'Two days a week',
+    ][index]!;
+    const channel = index % 2 ? 'text' : 'voice';
+    const response = await service.turn(scope, course.id, {
+      ...command(saved.revision),
+      mode: 'preferences',
+      channel,
+      message,
+    });
+    assert.equal(response.intakeProgress?.answered, index + 1);
+    assert.equal(response.ready, index === 5);
+    saved = await service.course(scope, course.id);
+  }
+  assert.deepEqual(
+    saved.intakeAnswers?.map((answer) => answer.topic),
+    ['goal', 'level', 'ageAndLiteracy', 'interests', 'learningPreferences', 'schedule'],
+  );
+  assert.equal(saved.intakeAnswers?.[0]?.channel, 'voice');
+  assert.equal(saved.intakeAnswers?.[1]?.channel, 'text');
+  assert.deepEqual(saved.preferences.interests, ['travel', 'food']);
+  assert.equal(saved.preferences.daysPerWeek, 2);
+  const corrected = await service.turn(scope, course.id, {
+    ...command(saved.revision),
+    mode: 'preferences',
+    channel: 'text',
+    message: 'Speak with customers',
+    answerIndex: 0,
+  });
+  assert.equal(corrected.intakeAnswers?.[0]?.text, 'Speak with customers');
+  assert.equal(
+    corrected.messages.filter((turn) => turn.role === 'learner')[0]?.text,
+    'Speak with customers',
+  );
+  assert.equal(corrected.preferences.goal, 'Speak with customers');
+  assert.deepEqual(corrected.preferences.interests, ['travel', 'food']);
+  assert.equal(corrected.preferences.daysPerWeek, 2);
+  assert.equal(corrected.intakeProgress?.answered, 6);
+  const resumed = await service.turn(scope, course.id, {
+    ...command(corrected.revision),
+    mode: 'preferences',
+    channel: 'text',
+    message: 'I also like practicing at work',
+  });
+  assert.equal(resumed.ready, true);
+  assert.equal(resumed.intakeProgress?.answered, 6);
+  assert.equal(resumed.intakeAnswers?.[0]?.text, 'Speak with customers');
+  assert.deepEqual(resumed.preferences.interests, ['travel', 'food']);
+  assert.deepEqual(resumed.suggestions, []);
+  const approved = await service.approvePreferences(scope, course.id, command(resumed.revision));
+  const draft = await service.plan(scope, course.id, command(approved.revision));
+  assert.equal(draft.versions[0]?.preferences.goal, 'Speak with customers');
+});
+
 test('course requires two explicit approvals; a preview cannot start a lesson', async () => {
   const { store, service } = setup();
   const course = courseFixture();

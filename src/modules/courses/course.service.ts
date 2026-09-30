@@ -39,6 +39,47 @@ import {
 
 type Command = z.infer<typeof commandSchema>;
 const now = () => new Date().toISOString();
+const intakeTopics = [
+  'goal',
+  'level',
+  'ageAndLiteracy',
+  'interests',
+  'learningPreferences',
+  'schedule',
+] as const;
+type IntakeTopic = (typeof intakeTopics)[number];
+const intakeFields: Record<IntakeTopic, Array<keyof CoursePreferences>> = {
+  goal: ['goal', 'path', 'statedNeeds'],
+  level: ['experience', 'startingLevel', 'absoluteBeginner'],
+  ageAndLiteracy: ['ageGroup', 'literacy'],
+  interests: ['interests'],
+  learningPreferences: ['path', 'statedNeeds', 'recommendations'],
+  schedule: ['minutesPerLesson', 'daysPerWeek'],
+};
+function applyIntakeAnswer(
+  current: CoursePreferences,
+  proposed: CoursePreferences,
+  topic: IntakeTopic,
+) {
+  const next = { ...current };
+  for (const field of intakeFields[topic])
+    (next as Record<string, unknown>)[field] = proposed[field];
+  return next;
+}
+function appendCourseMessage(
+  course: CourseDocument,
+  messages: CourseDocument['messages'],
+  message: CourseDocument['messages'][number],
+) {
+  const preserved = course.intakeAnswers
+    ? Math.min(messages.length, course.intakeAnswers.length * 2 + 1)
+    : 0;
+  return [
+    ...messages.slice(0, preserved),
+    ...messages.slice(preserved).slice(-(39 - preserved)),
+    message,
+  ];
+}
 export class CourseService {
   constructor(
     readonly store: LearningDocumentStore,
@@ -103,7 +144,7 @@ export class CourseService {
       scope,
       intakeReplySchema,
       'course_intake',
-      intakeInstruction,
+      `${intakeInstruction} This is the first of exactly six questions. Ask only about the learner's goal and desired course direction. ready=false.`,
       { preferences, profile, messages: [], firstTurn: true },
     );
     const course: CourseDocument = {
@@ -111,15 +152,12 @@ export class CourseService {
       id: randomUUID(),
       revision: 0,
       createdAt: now(),
-      preferences: {
-        ...reply.preferences,
-        targetLanguageCode: input.targetLanguageCode,
-        supportLanguageCode: input.supportLanguageCode,
-      },
+      preferences,
       approvedPreferences: null,
       preferencesApprovedAt: null,
       ready: false,
       messages: [{ role: 'tutor', text: reply.message, channel: 'text' }],
+      intakeAnswers: [],
       suggestions: reply.suggestions,
       versions: [],
       activeVersion: null,
@@ -149,10 +187,61 @@ export class CourseService {
     const current = await this.current(scope, id, input, 'turn', input);
     if (current.replay) return publicCourse(asCourse(current.replay));
     const course = asCourse(current.document);
-    const messages = [
-      ...course.messages,
-      { role: 'learner' as const, text: input.message, channel: input.channel },
-    ].slice(-40);
+    if (input.answerIndex !== undefined) {
+      if (
+        input.mode !== 'preferences' ||
+        !course.intakeAnswers ||
+        input.answerIndex >= course.intakeAnswers.length ||
+        course.draftVersion ||
+        course.activeVersion
+      )
+        throw courseConflict();
+      const topic = intakeTopics[input.answerIndex]!;
+      const answers = course.intakeAnswers.map((answer, index) =>
+        index === input.answerIndex
+          ? { topic, text: input.message, channel: input.channel }
+          : answer,
+      );
+      let learnerIndex = -1;
+      const correctedMessages = course.messages.map((message) => {
+        if (message.role !== 'learner') return message;
+        learnerIndex++;
+        return learnerIndex === input.answerIndex
+          ? { ...message, text: input.message, channel: input.channel }
+          : message;
+      });
+      const reply = await this.ai().generate(
+        scope,
+        intakeReplySchema,
+        'course_intake',
+        `${intakeInstruction} The learner corrected their ${topic} answer. Update ONLY these preference fields: ${intakeFields[topic].join(', ')}. Keep every other field unchanged. Acknowledge briefly; ask no new question.`,
+        {
+          preferences: course.preferences,
+          answers,
+          messages: correctedMessages,
+          correctedTopic: topic,
+        },
+      );
+      const next: CourseDocument = {
+        ...course,
+        preferences: applyIntakeAnswer(course.preferences, reply.preferences, topic),
+        approvedPreferences: null,
+        preferencesApprovedAt: null,
+        draftVersion: null,
+        intakeAnswers: answers,
+        messages: correctedMessages,
+      };
+      return publicCourse(
+        asCourse(
+          await this.store.save(scope, next, input.revision, input.eventId, current.fingerprint),
+        ),
+      );
+    }
+    const messages = appendCourseMessage(course, course.messages, {
+      role: 'learner',
+      text: input.message,
+      channel: input.channel,
+    });
     if (input.mode === 'plan') {
       if (!course.approvedPreferences) throw courseConflict();
       const reply = await this.ai().generate(
@@ -178,8 +267,96 @@ export class CourseService {
         approvedPreferences: changed ? null : course.approvedPreferences,
         preferencesApprovedAt: changed ? null : course.preferencesApprovedAt,
         draftVersion: null,
-        messages: [...messages, { role: 'tutor', text: reply.message, channel: 'text' }],
+        messages: appendCourseMessage(course, messages, {
+          role: 'tutor',
+          text: reply.message,
+          channel: 'text',
+        }),
         suggestions: [],
+      };
+      return publicCourse(
+        asCourse(
+          await this.store.save(scope, next, input.revision, input.eventId, current.fingerprint),
+        ),
+      );
+    }
+    if (course.intakeAnswers && course.intakeAnswers.length < intakeTopics.length) {
+      const step = course.intakeAnswers.length;
+      const topic = intakeTopics[step]!;
+      const nextTopic = intakeTopics[step + 1];
+      const reply = await this.ai().generate(
+        scope,
+        intakeReplySchema,
+        'course_intake',
+        `${intakeInstruction} This conversation has exactly six questions in this order: goal, prior experience and level, age and reading comfort, interests, learning style and course focus, lesson length and weekly availability. The latest learner answer is about ${topic}. Update ONLY these preference fields: ${intakeFields[topic].join(', ')}. Keep every other field unchanged. ${nextTopic ? `Ask exactly one short question about ${nextTopic} in the support language; do not ask about another topic. ready=false.` : 'The six answers are complete. Ask no further question. Briefly invite the learner to review their details. ready=true.'}`,
+        {
+          preferences: course.preferences,
+          messages,
+          answers: course.intakeAnswers,
+          answer: input.message,
+          nextTopic,
+        },
+      );
+      const preferences = applyIntakeAnswer(course.preferences, reply.preferences, topic);
+      if (
+        preferences.absoluteBeginner &&
+        new Intl.Locale(preferences.targetLanguageCode).language ===
+          new Intl.Locale(preferences.supportLanguageCode).language
+      )
+        throw new AppError(
+          400,
+          'COURSE_SUPPORT_LANGUAGE_REQUIRED',
+          'Choose a different explanation language for beginner lessons',
+        );
+      const next: CourseDocument = {
+        ...course,
+        preferences,
+        ready: !nextTopic,
+        approvedPreferences: null,
+        preferencesApprovedAt: null,
+        draftVersion: null,
+        intakeAnswers: [
+          ...course.intakeAnswers,
+          { topic, text: input.message, channel: input.channel },
+        ],
+        suggestions: nextTopic ? reply.suggestions : [],
+        messages: appendCourseMessage(course, messages, {
+          role: 'tutor',
+          text: reply.message,
+          channel: 'text',
+        }),
+      };
+      return publicCourse(
+        asCourse(
+          await this.store.save(scope, next, input.revision, input.eventId, current.fingerprint),
+        ),
+      );
+    }
+    if (course.intakeAnswers?.length === intakeTopics.length) {
+      const reply = await this.ai().generate(
+        scope,
+        intakeReplySchema,
+        'course_intake',
+        `${intakeInstruction} The six questions are complete. Treat this new message as a correction or an added detail. Preserve every existing preference unless the learner explicitly changes it. Acknowledge briefly and ask no question. ready=true; suggestions=[].`,
+        { preferences: course.preferences, answers: course.intakeAnswers, messages },
+      );
+      const next: CourseDocument = {
+        ...course,
+        preferences: {
+          ...reply.preferences,
+          targetLanguageCode: course.preferences.targetLanguageCode,
+          supportLanguageCode: course.preferences.supportLanguageCode,
+        },
+        ready: true,
+        approvedPreferences: null,
+        preferencesApprovedAt: null,
+        draftVersion: null,
+        suggestions: [],
+        messages: appendCourseMessage(course, messages, {
+          role: 'tutor',
+          text: reply.message,
+          channel: 'text',
+        }),
       };
       return publicCourse(
         asCourse(
@@ -216,10 +393,11 @@ export class CourseService {
       preferencesApprovedAt: null,
       draftVersion: null,
       suggestions: reply.suggestions,
-      messages: [
-        ...messages,
-        { role: 'tutor' as const, text: reply.message, channel: 'text' as const },
-      ],
+      messages: appendCourseMessage(course, messages, {
+        role: 'tutor',
+        text: reply.message,
+        channel: 'text',
+      }),
     };
     return publicCourse(
       asCourse(
@@ -318,13 +496,21 @@ export class CourseService {
     const preservedUnits = active?.plan.units.filter((u) => preservedKeys.has(u.key)) ?? [];
     const preferences = course.approvedPreferences;
     const plan = validateCoursePlan(
-      await this.ai().generate(scope, coursePlanSchema, 'course_plan', planInstruction, {
-        preferences,
-        syllabus: syllabusFor(preferences),
-        previousPlan: previous?.plan ?? null,
-        requestedChange: change,
-        preservedUnits,
-      }),
+      await this.ai().generate(
+        scope,
+        coursePlanSchema,
+        'course_plan',
+        `${planInstruction} Use learnerAnswers to personalize examples and situations. Approved preferences take precedence if a later edit conflicts with an earlier answer.`,
+        {
+          preferences,
+          learnerAnswers: course.intakeAnswers ?? [],
+          conversation: course.messages,
+          syllabus: syllabusFor(preferences),
+          previousPlan: previous?.plan ?? null,
+          requestedChange: change,
+          preservedUnits,
+        },
+      ),
       preferences,
       course,
     );
@@ -670,6 +856,14 @@ export function publicCourse(course: CourseDocument) {
   );
   return {
     ...course,
+    intakeProgress: course.intakeAnswers
+      ? {
+          current: Math.min(course.intakeAnswers.length + 1, intakeTopics.length),
+          answered: course.intakeAnswers.length,
+          total: intakeTopics.length,
+        }
+      : null,
+    reportedAvailability: course.intakeAnswers?.find((answer) => answer.topic === 'schedule')?.text,
     evidence,
     versions: course.versions.filter(
       (v) => v.version === course.draftVersion || v.version === course.activeVersion,

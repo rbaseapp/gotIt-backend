@@ -85,6 +85,7 @@ export type CourseDocument = {
   preferencesApprovedAt: string | null;
   ready: boolean;
   messages: Array<{ role: 'learner' | 'tutor'; text: string; channel: 'text' | 'voice' }>;
+  intakeAnswers?: Array<{ topic: string; text: string; channel: 'text' | 'voice' }>;
   suggestions: string[];
   versions: CourseVersion[];
   draftVersion: number | null;
@@ -176,6 +177,7 @@ export const courseTurnSchema = commandSchema.extend({
   message: text(1500),
   channel: z.enum(['text', 'voice']),
   mode: z.enum(['preferences', 'plan']),
+  answerIndex: z.number().int().min(0).max(5).optional(),
 });
 export const homeworkActionSchema = commandSchema.extend({
   taskIndex: z.number().int().min(0).max(5),
