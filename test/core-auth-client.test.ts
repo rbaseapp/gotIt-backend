@@ -39,6 +39,7 @@ test('CoreAuthClient maps Core /auth/me user to trusted GotIt identity', async (
     applicationId: '22222222-2222-4222-8222-222222222222',
     applicationUserId: '11111111-1111-4111-8111-111111111111',
     role: 'admin',
+    verifiedEmail: 'user@example.test',
   });
 
   assert.equal(seenHeaders?.get('authorization'), 'Bearer access-token');

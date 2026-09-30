@@ -26,6 +26,7 @@ import { createWordPackRoutes } from './modules/word-packs/word-packs.routes.js'
 import { createPrivateLessonRoutes } from './modules/private-lessons/private-lesson.routes.js';
 import { createCourseRoutes } from './modules/courses/course.routes.js';
 import { createRequireAddonMiddleware, requireBoth } from './shared/middleware/require-addon.js';
+import { createNotificationRoutes } from './modules/notifications/notification.routes.js';
 import {
   privateLessonDemoCss,
   privateLessonDemoHtml,
@@ -179,6 +180,8 @@ export function createRoutes(dependencies: AppDependencies) {
     });
   });
   router.use('/api/v1/profile', createProfileRoutes(dependencies.profileService));
+  if (dependencies.notificationService)
+    router.use('/api/v1/notifications', createNotificationRoutes(dependencies.notificationService));
   if (dependencies.libraryService) {
     router.use(
       '/api/v1/learning-items',
