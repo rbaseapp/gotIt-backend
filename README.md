@@ -27,6 +27,9 @@ routes** from [api-catalog.ts](src/shared/http/api-catalog.ts).
 | /private-lessons                          | Five-minute personalized OpenAI Realtime voice lesson sessions                                     |
 | /export, /import                          | Paginated library/progress export and idempotent capture-request import                            |
 
+The English-for-Hebrew daily-use catalog has three ordered 1,000-item tracks,
+each split into 20 selectable 50-item packs. See [research, provenance and rollout](docs/DAILY_ENGLISH_CATALOG.md).
+
 Product routes authenticate once through Core. `GET /health` checks liveness;
 `GET /ready` checks PostgreSQL and fails during draining. Startup separately
 checks the current schema and enforces dedicated runtime privileges in production.
