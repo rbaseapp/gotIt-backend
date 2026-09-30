@@ -34,6 +34,7 @@ export const privateLessonSpeechRates = [
 ] as const;
 
 export const privateLessonModes = ['standard', 'absolute_beginner'] as const;
+export const privateLessonTeachingLanguages = ['target', 'support'] as const;
 
 export const privateLessonInputSchema = z
   .object({
@@ -41,6 +42,7 @@ export const privateLessonInputSchema = z
     targetLanguageCode: languageSchema,
     supportLanguageCode: languageSchema.nullable().optional(),
     lessonMode: z.enum(privateLessonModes).optional(),
+    teachingLanguage: z.enum(privateLessonTeachingLanguages).optional(),
     requestedLevel: z.enum(CEFR_LEVELS).optional(),
     requestedDurationMinutes: z
       .union([z.literal(1), z.literal(5), z.literal(10), z.literal(15)])
@@ -61,6 +63,12 @@ export const privateLessonInputSchema = z
   })
   .strict()
   .superRefine((value, context) => {
+    if (value.lessonMode === 'absolute_beginner' && value.teachingLanguage === 'target')
+      context.addIssue({
+        code: 'custom',
+        path: ['teachingLanguage'],
+        message: 'Absolute beginner lessons use the support language for teaching',
+      });
     if (
       !value.courseId &&
       value.supportLanguageCode &&
@@ -80,6 +88,7 @@ export const privateLessonPreferencesInputSchema = z
     targetLanguageCode: languageSchema,
     supportLanguageCode: languageSchema.nullable(),
     lessonMode: z.enum(privateLessonModes).default('standard'),
+    teachingLanguage: z.enum(privateLessonTeachingLanguages).optional(),
     requestedDurationMinutes: z.union([z.literal(1), z.literal(5), z.literal(10), z.literal(15)]),
     teacherVoice: z.enum(['female', 'male']),
     speechRate: z.enum(privateLessonSpeechRates),
@@ -94,6 +103,18 @@ export const privateLessonPreferencesInputSchema = z
   })
   .strict()
   .superRefine((value, context) => {
+    if (value.lessonMode === 'absolute_beginner' && value.teachingLanguage === 'target')
+      context.addIssue({
+        code: 'custom',
+        path: ['teachingLanguage'],
+        message: 'Absolute beginner lessons use the support language for teaching',
+      });
+    if (value.teachingLanguage === 'support' && !value.supportLanguageCode)
+      context.addIssue({
+        code: 'custom',
+        path: ['supportLanguageCode'],
+        message: 'A support language is required for teaching in that language',
+      });
     if (value.lessonMode === 'absolute_beginner' && !value.supportLanguageCode)
       context.addIssue({
         code: 'custom',

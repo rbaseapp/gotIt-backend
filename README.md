@@ -143,6 +143,15 @@ Course planning, per-lesson teaching briefs, homework and post-lesson reports us
 API. The teaching brief supplies a short explanation, examples and practice checks
 to the Realtime tutor. `OPENAI_TRANSLATION_MODEL` remains assigned to contextual
 translation and other non-lesson tasks.
+`POST /api/v1/private-lessons/realtime-sessions` accepts optional
+`teachingLanguage: "target" | "support"`. The latter requires a configured support
+language distinct from the target and applies to explanations, directions and
+feedback, while practice examples and learner answers stay in the target language.
+The choice is returned with the lesson, reused by every Realtime turn directive,
+and saved with the session and per-language lesson preferences. Existing clients
+default to target-language teaching for standard lessons and support-language
+teaching for absolute beginners. Apply the teaching-language migration before
+starting the new backend.
 Open `/demo/private-lesson` on the running backend for the standalone demo UI; it
 keeps the supplied Core bearer token in memory only and still enforces authentication
 when it creates the short-lived Realtime session.

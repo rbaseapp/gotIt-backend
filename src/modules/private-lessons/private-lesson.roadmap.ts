@@ -23,7 +23,7 @@ export type PrivateLessonPreferences = Pick<
   | 'customFocus'
   | 'correctionMode'
   | 'vocabularyMode'
-> & { requestedDurationMinutes: 1 | 5 | 10 | 15 };
+> & { requestedDurationMinutes: 1 | 5 | 10 | 15; teachingLanguage: 'target' | 'support' };
 
 export type PrivateLessonMilestone = {
   id: string;
@@ -93,6 +93,7 @@ export class PostgresPrivateLessonRoadmapStore implements PrivateLessonRoadmapSt
       supportLanguageCode:
         typeof row.support_language_code === 'string' ? row.support_language_code : null,
       lessonMode: row.lesson_mode === 'absolute_beginner' ? 'absolute_beginner' : 'standard',
+      teachingLanguage: row.teaching_language === 'support' ? 'support' : 'target',
       requestedDurationMinutes: Number(row.requested_duration_minutes) as 1 | 5 | 10 | 15,
       teacherVoice: row.teacher_voice,
       speechRate: row.speech_rate,
@@ -108,6 +109,7 @@ export class PostgresPrivateLessonRoadmapStore implements PrivateLessonRoadmapSt
       targetLanguageCode: input.targetLanguageCode,
       supportLanguageCode: plan.supportLanguageCode,
       lessonMode: plan.lessonMode,
+      teachingLanguage: plan.teachingLanguage,
       requestedDurationMinutes: Math.round(plan.durationSeconds / 60) as 1 | 5 | 10 | 15,
       teacherVoice: plan.teacherVoice,
       speechRate: plan.speechRate,
@@ -120,15 +122,16 @@ export class PostgresPrivateLessonRoadmapStore implements PrivateLessonRoadmapSt
 
   async savePreferenceValues(scope: ProfileScope, input: PrivateLessonPreferencesInput) {
     await this.pool.query(
-      `INSERT INTO product_gotit.private_lesson_preferences(application_id,application_user_id,target_language_code,support_language_code,lesson_mode,requested_duration_minutes,teacher_voice,speech_rate,correction_mode,vocabulary_mode,focus_areas,custom_focus)
-       VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::jsonb,$12)
-       ON CONFLICT(application_id,application_user_id,target_language_code) DO UPDATE SET support_language_code=EXCLUDED.support_language_code,lesson_mode=EXCLUDED.lesson_mode,requested_duration_minutes=EXCLUDED.requested_duration_minutes,teacher_voice=EXCLUDED.teacher_voice,speech_rate=EXCLUDED.speech_rate,correction_mode=EXCLUDED.correction_mode,vocabulary_mode=EXCLUDED.vocabulary_mode,focus_areas=EXCLUDED.focus_areas,custom_focus=EXCLUDED.custom_focus,updated_at=now()`,
+      `INSERT INTO product_gotit.private_lesson_preferences(application_id,application_user_id,target_language_code,support_language_code,lesson_mode,teaching_language,requested_duration_minutes,teacher_voice,speech_rate,correction_mode,vocabulary_mode,focus_areas,custom_focus)
+       VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12::jsonb,$13)
+       ON CONFLICT(application_id,application_user_id,target_language_code) DO UPDATE SET support_language_code=EXCLUDED.support_language_code,lesson_mode=EXCLUDED.lesson_mode,teaching_language=CASE WHEN $14::boolean THEN EXCLUDED.teaching_language ELSE product_gotit.private_lesson_preferences.teaching_language END,requested_duration_minutes=EXCLUDED.requested_duration_minutes,teacher_voice=EXCLUDED.teacher_voice,speech_rate=EXCLUDED.speech_rate,correction_mode=EXCLUDED.correction_mode,vocabulary_mode=EXCLUDED.vocabulary_mode,focus_areas=EXCLUDED.focus_areas,custom_focus=EXCLUDED.custom_focus,updated_at=now()`,
       [
         scope.applicationId,
         scope.applicationUserId,
         base(input.targetLanguageCode),
         input.supportLanguageCode,
         input.lessonMode,
+        input.teachingLanguage ?? (input.lessonMode === 'absolute_beginner' ? 'support' : 'target'),
         input.requestedDurationMinutes,
         input.teacherVoice,
         input.speechRate,
@@ -136,6 +139,7 @@ export class PostgresPrivateLessonRoadmapStore implements PrivateLessonRoadmapSt
         input.vocabularyMode,
         JSON.stringify(input.focusAreas),
         input.customFocus,
+        input.teachingLanguage !== undefined,
       ],
     );
   }

@@ -173,7 +173,7 @@ test(
           const metadata = await database.adminPool.query(
             'SELECT count(*)::integer AS count FROM gotit_migrations.pgmigrations',
           );
-          assert.equal(metadata.rows[0].count, 21);
+          assert.equal(metadata.rows[0].count, 22);
           const catalog = await database.adminPool.query(`
             SELECT tp.slug,
               count(DISTINCT tr.id)::integer AS tracks,

@@ -14,6 +14,10 @@ import {
   type PrivateLessonVocabularySource,
 } from '../src/modules/private-lessons/private-lesson.service.js';
 import { privateLessonDemoJs } from '../src/modules/private-lessons/private-lesson.demo.js';
+import {
+  privateLessonBriefInput,
+  privateLessonBriefInstruction,
+} from '../src/modules/private-lessons/private-lesson.content.js';
 import type {
   PrivateLessonJournal,
   StoredPrivateLesson,
@@ -36,7 +40,11 @@ import {
   buildRoadmapBlueprint,
   privateLessonCurriculum,
 } from '../src/modules/private-lessons/private-lesson.curriculum.js';
-import { privateLessonRoadmapInputSchema } from '../src/modules/private-lessons/private-lesson.validation.js';
+import {
+  privateLessonInputSchema,
+  privateLessonPreferencesInputSchema,
+  privateLessonRoadmapInputSchema,
+} from '../src/modules/private-lessons/private-lesson.validation.js';
 import { PostgresPrivateLessonRoadmapStore } from '../src/modules/private-lessons/private-lesson.roadmap.js';
 import { taskLevelForPlan } from '../src/modules/private-lessons/private-lesson.assessment.js';
 import type { AddonAccessContract } from '../src/modules/addons/addon-access.js';
@@ -1556,9 +1564,12 @@ test('first roadmap milestone lesson teaches the topic before conversation', () 
   assert.match(prompt, /teach before starting the conversation/u);
   assert.match(
     prompt,
-    /plain explanation of the rule and its use, sentence pattern, contrasting examples, an open question about a new case/u,
+    /plain explanation in TEACHING_LANGUAGE of the rule and when and why to use each form, the TARGET_LANGUAGE sentence pattern and contrasting examples, an open question in TEACHING_LANGUAGE about a new case/u,
   );
-  assert.match(prompt, /independent speaking after the learner shows understanding/u);
+  assert.match(
+    prompt,
+    /independent TARGET_LANGUAGE speaking after the learner shows understanding/u,
+  );
   assert.match(prompt, /Do not assume the learner already knows the name of the topic/u);
   assert.match(prompt, /"isFirstMilestoneLesson": true/u);
 });
@@ -1662,4 +1673,267 @@ test('private lesson vocabulary source selects only active mastered words in the
       primaryTranslation: 'להשיג',
     },
   ]);
+});
+
+test('wrong-script practice examples are regenerated before opening Realtime', async () => {
+  let contentCalls = 0;
+  let realtimeCalls = 0;
+  const feedback: Array<string | null> = [];
+  const contentGenerator = new OpenAiCourseGenerator(
+    'content-secret',
+    'gpt-6-sol',
+    'gpt-transcribe-test',
+    async (_url, init) => {
+      contentCalls++;
+      const body = JSON.parse(String(init?.body)) as { input: Array<{ content: string }> };
+      feedback.push(
+        (JSON.parse(body.input[0]!.content) as { revisionFeedback: string | null })
+          .revisionFeedback,
+      );
+      const targetText = contentCalls === 1 ? 'הלכתי הביתה.' : 'I went home.';
+      return Response.json({
+        status: 'completed',
+        output: [
+          {
+            content: [
+              {
+                type: 'output_text',
+                text: JSON.stringify({
+                  openingExplanation: 'Use the past simple for a finished event yesterday.',
+                  examples: [
+                    { targetText, meaningAndReason: 'This marks a completed action.' },
+                    {
+                      targetText: 'I stayed home.',
+                      meaningAndReason: 'This also marks a completed action.',
+                    },
+                  ],
+                  recognitionQuestion: 'Which sentence describes a completed action?',
+                  guidedPrompt: 'Describe going home yesterday using the past form.',
+                  independentPrompt: 'Tell me about a place you visited last week.',
+                  correctionTip: 'Use the past form for a completed event.',
+                }),
+              },
+            ],
+          },
+        ],
+      });
+    },
+  );
+  const service = new PrivateLessonService({
+    apiKey: 'realtime-secret',
+    model: 'gpt-realtime-test',
+    voice: 'marin',
+    transcriptionModel: 'gpt-transcribe-test',
+    profiles,
+    vocabulary,
+    lessonContentGenerator: contentGenerator,
+    fetchImpl: async () => {
+      realtimeCalls++;
+      return Response.json({ value: 'ek_demo' });
+    },
+  });
+  await service.createSession(identity, {
+    targetLanguageCode: 'en',
+    supportLanguageCode: 'he',
+    teachingLanguage: 'support',
+    grammarFocus: 'past simple',
+  });
+  assert.equal(contentCalls, 2);
+  assert.equal(feedback[0], null);
+  assert.match(feedback[1]!, /Example 1 does not contain target-language writing/u);
+  assert.equal(realtimeCalls, 1);
+});
+
+test('wrong-script practice examples fail closed after a bounded repair', async () => {
+  let realtimeCalled = false;
+  let contentCalls = 0;
+  const contentGenerator = new OpenAiCourseGenerator(
+    'content-secret',
+    'gpt-6-sol',
+    'gpt-transcribe-test',
+    async () => {
+      contentCalls++;
+      return Response.json({
+        status: 'completed',
+        output: [
+          {
+            content: [
+              {
+                type: 'output_text',
+                text: JSON.stringify({
+                  openingExplanation: 'Use the past simple for a finished event yesterday.',
+                  examples: [
+                    {
+                      targetText: 'הלכתי הביתה.',
+                      meaningAndReason: 'This marks a completed action.',
+                    },
+                    {
+                      targetText: 'נשארתי בבית.',
+                      meaningAndReason: 'This also marks a completed action.',
+                    },
+                  ],
+                  recognitionQuestion: 'Which sentence describes a completed action?',
+                  guidedPrompt: 'Describe going home yesterday using the past form.',
+                  independentPrompt: 'Tell me about a place you visited last week.',
+                  correctionTip: 'Use the past form for a completed event.',
+                }),
+              },
+            ],
+          },
+        ],
+      });
+    },
+  );
+  const service = new PrivateLessonService({
+    apiKey: 'realtime-secret',
+    model: 'gpt-realtime-test',
+    voice: 'marin',
+    transcriptionModel: 'gpt-transcribe-test',
+    profiles,
+    vocabulary,
+    lessonContentGenerator: contentGenerator,
+    fetchImpl: async () => {
+      realtimeCalled = true;
+      return Response.json({ value: 'ek_demo' });
+    },
+  });
+  await assert.rejects(
+    service.createSession(identity, {
+      targetLanguageCode: 'en',
+      supportLanguageCode: 'he',
+      teachingLanguage: 'support',
+    }),
+    { code: 'PRIVATE_LESSON_CONTENT_LANGUAGE_INVALID' },
+  );
+  assert.equal(contentCalls, 2);
+  assert.equal(realtimeCalled, false);
+});
+
+test('standard grammar lesson keeps Hebrew instruction and English practice through every turn', async () => {
+  let requestBody: Record<string, unknown> | undefined;
+  const service = makeService(async (_url, init) => {
+    requestBody = JSON.parse(String(init?.body)) as Record<string, unknown>;
+    return Response.json({ value: 'ek_demo' });
+  });
+  const result = await service.createSession(identity, {
+    targetLanguageCode: 'en',
+    supportLanguageCode: 'he',
+    lessonMode: 'standard',
+    teachingLanguage: 'support',
+    grammarFocus: 'past simple',
+  });
+  const session = requestBody?.session as {
+    instructions: string;
+    audio: { input: { transcription: { language?: string; prompt: string } } };
+  };
+  assert.equal(result.lesson.teachingLanguage, 'support');
+  assert.equal(session.audio.input.transcription.language, undefined);
+  assert.match(session.audio.input.transcription.prompt, /English or Hebrew/u);
+  assert.match(session.instructions, /TEACHING_LANGUAGE is SUPPORT_LANGUAGE: Hebrew/u);
+  assert.match(session.instructions, /word, model sentence, example, answer option/u);
+  assert.match(
+    session.instructions,
+    /never translate, transliterate or replace practice material/u,
+  );
+  assert.match(
+    result.realtime.openingEvent.response.instructions,
+    /Explain the concept and when and why to use it in Hebrew.*contrasting examples in (American )?English/u,
+  );
+  assert.match(
+    result.realtime.continuationEvent.response.instructions,
+    /Use Hebrew.*for explanation and understanding checks.*English.*for practice; keep target-language examples and answer options untranslated/u,
+  );
+  assert.match(
+    result.realtime.wrapUpEvent.response.instructions,
+    /Say every practice example in (American )?English.*without replacing it with a translation/u,
+  );
+  assert.match(
+    result.realtime.translationEvent!.response.instructions,
+    /Repeat each original phrase in (American )?English/u,
+  );
+
+  const briefInput = privateLessonBriefInput({ ...reportPlan, teachingLanguage: 'support' });
+  assert.equal(briefInput.teachingLanguageCode, 'he');
+  assert.equal(briefInput.targetLanguageCode, 'en');
+  assert.match(
+    privateLessonBriefInstruction,
+    /examples\.targetText must use targetLanguageCode only/u,
+  );
+  assert.match(
+    privateLessonBriefInstruction,
+    /Do not translate, transliterate or replace target-language practice material/u,
+  );
+});
+
+test('teaching language validates a distinct support language and keeps target as the default', async () => {
+  assert.equal(
+    privateLessonInputSchema.safeParse({
+      targetLanguageCode: 'en',
+      supportLanguageCode: 'he',
+      teachingLanguage: 'support',
+    }).success,
+    true,
+  );
+  assert.equal(
+    privateLessonPreferencesInputSchema.safeParse({
+      targetLanguageCode: 'en',
+      supportLanguageCode: null,
+      lessonMode: 'standard',
+      teachingLanguage: 'support',
+      requestedDurationMinutes: 5,
+      teacherVoice: 'female',
+      speechRate: 'normal',
+      focusAreas: ['grammar'],
+      customFocus: null,
+      correctionMode: 'recast',
+      vocabularyMode: 'none',
+    }).success,
+    false,
+  );
+  const service = makeService(async () => Response.json({ value: 'ek_demo' }));
+  await assert.rejects(
+    service.createSession(identity, {
+      targetLanguageCode: 'ar',
+      supportLanguageCode: 'ar-EG',
+      teachingLanguage: 'support',
+    }),
+    { code: 'PRIVATE_LESSON_SUPPORT_LANGUAGE_REQUIRED' },
+  );
+  await assert.rejects(
+    service.createSession(identity, {
+      targetLanguageCode: 'es',
+      supportLanguageCode: null,
+      teachingLanguage: 'support',
+    }),
+    { code: 'PRIVATE_LESSON_SUPPORT_LANGUAGE_REQUIRED' },
+  );
+  const target = await service.createSession(identity, {
+    targetLanguageCode: 'ar',
+    supportLanguageCode: 'he',
+  });
+  assert.equal(target.lesson.teachingLanguage, 'target');
+});
+
+test('mixed RTL language pairs keep lesson examples in the selected target language', () => {
+  for (const [targetLanguageCode, supportLanguageCode, sourceText] of [
+    ['en', 'he', 'I went home.'],
+    ['ar', 'he', 'ذهبت إلى البيت.'],
+    ['he', 'ar', 'הלכתי הביתה.'],
+  ] as const) {
+    const plan: PrivateLessonPlan = {
+      ...reportPlan,
+      targetLanguageCode,
+      supportLanguageCode,
+      teachingLanguage: 'support',
+      targets: [{ ...reportPlan.targets[0]!, sourceText }],
+    };
+    const prompt = buildPrivateLessonPrompt(plan);
+    assert.ok(prompt.includes(sourceText));
+    assert.match(
+      prompt,
+      /Keep every taught word, model sentence, example, answer option and sentence the learner must produce in TARGET_LANGUAGE/u,
+    );
+    assert.match(prompt, /TEACHING_LANGUAGE is SUPPORT_LANGUAGE/u);
+    assert.doesNotMatch(prompt, /Speak in TARGET_LANGUAGE from the very first spoken word/u);
+  }
 });

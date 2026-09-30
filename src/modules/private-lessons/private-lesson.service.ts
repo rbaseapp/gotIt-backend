@@ -44,6 +44,7 @@ import type { CourseGenerator } from '../courses/course.provider.js';
 import {
   privateLessonBriefInput,
   privateLessonBriefInstruction,
+  privateLessonBriefLanguageIssue,
   privateLessonBriefSchema,
 } from './private-lesson.content.js';
 
@@ -159,6 +160,10 @@ export class PrivateLessonService {
       this.options.roadmaps?.getActive(scope, input.targetLanguageCode) ?? Promise.resolve(null),
     ]);
     const requestedLessonMode = input.lessonMode ?? preferences?.lessonMode ?? 'standard';
+    const requestedTeachingLanguage =
+      requestedLessonMode === 'absolute_beginner'
+        ? (input.teachingLanguage ?? 'support')
+        : (input.teachingLanguage ?? preferences?.teachingLanguage ?? 'target');
     const configuredSupportLanguage =
       input.supportLanguageCode === undefined && preferences
         ? preferences.supportLanguageCode
@@ -166,7 +171,7 @@ export class PrivateLessonService {
           ? profile.defaultTranslationLanguage
           : input.supportLanguageCode;
     if (
-      requestedLessonMode === 'absolute_beginner' &&
+      (requestedLessonMode === 'absolute_beginner' || requestedTeachingLanguage === 'support') &&
       (!configuredSupportLanguage ||
         new Intl.Locale(configuredSupportLanguage).language ===
           new Intl.Locale(input.targetLanguageCode).language)
@@ -174,7 +179,13 @@ export class PrivateLessonService {
       throw new AppError(
         400,
         'PRIVATE_LESSON_SUPPORT_LANGUAGE_REQUIRED',
-        'Absolute beginner lessons require a support language that differs from the target language',
+        'Teaching in the support language requires a language that differs from the target language',
+      );
+    if (requestedLessonMode === 'absolute_beginner' && requestedTeachingLanguage !== 'support')
+      throw new AppError(
+        400,
+        'PRIVATE_LESSON_TEACHING_LANGUAGE_INVALID',
+        'Absolute beginner lessons teach in the support language',
       );
     const targetBaseLanguage = new Intl.Locale(input.targetLanguageCode).language;
     const previousLesson =
@@ -235,14 +246,27 @@ export class PrivateLessonService {
     let timeout: ReturnType<typeof setTimeout> | undefined;
     try {
       if (this.options.lessonContentGenerator) {
-        const teachingBrief = await this.options.lessonContentGenerator.generate(
-          scope,
-          privateLessonBriefSchema,
-          'private_lesson_brief',
-          privateLessonBriefInstruction,
-          privateLessonBriefInput(plan),
-        );
-        plan = { ...plan, teachingBrief };
+        let languageIssue: string | null = null;
+        for (let attempt = 0; attempt < 2; attempt++) {
+          const teachingBrief = await this.options.lessonContentGenerator.generate(
+            scope,
+            privateLessonBriefSchema,
+            'private_lesson_brief',
+            privateLessonBriefInstruction,
+            { ...privateLessonBriefInput(plan), revisionFeedback: languageIssue },
+          );
+          languageIssue = privateLessonBriefLanguageIssue(plan, teachingBrief);
+          if (!languageIssue) {
+            plan = { ...plan, teachingBrief };
+            break;
+          }
+        }
+        if (languageIssue)
+          throw new AppError(
+            503,
+            'PRIVATE_LESSON_CONTENT_LANGUAGE_INVALID',
+            'Practice examples must remain in the target language',
+          );
       }
       timeout = setTimeout(() => controller.abort(), this.requestTimeoutMs);
       const instructions = buildPrivateLessonPrompt(plan);
@@ -258,7 +282,8 @@ export class PrivateLessonService {
         : null;
       const transcriptionLanguage = new Intl.Locale(targetLanguage.code).language;
       const absoluteBeginner = plan.lessonMode === 'absolute_beginner';
-      const bilingualCourse = absoluteBeginner || Boolean(plan.course);
+      const supportTeaching = plan.teachingLanguage === 'support';
+      const bilingualCourse = supportTeaching || Boolean(plan.course);
       const teacher = privateLessonTeachers[plan.teacherVoice];
       const voice = teacher.voice;
       const response = await this.fetchImpl('https://api.openai.com/v1/realtime/client_secrets', {
@@ -316,25 +341,29 @@ export class PrivateLessonService {
             childCourse
               ? `Begin a child-friendly lesson now. Introduce yourself as ${teacher.name}. Follow the language policy and today's approved course objective. Give one short concrete model, explain it simply, then ask one short spoken understanding question about a fresh situation without giving its answer. Wait for the child's answer before the next step. Use imitation only when the objective or a sound requires it.`
               : absoluteBeginner
-                ? `Begin with one short greeting in ${targetLanguage.promptName}, then give its meaning in ${supportLanguage!.promptName}. Introduce yourself as ${teacher.name} and explain today's objective in ${supportLanguage!.promptName}. Follow the approved objective when course is present. Explain the situation, meaning and useful parts of the first target phrase, give a short example, then ask one open understanding question in ${supportLanguage!.promptName} about a different case. Do not say the answer in the question. Invite imitation only when it is the explicit lesson objective or a specific sound needs practice; do not mistake it for understanding.`
-                : `Begin the lesson now. Speak only in ${targetLanguage.promptName}. The very first spoken word must be in this language. Greet briefly and introduce yourself as ${teacher.name}. State today's objective from the approved course, roadmap or grammar focus. Explain the concept and when to use it, show a clear example, then ask one open understanding question about a fresh case without saying the answer. For an independent unit check, elicit the task without giving its answer. If no structured objective is configured, follow the conversational opening policy. Invite imitation only when it is the explicit lesson objective. Do not use any other language.`,
+                ? `Begin with one short greeting in ${targetLanguage.promptName}, then give its meaning in ${supportLanguage!.promptName}. Introduce yourself as ${teacher.name} and explain today's objective in ${supportLanguage!.promptName}. Follow the approved objective when course is present. Explain the situation, meaning and useful parts of the first target phrase, give a short ${targetLanguage.promptName} example, then ask one open understanding question in ${supportLanguage!.promptName} about a different case. Do not say the answer in the question. Keep every practice word and sentence in ${targetLanguage.promptName}; explain meanings separately in ${supportLanguage!.promptName}. Use teachingBrief when supplied. Invite imitation only when it is the explicit lesson objective or a specific sound needs practice; do not mistake it for understanding.`
+                : supportTeaching
+                  ? `Begin with a short greeting in ${targetLanguage.promptName}, introduce yourself as ${teacher.name}, and explain today's objective in ${supportLanguage!.promptName}. Explain the concept and when and why to use it in ${supportLanguage!.promptName}, show contrasting examples in ${targetLanguage.promptName}, then ask one open understanding question in ${supportLanguage!.promptName} about a fresh case without saying the answer. Keep every practice word and sentence in ${targetLanguage.promptName}; explain meanings separately. Use teachingBrief when supplied. Follow the approved course objective when present.`
+                  : `Begin the lesson now. Speak only in ${targetLanguage.promptName}. The very first spoken word must be in this language. Greet briefly and introduce yourself as ${teacher.name}. State today's objective from the approved course, roadmap or grammar focus. Explain the concept and when to use it, show a clear example, then ask one open understanding question about a fresh case without saying the answer. For an independent unit check, elicit the task without giving its answer. If no structured objective is configured, follow the conversational opening policy. Use teachingBrief when supplied. Invite imitation only when it is the explicit lesson objective. Do not use any other language.`,
           ),
           continuationEvent: responseEvent(
             childCourse
               ? `Continue the child's current lesson under the configured language policy. Keep the approved objective. If the child has not answered, re-explain with one different concrete example and ask a smaller spoken question; never claim the child answered. If the answer was wrong, kindly explain the specific point and ask a fresh check. Give specific feedback and advance only after evidence of understanding, then pause for the next answer.`
-              : `Continue the current lesson after a pause or the learner's request to continue. ${absoluteBeginner ? `Use ${supportLanguage!.promptName} for explanation and understanding checks and ${targetLanguage.promptName} for practice.` : `Speak only in ${targetLanguage.promptName}.`} Keep the current objective and conversation history. Do not restart or assume an unheard answer was correct. If the last task is unanswered or the learner is confused, re-explain with a different example and ask a smaller open question without its answer. If the learner answered incorrectly, explain the specific error and ask a fresh check of the same point. Advance only after evidence of understanding; a copied answer is not enough. End with one concrete prompt. Do not repeat a mastered sentence or ask the learner to choose what happens next.`,
+              : `Continue the current lesson after a pause or the learner's request to continue. ${supportTeaching ? `Use ${supportLanguage!.promptName} for explanation and understanding checks and ${targetLanguage.promptName} for practice; keep target-language examples and answer options untranslated.` : `Speak only in ${targetLanguage.promptName}.`} Keep the current objective and conversation history. Do not restart or assume an unheard answer was correct. If the last task is unanswered or the learner is confused, re-explain with a different example and ask a smaller open question without its answer. If the learner answered incorrectly, explain the specific error and ask a fresh check of the same point. Advance only after evidence of understanding; a copied answer is not enough. End with one concrete prompt. Do not repeat a mastered sentence or ask the learner to choose what happens next.`,
           ),
           wrapUpEvent: responseEvent(
             childCourse
               ? `The child's lesson is ending now. Follow the configured language policy. Name one specific success, briefly model one useful phrase to remember, and say a warm goodbye. Do not ask another question or introduce new material. Keep this short.`
               : absoluteBeginner
                 ? `The lesson is ending now. In ${supportLanguage!.promptName}, briefly praise one success and recap the 3-5 ${targetLanguage.promptName} phrases learned today, saying each phrase slowly with its meaning. Do not introduce new material or ask another question. End warmly in ${supportLanguage!.promptName}. Keep the closing under 25 seconds.`
-                : `The lesson is ending now. Speak only in ${targetLanguage.promptName}. Do not ask another question. In three short parts, give one specific success, one correction with the correct form, and the target words worth reviewing. Then say a warm, encouraging goodbye in the same language. Do not use any other language. Keep the entire closing under 20 seconds.`,
+                : supportTeaching
+                  ? `The lesson is ending now. In ${supportLanguage!.promptName}, name one specific success and recap the ${targetLanguage.promptName} words and sentences learned today. Say every practice example in ${targetLanguage.promptName} and explain its meaning separately, without replacing it with a translation. Do not introduce new material or ask another question. End warmly in ${supportLanguage!.promptName}. Keep the closing under 25 seconds.`
+                  : `The lesson is ending now. Speak only in ${targetLanguage.promptName}. Do not ask another question. In three short parts, give one specific success, one correction with the correct form, and the target words worth reviewing. Then say a warm, encouraging goodbye in the same language. Do not use any other language. Keep the entire closing under 20 seconds.`,
           ),
           translationEvent: supportLanguage
             ? responseEvent(
-                absoluteBeginner
-                  ? `In ${supportLanguage.promptName}, explain the meaning of every ${targetLanguage.promptName} phrase from the tutor's most recent turn. Do not introduce new material or ask a new question. Then continue the absolute-beginner lesson using the configured bilingual method.`
+                supportTeaching
+                  ? `In ${supportLanguage.promptName}, explain the meaning of every ${targetLanguage.promptName} phrase from the tutor's most recent turn. Repeat each original phrase in ${targetLanguage.promptName}; do not replace the practice material with translated sentences. Do not introduce new material or ask a new question. Continue with the configured teaching language.`
                   : `For this response only, translate the tutor's entire most recent speaking turn into ${supportLanguage.promptName}. Translate every sentence from that turn, from beginning to end; do not translate only its final sentence. Give only the complete translation and at most one brief clarification. Do not advance the lesson or ask a new question. After this response, resume speaking only in ${targetLanguage.promptName}.`,
               )
             : null,
@@ -497,6 +526,27 @@ export class PrivateLessonService {
         'PRIVATE_LESSON_SUPPORT_LANGUAGE_REQUIRED',
         'Absolute beginner lessons require a support language',
       );
+    const teachingLanguage =
+      lessonMode === 'absolute_beginner'
+        ? (input.teachingLanguage ?? 'support')
+        : (input.teachingLanguage ?? preferences?.teachingLanguage ?? 'target');
+    if (
+      teachingLanguage === 'support' &&
+      (!supportLanguageCode ||
+        new Intl.Locale(supportLanguageCode).language ===
+          new Intl.Locale(input.targetLanguageCode).language)
+    )
+      throw new AppError(
+        400,
+        'PRIVATE_LESSON_SUPPORT_LANGUAGE_REQUIRED',
+        'A distinct support language is required for explanations',
+      );
+    if (lessonMode === 'absolute_beginner' && teachingLanguage !== 'support')
+      throw new AppError(
+        400,
+        'PRIVATE_LESSON_TEACHING_LANGUAGE_INVALID',
+        'Absolute beginner lessons teach in the support language',
+      );
     const targets = queue
       .filter(
         (item) =>
@@ -549,6 +599,7 @@ export class PrivateLessonService {
       targetLanguageCode: input.targetLanguageCode,
       supportLanguageCode,
       lessonMode,
+      teachingLanguage,
       level,
       topic:
         input.topic ??
@@ -600,6 +651,8 @@ function publicStoredLesson(lesson: StoredPrivateLesson) {
     targetLanguageCode: lesson.targetLanguageCode,
     supportLanguageCode: lesson.supportLanguageCode,
     lessonMode: lesson.lessonMode,
+    teachingLanguage:
+      lesson.teachingLanguage ?? (lesson.lessonMode === 'absolute_beginner' ? 'support' : 'target'),
     level: lesson.level,
     topic: lesson.topic,
     grammarFocus: lesson.grammarFocus,
@@ -631,6 +684,8 @@ function publicPlan(plan: PrivateLessonPlan) {
     targetLanguageCode: plan.targetLanguageCode,
     supportLanguageCode: plan.supportLanguageCode,
     lessonMode: plan.lessonMode,
+    teachingLanguage:
+      plan.teachingLanguage ?? (plan.lessonMode === 'absolute_beginner' ? 'support' : 'target'),
     level: plan.level,
     topic: plan.topic,
     grammarFocus: plan.grammarFocus,
