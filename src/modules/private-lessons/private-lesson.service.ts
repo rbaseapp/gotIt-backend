@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { privateLessonTeachers } from './private-lesson.teachers.js';
+import { childCourseTeacherVoice, privateLessonTeachers } from './private-lesson.teachers.js';
 import { z } from 'zod';
 import { AppError } from '../../shared/errors/app-error.js';
 import {
@@ -213,6 +213,9 @@ export class PrivateLessonService {
         throw new AppError(503, 'COURSE_AI_UNAVAILABLE', 'Courses are unavailable');
       plan = await this.options.courses.prepareLesson(scope, plan, input.courseId, courseContext!);
     }
+    const childCourse = plan.course?.preferences.ageGroup === 'child';
+    if (childCourse)
+      plan = { ...plan, teacherVoice: childCourseTeacherVoice, correctionMode: 'recast' };
     const instructions = buildPrivateLessonPrompt(plan);
     // Realtime response instructions replace (rather than append to) session
     // instructions. Preserve the full teaching policy and approved lesson data.
@@ -285,17 +288,23 @@ export class PrivateLessonService {
           model: this.options.model,
           connectionUrl: 'https://api.openai.com/v1/realtime/calls',
           openingEvent: responseEvent(
-            absoluteBeginner
-              ? `Begin with one short greeting in ${targetLanguage.promptName}, then give its meaning in ${supportLanguage!.promptName}. Introduce yourself as ${teacher.name} and explain today's objective in ${supportLanguage!.promptName}. Follow the approved objective when course is present. Explain the situation, meaning and useful parts of the first target phrase, give a short example, then ask one open understanding question in ${supportLanguage!.promptName} about a different case. Do not say the answer in the question. Invite imitation only when it is the explicit lesson objective or a specific sound needs practice; do not mistake it for understanding.`
-              : `Begin the lesson now. Speak only in ${targetLanguage.promptName}. The very first spoken word must be in this language. Greet briefly and introduce yourself as ${teacher.name}. State today's objective from the approved course, roadmap or grammar focus. Explain the concept and when to use it, show a clear example, then ask one open understanding question about a fresh case without saying the answer. For an independent unit check, elicit the task without giving its answer. If no structured objective is configured, follow the conversational opening policy. Invite imitation only when it is the explicit lesson objective. Do not use any other language.`,
+            childCourse
+              ? `Begin a child-friendly lesson now. Introduce yourself as ${teacher.name}. Follow the language policy and today's approved course objective. Give one short concrete model, explain it simply, then ask one short spoken understanding question about a fresh situation without giving its answer. Wait for the child's answer before the next step. Use imitation only when the objective or a sound requires it.`
+              : absoluteBeginner
+                ? `Begin with one short greeting in ${targetLanguage.promptName}, then give its meaning in ${supportLanguage!.promptName}. Introduce yourself as ${teacher.name} and explain today's objective in ${supportLanguage!.promptName}. Follow the approved objective when course is present. Explain the situation, meaning and useful parts of the first target phrase, give a short example, then ask one open understanding question in ${supportLanguage!.promptName} about a different case. Do not say the answer in the question. Invite imitation only when it is the explicit lesson objective or a specific sound needs practice; do not mistake it for understanding.`
+                : `Begin the lesson now. Speak only in ${targetLanguage.promptName}. The very first spoken word must be in this language. Greet briefly and introduce yourself as ${teacher.name}. State today's objective from the approved course, roadmap or grammar focus. Explain the concept and when to use it, show a clear example, then ask one open understanding question about a fresh case without saying the answer. For an independent unit check, elicit the task without giving its answer. If no structured objective is configured, follow the conversational opening policy. Invite imitation only when it is the explicit lesson objective. Do not use any other language.`,
           ),
           continuationEvent: responseEvent(
-            `Continue the current lesson after a pause or the learner's request to continue. ${absoluteBeginner ? `Use ${supportLanguage!.promptName} for explanation and understanding checks and ${targetLanguage.promptName} for practice.` : `Speak only in ${targetLanguage.promptName}.`} Keep the current objective and conversation history. Do not restart or assume an unheard answer was correct. If the last task is unanswered or the learner is confused, re-explain with a different example and ask a smaller open question without its answer. If the learner answered incorrectly, explain the specific error and ask a fresh check of the same point. Advance only after evidence of understanding; a copied answer is not enough. End with one concrete prompt. Do not repeat a mastered sentence or ask the learner to choose what happens next.`,
+            childCourse
+              ? `Continue the child's current lesson under the configured language policy. Keep the approved objective. If the child has not answered, re-explain with one different concrete example and ask a smaller spoken question; never claim the child answered. If the answer was wrong, kindly explain the specific point and ask a fresh check. Give specific feedback and advance only after evidence of understanding, then pause for the next answer.`
+              : `Continue the current lesson after a pause or the learner's request to continue. ${absoluteBeginner ? `Use ${supportLanguage!.promptName} for explanation and understanding checks and ${targetLanguage.promptName} for practice.` : `Speak only in ${targetLanguage.promptName}.`} Keep the current objective and conversation history. Do not restart or assume an unheard answer was correct. If the last task is unanswered or the learner is confused, re-explain with a different example and ask a smaller open question without its answer. If the learner answered incorrectly, explain the specific error and ask a fresh check of the same point. Advance only after evidence of understanding; a copied answer is not enough. End with one concrete prompt. Do not repeat a mastered sentence or ask the learner to choose what happens next.`,
           ),
           wrapUpEvent: responseEvent(
-            absoluteBeginner
-              ? `The lesson is ending now. In ${supportLanguage!.promptName}, briefly praise one success and recap the 3-5 ${targetLanguage.promptName} phrases learned today, saying each phrase slowly with its meaning. Do not introduce new material or ask another question. End warmly in ${supportLanguage!.promptName}. Keep the closing under 25 seconds.`
-              : `The lesson is ending now. Speak only in ${targetLanguage.promptName}. Do not ask another question. In three short parts, give one specific success, one correction with the correct form, and the target words worth reviewing. Then say a warm, encouraging goodbye in the same language. Do not use any other language. Keep the entire closing under 20 seconds.`,
+            childCourse
+              ? `The child's lesson is ending now. Follow the configured language policy. Name one specific success, briefly model one useful phrase to remember, and say a warm goodbye. Do not ask another question or introduce new material. Keep this short.`
+              : absoluteBeginner
+                ? `The lesson is ending now. In ${supportLanguage!.promptName}, briefly praise one success and recap the 3-5 ${targetLanguage.promptName} phrases learned today, saying each phrase slowly with its meaning. Do not introduce new material or ask another question. End warmly in ${supportLanguage!.promptName}. Keep the closing under 25 seconds.`
+                : `The lesson is ending now. Speak only in ${targetLanguage.promptName}. Do not ask another question. In three short parts, give one specific success, one correction with the correct form, and the target words worth reviewing. Then say a warm, encouraging goodbye in the same language. Do not use any other language. Keep the entire closing under 20 seconds.`,
           ),
           translationEvent: supportLanguage
             ? responseEvent(

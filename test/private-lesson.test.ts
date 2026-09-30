@@ -6,6 +6,8 @@ import { createApp } from '../src/app.js';
 import { CoreAuthClient } from '../src/shared/core/core-auth.client.js';
 import { ProviderHttpError } from '../src/modules/enrichment/providers/http.js';
 import type { GotItProfile, ProfileServiceContract } from '../src/modules/profile/profile.types.js';
+import type { CourseLessonContext } from '../src/modules/courses/course.schemas.js';
+import { preferences as coursePreferences } from './helpers/course-fixtures.js';
 import {
   PrivateLessonService,
   type PrivateLessonVocabularySource,
@@ -158,8 +160,13 @@ function makeCoreAuthClient() {
   });
 }
 
-function makeService(fetchImpl: typeof fetch, apiKey = 'server-secret') {
+function makeService(
+  fetchImpl: typeof fetch,
+  apiKey = 'server-secret',
+  courses?: ConstructorParameters<typeof PrivateLessonService>[0]['courses'],
+) {
   return new PrivateLessonService({
+    courses,
     apiKey,
     model: 'gpt-realtime-test',
     voice: 'marin',
@@ -169,6 +176,75 @@ function makeService(fetchImpl: typeof fetch, apiKey = 'server-secret') {
     fetchImpl,
   });
 }
+
+test('child course uses Rachel and short spoken checks while adult course keeps Mike and the standard lesson', async () => {
+  for (const ageGroup of ['child', 'adult'] as const) {
+    let requestBody: { session: { instructions: string; audio: { output: { voice: string } } } } | undefined;
+    const context: CourseLessonContext = {
+      courseId: '77777777-7777-4777-8777-777777777777',
+      version: 1,
+      unitKey: 'greetings',
+      lessonIndex: 0,
+      courseTitle: 'Greetings',
+      unitTitle: 'Introductions',
+      lessonTitle: 'Say hello',
+      level: 'A1',
+      objective: 'Say hello and give your name',
+      successTask: 'Introduce yourself',
+      isUnitCheck: false,
+      grammar: [],
+      vocabulary: ['hello'],
+      preferences: {
+        ...coursePreferences,
+        ageGroup,
+        literacy: ageGroup === 'child' ? 'not_yet' : 'independent',
+        absoluteBeginner: false,
+      },
+      homework: '',
+    };
+    const courses = {
+      lessonContext: async () => context,
+      prepareLesson: async (_scope: unknown, plan: PrivateLessonPlan) => ({
+        ...plan,
+        course: context,
+        correctionMode: 'deep_explanation' as const,
+      }),
+    } as unknown as NonNullable<ConstructorParameters<typeof PrivateLessonService>[0]['courses']>;
+    const service = makeService(async (_url, init) => {
+      requestBody = JSON.parse(String(init?.body));
+      return new Response(JSON.stringify({ value: 'ek_demo' }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }, 'server-secret', courses);
+
+    const result = await service.createSession(identity, {
+      courseId: context.courseId,
+      targetLanguageCode: 'en',
+      teacherVoice: 'male',
+    });
+    const instructions = requestBody?.session.instructions ?? '';
+    if (ageGroup === 'child') {
+      assert.equal(result.lesson.teacherVoice, 'female');
+      assert.equal(result.lesson.correctionMode, 'recast');
+      assert.equal(requestBody?.session.audio.output.voice, 'marin');
+      assert.match(instructions, /Your name is Rachel/u);
+      assert.match(instructions, /Child teaching method/u);
+      assert.match(instructions, /spoken choices and oral responses/u);
+      assert.match(instructions, /specific success when earned/u);
+      assert.match(result.realtime.openingEvent.response.instructions, /short spoken understanding question/u);
+      assert.match(result.realtime.continuationEvent.response.instructions, /specific feedback/u);
+      assert.match(result.realtime.wrapUpEvent.response.instructions, /one specific success/u);
+    } else {
+      assert.equal(result.lesson.teacherVoice, 'male');
+      assert.equal(result.lesson.correctionMode, 'deep_explanation');
+      assert.equal(requestBody?.session.audio.output.voice, 'cedar');
+      assert.match(instructions, /Your name is Mike/u);
+      assert.doesNotMatch(instructions, /Child teaching method/u);
+      assert.match(result.realtime.openingEvent.response.instructions, /introduce yourself as Mike/u);
+    }
+  }
+});
 
 test('private lesson creates a bounded personalized Realtime session', async () => {
   let requestBody: Record<string, unknown> | undefined;

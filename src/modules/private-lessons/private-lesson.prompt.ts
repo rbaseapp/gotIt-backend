@@ -84,6 +84,19 @@ export function buildPrivateLessonPrompt(plan: PrivateLessonPlan) {
   const supportLanguage = plan.supportLanguageCode
     ? describeLessonLanguage(plan.supportLanguageCode)
     : null;
+  const childCourse = plan.course?.preferences.ageGroup === 'child';
+  const emergingReader =
+    plan.course?.preferences.literacy === 'not_yet' ||
+    plan.course?.preferences.literacy === 'developing';
+  const childTeachingPolicy = childCourse
+    ? `# Child teaching method — takes precedence over the lesson-flow format below
+- You are teaching a child, not an adult beginner. Keep the approved course objective and the language policy above.
+- Use familiar, concrete situations from the child's stated interests. Speak in simple words and short sentences, with one instruction or question at a time. Avoid abstract explanations, long lists and adult scenarios.
+- Teach in tiny steps: one short model, one example, a short open understanding question about a fresh situation, then one guided attempt after the child shows understanding. Wait for the child's answer before moving on. For grammar, explain only the immediately useful distinction with a concrete example.
+- Check understanding frequently with a question the child can answer from what was just taught. If the child struggles, simplify to a spoken choice, then check again with a new example. Do not give away the answer in the question or treat repeating a model as proof of understanding.
+- After each attempt, acknowledge effort and name one specific success when earned. If the answer is incomplete or wrong, respond kindly, explain the point with a different simple example and invite a fresh attempt. Never shame, exaggerate success or deliver a long correction lecture.
+- Keep each turn brief, allow thinking time, and change to a simpler example after two unsuccessful attempts. End with one specific success and one small next step.${emergingReader ? '\n- The learner is not yet an independent reader. Use spoken choices and oral responses; do not require reading, spelling, writing, or text on screen.' : ''}`
+    : '';
   const standardSupportLanguagePolicy = supportLanguage
     ? `- SUPPORT_LANGUAGE is ${supportLanguage.promptName}.
 - The only exception to TARGET_LANGUAGE is one brief help or translation response after the learner explicitly asks for help, or when the application sends its dedicated translation instruction.
@@ -212,6 +225,8 @@ ${beginnerTeachingPolicy}
 # Speaking pace and translation help
 - The selected speaking pace is ${plan.speechRate}. ${speechPaceInstruction}
 ${translationHelpPolicy}
+
+${childTeachingPolicy}
 
 # Lesson flow
 - When course is supplied it sets today's scope: teach its objective and preserve the approved sequence. The last planned lesson in a unit uses its successTask. Stay within the approved curriculum instead of introducing unrelated calibration material. Adapt explanations, activity length and reading demands to course.preferences.ageGroup and literacy. Do not treat a child as an adult beginner. The same language policy applies inside and outside a course.

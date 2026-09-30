@@ -142,6 +142,15 @@ Open `/demo/private-lesson` on the running backend for the standalone demo UI; i
 keeps the supplied Core bearer token in memory only and still enforces authentication
 when it creates the short-lived Realtime session.
 
+Child course lessons use the existing Rachel tutor identity (`marin` Realtime voice)
+and the matching five female portrait frames in
+`../gotIt-front/src/assets/private-lesson/`. Adult lessons retain the selected
+Rachel or Mike identity (`marin` or `cedar`) and their matching portrait frames.
+No dedicated child tutor portrait set or prerecorded voice asset is present in the
+GotIt repositories. A distinct child character requires approved identity, matching
+media frames and a voice mapping before it can be exposed; do not infer one from a
+filename or switch the portrait independently of the voice.
+
 OpenAI contextual translation uses the Responses API with strict structured output.
 Set `OPENAI_API_KEY`, `OPENAI_TRANSLATION_MODEL` (the deployment default is
 `gpt-5.4-nano`) and an independent `ENRICHMENT_SIGNING_SECRET` of at least 32
