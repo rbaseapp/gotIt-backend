@@ -187,7 +187,16 @@ export class FixtureGenerator implements CourseGenerator {
         ? plan
         : name === 'course_intake' || name === 'course_intake_revision'
           ? {
-              message: 'מה חשוב לך ללמוד?',
+              message: (data as { step?: number }).step === undefined
+                ? 'מה חשוב לך ללמוד?'
+                : [
+                    'נשמע שהמטרה חשובה לך. מה כבר יצא לך ללמוד?',
+                    'יש לך קצת רקע. בן כמה אתה, והאם נוח לך לקרוא?',
+                    'תודה ששיתפת. אילו נושאים מעניינים אותך?',
+                    'מעניין! איך נוח לך ללמוד ולתרגל?',
+                    'מה יתאים לך מבחינת אורך שיעור וזמן בשבוע?',
+                    'תודה, בוא נעבור יחד על הפרטים לפני בניית הקורס.',
+                  ][(data as { step: number }).step],
               suggestions: ['לדבר', 'דקדוק', 'לא בטוח'],
               ready: true,
               preferences,

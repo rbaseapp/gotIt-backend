@@ -215,6 +215,13 @@ const courseService = new CourseService(
   new PostgresLearningDocumentStore(pool),
   profileService,
   privateLessonContentGenerator,
+  (env.OPENAI_REALTIME_API_KEY ?? env.OPENAI_API_KEY)
+    ? {
+        apiKey: (env.OPENAI_REALTIME_API_KEY ?? env.OPENAI_API_KEY)!,
+        model: env.OPENAI_REALTIME_MODEL,
+        transcriptionModel: env.OPENAI_REALTIME_TRANSCRIPTION_MODEL,
+      }
+    : undefined,
 );
 const privateLessonService = new PrivateLessonService({
   courses: courseService,

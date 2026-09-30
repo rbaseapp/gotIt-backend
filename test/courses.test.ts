@@ -42,6 +42,44 @@ const setup = () => {
 };
 const conflict = (error: unknown) => error instanceof AppError && error.statusCode === 409;
 
+test('live course interview uses lesson Realtime model with automatic speech turns and no autonomous replies', async () => {
+  const store = new MemoryLearningStore();
+  const course = courseFixture();
+  course.ready = false;
+  course.approvedPreferences = null;
+  course.messages = [{ role: 'tutor', text: 'מה תרצה ללמוד?', channel: 'text' }];
+  store.seed(course);
+  let requestBody: {
+    session: {
+      model: string;
+      audio: {
+        input: { turn_detection: { type: string; create_response: boolean } };
+        output: { voice: string };
+      };
+    };
+  } | undefined;
+  const service = new CourseService(store, profiles, new FixtureGenerator(), {
+    apiKey: 'server-secret',
+    model: 'gpt-realtime-2.1',
+    transcriptionModel: 'gpt-4o-mini-transcribe',
+    fetchImpl: async (_url, init) => {
+      requestBody = JSON.parse(String(init?.body));
+      return new Response(JSON.stringify({ value: 'ephemeral-secret' }), { status: 200 });
+    },
+  });
+  const realtime = await service.realtimeSession(scope, course.id);
+  assert.equal(realtime.clientSecret, 'ephemeral-secret');
+  assert.equal(requestBody?.session.model, 'gpt-realtime-2.1');
+  assert.equal(requestBody?.session.audio.input.turn_detection.type, 'semantic_vad');
+  assert.equal(requestBody?.session.audio.input.turn_detection.create_response, false);
+  assert.equal(requestBody?.session.audio.output.voice, 'marin');
+  assert.match(realtime.openingEvent.response.instructions, /מה תרצה ללמוד/u);
+  assert.doesNotMatch(JSON.stringify(realtime), /server-secret/u);
+  course.ready = true;
+  store.seed(course);
+  await assert.rejects(() => service.realtimeSession(scope, course.id), conflict);
+});
+
 test('six text and voice answers survive correction and shape the approved plan', async () => {
   const { store, service, ai } = setup();
   const course = courseFixture();
@@ -237,6 +275,10 @@ test('intake is six short localized questions and respects a stated 1-2 day sche
     assert.equal(current.intakeProgress?.answered, index + 1);
     assert.equal(current.ready, index === 5);
     assert.equal(current.messages.at(-2)?.text, answer);
+    if (index === 0) {
+      assert.match(current.messages.at(-1)!.text, /נשמע שהמטרה/u);
+      assert.notEqual(current.messages.at(-1)!.text, 'מה כבר למדת בשפה הזאת?');
+    }
   }
   assert.equal(current.preferences.daysPerWeek, 2);
   assert.equal(current.reportedAvailability, answers[5]);
@@ -912,12 +954,12 @@ test('course HTTP routes enforce Core identity, entitlement, strict input and pr
     })
     .expect(400);
   assert.equal((await service.homework(scope, homework.id)).revision, 0);
-  assert.equal(API_ROUTES.filter(({ path }) => path.startsWith('/api/v1/courses')).length, 12);
+  assert.equal(API_ROUTES.filter(({ path }) => path.startsWith('/api/v1/courses')).length, 13);
   assert.equal(
     new Set(API_ROUTES.map(({ method, path }) => `${method} ${path}`)).size,
     API_ROUTES.length,
   );
-  assert.equal(API_ROUTES.length, 74);
+  assert.equal(API_ROUTES.length, 75);
 });
 
 test('course session resolves approved language and objective before creating the Realtime session', async () => {

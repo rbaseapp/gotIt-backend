@@ -93,6 +93,12 @@ export class CourseService {
     readonly store: LearningDocumentStore,
     private readonly profiles: ProfileServiceContract,
     private readonly generator?: CourseGenerator,
+    private readonly realtime?: {
+      apiKey: string;
+      model: string;
+      transcriptionModel: string;
+      fetchImpl?: typeof fetch;
+    },
   ) {}
   get available() {
     return Boolean(this.generator);
@@ -119,6 +125,58 @@ export class CourseService {
     const document = await this.store.get(scope, id);
     if (document?.kind !== 'course') throw courseNotFound();
     return document;
+  }
+  async realtimeSession(scope: ProfileScope, id: string) {
+    const course = await this.course(scope, id);
+    if (!this.realtime || course.approvedPreferences || course.ready)
+      throw new AppError(409, 'COURSE_VOICE_UNAVAILABLE', 'The live interview is unavailable');
+    const question = course.messages.at(-1);
+    if (question?.role !== 'tutor') throw courseConflict();
+    const language = new Intl.Locale(course.preferences.supportLanguageCode).language;
+    const signal = AbortSignal.timeout(20_000);
+    const response = await (this.realtime.fetchImpl ?? fetch)(
+      'https://api.openai.com/v1/realtime/client_secrets',
+      {
+        method: 'POST',
+        signal,
+        headers: {
+          authorization: `Bearer ${this.realtime.apiKey}`,
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          session: {
+            type: 'realtime',
+            model: this.realtime.model,
+            output_modalities: ['audio'],
+            instructions: `You are the learner's live course teacher. Speak only in ${intakeLanguageName(language)}. Read the exact supplied server question naturally, without adding, changing or answering it. Wait silently for the learner. The server will supply each next question.`,
+            audio: {
+              input: {
+                noise_reduction: { type: 'far_field' },
+                transcription: { model: this.realtime.transcriptionModel, language },
+                turn_detection: {
+                  type: 'semantic_vad',
+                  eagerness: 'medium',
+                  create_response: false,
+                  interrupt_response: true,
+                },
+              },
+              output: { voice: 'marin', speed: 1 },
+            },
+          },
+        }),
+      },
+    );
+    if (!response.ok)
+      throw new AppError(503, 'COURSE_VOICE_UNAVAILABLE', 'The live interview could not start');
+    const secret = z.object({ value: z.string().min(1), expires_at: z.number().optional() })
+      .parse(await response.json());
+    return {
+      clientSecret: secret.value,
+      expiresAt: secret.expires_at ? new Date(secret.expires_at * 1000).toISOString() : null,
+      model: this.realtime.model,
+      connectionUrl: 'https://api.openai.com/v1/realtime/calls' as const,
+      openingEvent: courseSpokenQuestion(question.text, language),
+    };
   }
   async homework(scope: ProfileScope, id: string) {
     const document = await this.store.get(scope, id);
@@ -377,7 +435,6 @@ export class CourseService {
         input.message,
       );
       const nextStep = step + 1;
-      const nextQuestion = course.intakeQuestions[nextStep];
       const next: CourseDocument = {
         ...course,
         preferences,
@@ -391,12 +448,12 @@ export class CourseService {
         approvedPreferences: null,
         preferencesApprovedAt: null,
         draftVersion: null,
-        suggestions: nextQuestion?.suggestions ?? [],
+        suggestions: nextStep < 6 ? reply.suggestions : [],
         messages: [
           ...messages,
           {
             role: 'tutor',
-            text: nextQuestion?.question ?? course.intakeClosing ?? reply.message,
+            text: reply.message,
             channel: 'text',
           },
         ],
@@ -1008,6 +1065,14 @@ function intakeLanguageName(code: string) {
   const native = new Intl.DisplayNames([code], { type: 'language' }).of(code) ?? code;
   return `${english} (${native}; ${code})`;
 }
+function courseSpokenQuestion(question: string, language: string) {
+  return {
+    type: 'response.create' as const,
+    response: {
+      instructions: `Speak only in ${intakeLanguageName(language)}. Say exactly this teacher message, naturally and clearly, then stop and listen: ${JSON.stringify(question)}`,
+    },
+  };
+}
 function intakeQuestionsInstruction(code: string) {
   return `Create one short private-teacher interview in ${intakeLanguageName(code)}. The learner speaks this language. ALL user-visible question, suggestion and closing text must be in this language, not English unless it is English. Write exactly six distinct, conversational questions in this fixed order: 1) learning goal and preferred course direction, 2) previous experience with the target language, 3) age and reading comfort, 4) interests or situations worth practicing, 5) preferred learning style and course focus, 6) realistic minutes per lesson and days per week. Ask one question per turn. Each question must be a single brief sentence, ideally under 18 words, easy to say aloud in one breath, with no long lists, repeated topics, tests or jargon. The first question may include a brief greeting. Suggestions are optional very short replies in the same language. The closing should invite the learner to review the captured details. This is a bounded six-question conversation lasting only a few minutes. Do not ask a seventh question. Never assume three study days per week; respect the learner's stated availability. If revisionFeedback is present, correct it.`;
 }
@@ -1023,7 +1088,7 @@ function intakeAnswerInstruction(code: string, step: number) {
     'learning style and course focus',
     'lesson minutes and days per week',
   ];
-  return `Update only the ${topics[step]} fields of preferences from the learner's latest answer. Preserve EVERY other field exactly. Write any new free-text preference values in ${intakeLanguageName(code)}. Do not infer an age, level or availability the learner did not state. If the answer is unclear or declines to share, keep the prior value or unspecified. A range such as 1-2 days per week means at most 2 days, never 3; use the upper bound as daysPerWeek. The message field can be one short acknowledgment in the same language; suggestions must be empty and ready must be false because the server controls the next question. Do not ask a question or make a study-frequency recommendation.`;
+  return `Update only the ${topics[step]} fields of preferences from the learner's latest answer. Preserve EVERY other field exactly. Write any new free-text preference values in ${intakeLanguageName(code)}. Do not infer an age, level or availability the learner did not state. If the answer is unclear or declines to share, keep the prior value or unspecified. A range such as 1-2 days per week means at most 2 days, never 3; use the upper bound as daysPerWeek. ${step < 5 ? `In message, respond naturally to what the learner actually said and ask exactly one brief spoken question about ${topics[step + 1]}. Make the transition personal and conversational, without repeating the earlier scripted question verbatim or asking about another topic. Provide up to three short suggested replies in ${intakeLanguageName(code)}.` : `In message, briefly acknowledge the learner's answer and invite them to review their details. Ask no new question; suggestions=[].`} Keep ready=false because the server controls completion. Never make an unrequested study-frequency recommendation.`;
 }
 function intakeQuestionIssue(interview: z.infer<typeof intakeQuestionsSchema>, code: string) {
   const questions = interview.questions;

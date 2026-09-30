@@ -56,6 +56,11 @@ export function createCourseRoutes(service: CourseService, requireAccess: Reques
       ),
     }),
   );
+  router.post('/:id/realtime-session', async (req, res) =>
+    res.status(201).json({
+      realtime: await service.realtimeSession(req.gotitAuth!, parseInput(uuidSchema, req.params.id)),
+    }),
+  );
   router.post('/:id/turns', async (req, res) =>
     res.json({
       course: await service.turn(
