@@ -44,6 +44,7 @@ export type CoreAuthenticatedIdentity = {
   applicationId: string;
   applicationUserId: string;
   role: 'user' | 'admin';
+  verifiedEmail?: string;
 };
 
 type FetchLike = typeof fetch;
@@ -120,6 +121,9 @@ export class CoreAuthClient {
       applicationId: parsed.data.user.applicationId,
       applicationUserId: parsed.data.user.id,
       role: parsed.data.user.role,
+      ...(parsed.data.user.emailVerified && parsed.data.user.email
+        ? { verifiedEmail: parsed.data.user.email }
+        : {}),
     };
   }
 

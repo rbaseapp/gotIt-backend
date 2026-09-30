@@ -1,4 +1,4 @@
-# GotIt Backend
+﻿# GotIt Backend
 
 Independent Node 24 / TypeScript / Express product service. Core validates Bearer
 tokens; GotIt owns learning behavior and persists in `product_gotit` using trusted
@@ -9,12 +9,13 @@ remain unchanged.
 
 `src/server.ts` constructs the services, `src/app.ts` creates Express and
 [src/routes.ts](src/routes.ts) mounts all module routers. The old root-level
-`app.ts` is excluded from the build. Public `GET /api/v1` lists **68 product
+`app.ts` is excluded from the build. Public `GET /api/v1` lists **73 product
 routes** from [api-catalog.ts](src/shared/http/api-catalog.ts).
 
 | Prefix under /api/v1                      | Behavior                                                                                           |
 | ----------------------------------------- | -------------------------------------------------------------------------------------------------- |
 | /profile, /capabilities                   | Languages, interests, learning preferences and configured capabilities                             |
+| /notifications                            | Channel consent, push subscription and delivery capability                                         |
 | /captures                                 | Manual/provider preview, sense decisions, atomic save and original replay                          |
 | /learning-items, /tags                    | Filtered library, edits, bulk actions, restore, mastery, translations, contexts, examples and tags |
 | /word-packs                               | Leveled topic catalog, safe library installation/removal and pack-scoped learning                  |
@@ -46,7 +47,7 @@ GotIt-owned increments in `migrations/` use
 `gotit_migrations.pgmigrations` and the shared migration advisory lock. They add
 capture/practice/reading receipts, semantic evidence revisions, learning
 preferences, `practice_exercises`, `api_rate_limits`, and a versioned topic/level
-word-pack catalog, lesson evidence, personal courses/homework and add-on cycles. The resulting product schema has **42 tables**. The eight historical
+word-pack catalog, lesson evidence, personal courses/homework, add-on cycles and notifications. The resulting product schema has **45 tables**. The eight historical
 GotIt migrations in Core remain immutable.
 
 For existing databases, first take a backup and review baseline/normalization
@@ -240,6 +241,42 @@ catalog, provisioner and migration plan for current subscribers are ready. Enabl
 the flag without current grants fails closed with `402 ADDON_REQUIRED`.
 
 ## HTTP, deployment and verification
+
+### Practice reminders and system messages
+
+`GET/PATCH /api/v1/notifications/preferences` manages four independent, initially
+disabled email/push consents and a local reminder hour (0–23). The user's profile
+IANA timezone supplies the calendar day. Email opt-in requires a verified address
+returned by Core. `GET /api/v1/notifications/config` reports provider availability
+and the public VAPID key. Authenticated `POST/DELETE /api/v1/notifications/push-subscriptions`
+manage browser endpoints. The Web settings page registers a service worker only
+when the user enables push.
+
+The web process checks every minute. It queues one reminder per local day and channel
+when a review is due and no non-skipped practice attempt exists that day. If the
+chosen local hour is skipped by daylight saving time or the service was down at
+that hour, it sends at the next run later that day. The database uniqueness key
+prevents repeated local hours from queuing duplicates. Internal callers can enqueue
+a system message with a stable event key through `NotificationService.queueSystem`;
+no automatic system event producer is currently connected.
+
+SMTP and standards-based Web Push are optional transport adapters. Configure
+`NOTIFICATION_SMTP_HOST`, `NOTIFICATION_SMTP_PORT`,
+`NOTIFICATION_EMAIL_FROM`, and, when authentication is required,
+`NOTIFICATION_SMTP_USER` plus `NOTIFICATION_SMTP_PASSWORD`. Configure
+`NOTIFICATION_VAPID_SUBJECT` (a contact URL), `NOTIFICATION_VAPID_PUBLIC_KEY`,
+and `NOTIFICATION_VAPID_PRIVATE_KEY` for push. Generate the VAPID pair with the
+provider's tooling and keep the private key server-side. No values are bundled.
+An unconfigured channel cannot be enabled through the API. The deployment must
+apply migration `1790800002000_notifications` with the separate migrator before
+starting the new backend; it adds three product tables and requires runtime table
+grants. The web app and backend need HTTPS for browser push.
+
+Delivery rows are claimed with a bounded lease. Explicit push rate-limit responses
+are retried with exponential delay up to five attempts. A timeout, partial push batch or
+expired lease is marked `uncertain` and is not automatically retried, preventing
+an ambiguous send from being duplicated. Failed and uncertain rows require
+operator inspection; no real provider acceptance is claimed by local tests.
 
 Cross-origin browser clients require exact `CORS_ORIGINS` for the Web site and Chrome
 extension. Same-origin requests, including the backend-hosted private-lesson demo, are

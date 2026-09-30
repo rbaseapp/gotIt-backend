@@ -1,5 +1,8 @@
 import { ProfileRepository } from './modules/profile/profile.repository.js';
 import { ProfileService } from './modules/profile/profile.service.js';
+import { NotificationRepository } from './modules/notifications/notification.repository.js';
+import { NotificationService } from './modules/notifications/notification.service.js';
+import { createNotificationSender } from './modules/notifications/notification.providers.js';
 import { CaptureRepository } from './modules/capture/capture.repository.js';
 import { CaptureService } from './modules/capture/capture.service.js';
 import { createEnrichment } from './modules/enrichment/enrichment.config.js';
@@ -114,6 +117,25 @@ const coreAuthClient = new CoreAuthClient({
 
 const profileRepository = new ProfileRepository(pool);
 const profileService = new ProfileService(profileRepository);
+const notificationRepository = new NotificationRepository(pool);
+const notificationService = new NotificationService(
+  notificationRepository,
+  profileService,
+  createNotificationSender(
+    {
+      smtpHost: env.NOTIFICATION_SMTP_HOST,
+      smtpPort: env.NOTIFICATION_SMTP_PORT,
+      smtpUser: env.NOTIFICATION_SMTP_USER,
+      smtpPassword: env.NOTIFICATION_SMTP_PASSWORD,
+      emailFrom: env.NOTIFICATION_EMAIL_FROM,
+      vapidSubject: env.NOTIFICATION_VAPID_SUBJECT,
+      vapidPublicKey: env.NOTIFICATION_VAPID_PUBLIC_KEY,
+      vapidPrivateKey: env.NOTIFICATION_VAPID_PRIVATE_KEY,
+    },
+    notificationRepository,
+  ),
+  env.NOTIFICATION_VAPID_PUBLIC_KEY,
+);
 const enrichment = createEnrichment(env);
 const learningPolicy = policySchema.parse(
   env.LEARNING_POLICY_JSON ? JSON.parse(env.LEARNING_POLICY_JSON) : {},
@@ -226,6 +248,7 @@ const app = createApp({
   logger,
   coreAuthClient,
   profileService,
+  notificationService,
   captureService,
   libraryService: new LibraryRepository(pool, learningPolicy),
   practiceService,
@@ -274,6 +297,22 @@ const cleanup = setInterval(() => {
   void rateLimiter.cleanup().catch(() => logger.warn('Request limit cleanup failed'));
 }, 60000);
 cleanup.unref();
+let notificationRunActive = false;
+const runNotifications = async () => {
+  if (draining || notificationRunActive) return;
+  notificationRunActive = true;
+  try {
+    const result = await notificationService.run();
+    if (result.queued || result.processed) logger.info(result, 'Notification cycle completed');
+  } catch {
+    logger.error('Notification cycle failed');
+  } finally {
+    notificationRunActive = false;
+  }
+};
+const notificationTimer = setInterval(() => void runNotifications(), 60000);
+notificationTimer.unref();
+void runNotifications();
 server.on('error', () => {
   logger.fatal('HTTP listener failed');
   void pool.end().finally(() => process.exit(1));
@@ -283,6 +322,7 @@ async function shutdown(signal: string) {
   if (draining) return;
   draining = true;
   clearInterval(cleanup);
+  clearInterval(notificationTimer);
   logger.info({ signal }, 'Shutting down GotIt backend');
   const deadline = setTimeout(() => {
     server.closeAllConnections();
