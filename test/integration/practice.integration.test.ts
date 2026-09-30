@@ -1027,7 +1027,7 @@ test(
             client.release();
           }
           const inspection = await inspectProduction(db.runtimePool.options.connectionString);
-          assert.equal(inspection.productTableCount, 45);
+          assert.equal(inspection.productTableCount, 47);
           assert.deepEqual(inspection.v1, {
             learningRevision: true,
             captureReceipts: true,
@@ -1442,6 +1442,16 @@ test(
           const migratorUrl = adminUrl.replace('://postgres@', '://gotit_migrator@');
           const { migrate } = await import(
             new URL('../../scripts/migrate.js', import.meta.url).href
+          );
+          await db.adminPool.query('REVOKE REFERENCES ON TABLE core.application_users FROM gotit_migrator');
+          await db.adminPool.query('REVOKE USAGE ON SCHEMA core FROM gotit_migrator');
+          assert.equal(
+            (
+              await db.adminPool.query(
+                "SELECT has_schema_privilege('gotit_migrator','core','USAGE') AS core_usage",
+              )
+            ).rows[0].core_usage,
+            false,
           );
           await migrate(migratorUrl, 'down');
           await migrate(migratorUrl, 'up');

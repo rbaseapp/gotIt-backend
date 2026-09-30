@@ -8,6 +8,7 @@ export const API_ROUTES = [
   ['DELETE', '/notifications/push-subscriptions'],
   ['GET', '/capabilities'],
   ['GET', '/addons/status'],
+  ['GET', '/private-lesson-minutes'],
   ['POST', '/captures/preview'],
   ['POST', '/captures'],
   ['GET', '/learning-items'],

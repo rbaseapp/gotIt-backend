@@ -13,6 +13,7 @@ import type { WordPackRepository } from '../../modules/word-packs/word-packs.rep
 import type { PrivateLessonService } from '../../modules/private-lessons/private-lesson.service.js';
 import type { CourseService } from '../../modules/courses/course.service.js';
 import type { AddonAccessContract } from '../../modules/addons/addon-access.js';
+import type { MinuteWallet } from '../../modules/private-lessons/minute-wallet.js';
 import type { NotificationService } from '../../modules/notifications/notification.service.js';
 
 export type AppDependencies = {
@@ -31,6 +32,7 @@ export type AppDependencies = {
   privateLessonService?: PrivateLessonService;
   courseService?: CourseService;
   addonAccess?: AddonAccessContract;
+  minuteWallet?: MinuteWallet;
   enforceAddonEntitlements?: boolean;
   notificationService?: NotificationService;
   enforcePaidEntitlements?: boolean;

@@ -42,6 +42,7 @@ import {
 import { OpenAiPrivateLessonSummaryGenerator } from './modules/private-lessons/private-lesson.summary.js';
 import { PostgresPrivateLessonProficiencyStore } from './modules/private-lessons/private-lesson.proficiency.js';
 import { PostgresAddonAccess } from './modules/addons/addon-access.js';
+import { PostgresMinuteWallet } from './modules/private-lessons/minute-wallet.js';
 
 const logger = createLogger(env.LOG_LEVEL);
 const pool = createPool(env.DATABASE_URL);
@@ -114,6 +115,7 @@ const coreAuthClient = new CoreAuthClient({
   applicationKey: env.CORE_APPLICATION_KEY,
   timeoutMs: env.CORE_AUTH_TIMEOUT_MS,
 });
+const minuteWallet = new PostgresMinuteWallet(pool, coreAuthClient);
 
 const profileRepository = new ProfileRepository(pool);
 const profileService = new ProfileService(profileRepository);
@@ -244,6 +246,7 @@ const privateLessonService = new PrivateLessonService({
       )
     : undefined,
   lessonAccess: env.ENFORCE_ADDON_ENTITLEMENTS ? addonAccess : undefined,
+  minuteWallet,
 });
 const rateLimiter = new PostgresRateLimiter(pool);
 const readingGenerator =
@@ -274,6 +277,7 @@ const app = createApp({
   privateLessonService,
   courseService,
   addonAccess,
+  minuteWallet,
   enforceAddonEntitlements: env.ENFORCE_ADDON_ENTITLEMENTS,
   wordPackService: new WordPackRepository(pool),
   enforcePaidEntitlements: env.ENFORCE_PAID_ENTITLEMENTS,

@@ -47,7 +47,7 @@ GotIt-owned increments in `migrations/` use
 `gotit_migrations.pgmigrations` and the shared migration advisory lock. They add
 capture/practice/reading receipts, semantic evidence revisions, learning
 preferences, `practice_exercises`, `api_rate_limits`, and a versioned topic/level
-word-pack catalog, lesson evidence, personal courses/homework, add-on cycles and notifications. The resulting product schema has **45 tables**. The eight historical
+word-pack catalog, lesson evidence, personal courses/homework, add-on cycles, notifications and a private lesson minute wallet. The resulting product schema has **47 tables**. The eight historical
 GotIt migrations in Core remain immutable.
 
 For existing databases, first take a backup and review baseline/normalization
@@ -205,15 +205,31 @@ fabricate audio or scores.
 
 Paid entitlement enforcement is enabled by default. A new account receives the Core-managed 14-day Pro trial; an active subscription keeps all learning capabilities open. After both trial and paid access end, dashboard and saved vocabulary remain readable while capture, library mutations, imports, games, AI reading generation, speech, and pronunciation return `402 SUBSCRIPTION_REQUIRED`. AI reading generation is limited to one successful creation across the entire trial and four per UTC calendar month for paid accounts. AI translation in the browser extension requires a paid account. GotIt never accepts or stores card data.
 
-### Separate add-on entitlements (Trello 1sAsIoNg)
+### AI tutor minute wallet
 
-Core currently has one GotIt subscription per user. Its Pro plan bundles word learning and
-AI entitlements; the existing charge and trial are unchanged. GotIt now has a separate,
-disabled-by-default add-on layer. `ENFORCE_ADDON_ENTITLEMENTS=true` requires a current
-`ai` cycle for AI reading, speech, pronunciation, AI translation and courses, and a
-current `private_lessons` cycle for the voice lesson API. Base word learning still uses
-Core's `vocabulary.write` and `practice.play` entitlements. Both base access and the
-relevant add-on are required. The add-on status endpoint is `GET /api/v1/addons/status`.
+Core maps the seven Paddle prices to six prepaid tutor subscriptions and one
+60-minute one-time purchase. A monthly Tutor 60 subscription grants 60 minutes;
+quarterly and yearly versions grant 180 and 720 minutes for their full billing
+period. Tutor 3×/Week grants 195, 585 or 2340 minutes respectively. Core exposes
+only grants backed by an active subscription or a completed one-time transaction
+through authenticated `GET /api/v1/billing/minute-grants`. The product runtime
+has no direct access to Core billing tables.
+
+`GET /api/v1/private-lesson-minutes` reports the current balance. A voice session
+reserves its selected duration (1, 5, 10, 15 or 20 minutes) atomically across
+the grants that expire first. Retries do not reserve twice. A failed session
+creation returns its minutes; an opened session retains its reservation even if
+it ends early or the report fails. Subscription minutes expire at the end of the
+paid term; one-time minutes expire one year after purchase. Grants are reconciled
+from Core on each balance or reservation request, including revocation. The
+Core catalog migration must run before the product migration and backend release.
+
+### Legacy add-on entitlements
+
+The previous add-on cycle scaffold remains inactive. `ENFORCE_ADDON_ENTITLEMENTS`
+continues to control the separate AI add-on gate when enabled; private voice
+lessons use the minute wallet above. Its status endpoint remains
+`GET /api/v1/addons/status`.
 
 `product_gotit.addon_packages` contains an inactive AI option and inactive monthly
 lesson options of 2, 4, 8 and 12. Lesson duration is NULL until approved; an active

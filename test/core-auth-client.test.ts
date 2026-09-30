@@ -75,6 +75,31 @@ test('CoreAuthClient loads billing entitlements from the application-scoped Core
   assert.deepEqual(status.entitlements, ['reading.ai', 'speech.audio']);
 });
 
+test('CoreAuthClient accepts scoped minute grants and rejects a malformed grant', async () => {
+  let seenUrl = '';
+  let seenToken = '';
+  const grant = { sourceKind: 'purchase', sourceId: 'txn_' + 'a'.repeat(26),
+    startsAt: '2030-01-01T00:00:00.000Z', endsAt: '2031-01-01T00:00:00.000Z', secondsTotal: 3600 };
+  const client = new CoreAuthClient({
+    baseUrl: 'https://core.example.test', applicationKey: 'gotit', timeoutMs: 1000,
+    fetchImpl: async (input, init) => {
+      seenUrl = String(input);
+      seenToken = new Headers(init?.headers).get('authorization') ?? '';
+      return Response.json({ grants: [grant] });
+    },
+  });
+  assert.deepEqual((await client.getMinuteGrants('access-token')).grants, [grant]);
+  assert.equal(seenUrl, 'https://core.example.test/api/v1/billing/minute-grants');
+  assert.equal(seenToken, 'Bearer access-token');
+
+  const malformed = new CoreAuthClient({
+    baseUrl: 'https://core.example.test', applicationKey: 'gotit', timeoutMs: 1000,
+    fetchImpl: async () => Response.json({ grants: [{ ...grant, secondsTotal: -1 }] }),
+  });
+  await assert.rejects(() => malformed.getMinuteGrants('access-token'),
+    (error: unknown) => error instanceof AppError && error.code === 'CORE_BILLING_INVALID_RESPONSE');
+});
+
 test('CoreAuthClient maps invalid Core token to 401', async () => {
   const client = new CoreAuthClient({
     baseUrl: 'https://core.example.test',

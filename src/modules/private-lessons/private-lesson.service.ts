@@ -3,6 +3,7 @@ import { childCourseTeacherVoice, privateLessonTeachers } from './private-lesson
 import { z } from 'zod';
 import { AppError } from '../../shared/errors/app-error.js';
 import type { AddonAccessContract } from '../addons/addon-access.js';
+import type { MinuteWallet } from './minute-wallet.js';
 import {
   ProviderHttpError,
   providerFailureCode,
@@ -95,6 +96,7 @@ export type PrivateLessonServiceOptions = {
   durationSeconds?: number;
   requestTimeoutMs?: number;
   lessonAccess?: AddonAccessContract;
+  minuteWallet?: MinuteWallet;
 };
 
 export class PrivateLessonService {
@@ -125,7 +127,7 @@ export class PrivateLessonService {
     };
   }
 
-  async createSession(scope: ProfileScope, input: PrivateLessonInput) {
+  async createSession(scope: ProfileScope, input: PrivateLessonInput, accessToken?: string) {
     if (!this.options.apiKey)
       throw new AppError(
         503,
@@ -237,7 +239,11 @@ export class PrivateLessonService {
     if (childCourse)
       plan = { ...plan, teacherVoice: childCourseTeacherVoice, correctionMode: 'recast' };
     let reservedLessonId: string | null = null;
-    if (this.options.lessonAccess && (scope as ProfileScope & { role?: string }).role !== 'admin') {
+    if (this.options.minuteWallet && (scope as ProfileScope & { role?: string }).role !== 'admin') {
+      if (!accessToken) throw new AppError(401, 'UNAUTHORIZED', 'Access token is required');
+      await this.options.minuteWallet.reserve(scope, plan.id, plan.durationSeconds, accessToken);
+      reservedLessonId = plan.id;
+    } else if (this.options.lessonAccess && (scope as ProfileScope & { role?: string }).role !== 'admin') {
       const allowance = await this.options.lessonAccess.reserveLesson(scope, plan.id);
       reservedLessonId = plan.id;
       plan = { ...plan, durationSeconds: allowance.lessonDurationSeconds! };
@@ -372,7 +378,10 @@ export class PrivateLessonService {
         },
       };
     } catch (error) {
-      if (reservedLessonId) await this.options.lessonAccess!.releaseLesson(reservedLessonId);
+      if (reservedLessonId) {
+        if (this.options.minuteWallet) await this.options.minuteWallet.release(reservedLessonId);
+        else await this.options.lessonAccess!.releaseLesson(reservedLessonId);
+      }
       throw privateLessonProviderError(error, controller.signal.aborted);
     } finally {
       if (timeout) clearTimeout(timeout);

@@ -50,6 +50,7 @@ import {
 import { PostgresPrivateLessonRoadmapStore } from '../src/modules/private-lessons/private-lesson.roadmap.js';
 import { taskLevelForPlan } from '../src/modules/private-lessons/private-lesson.assessment.js';
 import type { AddonAccessContract } from '../src/modules/addons/addon-access.js';
+import type { MinuteWallet } from '../src/modules/private-lessons/minute-wallet.js';
 
 test('lesson history accepts a scoped course filter and rejects invalid IDs', () => {
   const courseId = '10000000-0000-4000-8000-000000000001';
@@ -340,6 +341,38 @@ test('private lesson uses approved add-on duration and releases a failed session
   );
   assert.equal(reserved.length, 2);
   assert.deepEqual(released, [reserved[1]]);
+});
+
+test('private lesson reserves its selected minute duration and releases it only when opening fails', async () => {
+  const reservations: Array<{ id: string; seconds: number; token: string }> = [];
+  const releases: string[] = [];
+  const minuteWallet: MinuteWallet = {
+    async balance() { return { secondsTotal: 3600, secondsUsed: 0, secondsRemaining: 3600, expiresAt: null }; },
+    async reserve(_scope, id, seconds, token) { reservations.push({ id, seconds, token }); },
+    async release(id) { releases.push(id); },
+  };
+  const options = {
+    apiKey: 'server-secret', model: 'gpt-realtime-test', voice: 'marin',
+    transcriptionModel: 'gpt-transcribe-test', profiles, vocabulary, minuteWallet,
+  };
+  const successful = new PrivateLessonService({ ...options,
+    fetchImpl: async () => new Response(JSON.stringify({ value: 'ek_demo' }), { status: 200 }),
+  });
+  const opened = await successful.createSession(identity, {
+    targetLanguageCode: 'en', requestedDurationMinutes: 20,
+  }, 'trusted-token');
+  assert.equal(opened.lesson.durationSeconds, 1200);
+  assert.deepEqual(reservations.map(({ seconds, token }) => [seconds, token]), [[1200, 'trusted-token']]);
+  assert.deepEqual(releases, []);
+
+  const failing = new PrivateLessonService({ ...options,
+    fetchImpl: async () => { throw new Error('provider unavailable'); },
+  });
+  await assert.rejects(failing.createSession(identity, {
+    targetLanguageCode: 'en', requestedDurationMinutes: 5,
+  }, 'trusted-token'), (error: any) => error.code === 'PRIVATE_LESSON_PROVIDER_UPSTREAM');
+  assert.deepEqual(reservations.map(({ seconds }) => seconds), [1200, 300]);
+  assert.deepEqual(releases, [reservations[1]!.id]);
 });
 
 test('private lesson creates a bounded personalized Realtime session', async () => {

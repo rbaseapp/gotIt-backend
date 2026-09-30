@@ -45,7 +45,7 @@ export const privateLessonInputSchema = z
     teachingLanguage: z.enum(privateLessonTeachingLanguages).optional(),
     requestedLevel: z.enum(CEFR_LEVELS).optional(),
     requestedDurationMinutes: z
-      .union([z.literal(1), z.literal(5), z.literal(10), z.literal(15)])
+      .union([z.literal(1), z.literal(5), z.literal(10), z.literal(15), z.literal(20)])
       .optional(),
     teacherVoice: z.enum(['female', 'male']).optional(),
     speechRate: z.enum(privateLessonSpeechRates).optional(),
@@ -89,7 +89,7 @@ export const privateLessonPreferencesInputSchema = z
     supportLanguageCode: languageSchema.nullable(),
     lessonMode: z.enum(privateLessonModes).default('standard'),
     teachingLanguage: z.enum(privateLessonTeachingLanguages).optional(),
-    requestedDurationMinutes: z.union([z.literal(1), z.literal(5), z.literal(10), z.literal(15)]),
+    requestedDurationMinutes: z.union([z.literal(1), z.literal(5), z.literal(10), z.literal(15), z.literal(20)]),
     teacherVoice: z.enum(['female', 'male']),
     speechRate: z.enum(privateLessonSpeechRates),
     focusAreas: z

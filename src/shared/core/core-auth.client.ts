@@ -37,6 +37,16 @@ const billingStatusSchema = z.object({
     })
     .nullable(),
 });
+const minuteGrantsSchema = z.object({
+  grants: z.array(z.object({
+    sourceKind: z.enum(['subscription', 'purchase']),
+    sourceId: z.string().min(1),
+    startsAt: z.string().datetime({ offset: true }),
+    endsAt: z.string().datetime({ offset: true }),
+    secondsTotal: z.number().int().positive(),
+  })),
+});
+export type CoreMinuteGrants = z.infer<typeof minuteGrantsSchema>;
 
 export type CoreBillingStatus = z.infer<typeof billingStatusSchema>;
 
@@ -160,6 +170,28 @@ export class CoreAuthClient {
         'CORE_BILLING_INVALID_RESPONSE',
         'Billing service returned an invalid response',
       );
+    return parsed.data;
+  }
+
+  async getMinuteGrants(accessToken: string): Promise<CoreMinuteGrants> {
+    let response: Response;
+    try {
+      response = await (this.options.fetchImpl ?? fetch)(
+        new URL('/api/v1/billing/minute-grants', this.options.baseUrl), {
+          headers: { authorization: `Bearer ${accessToken}`, 'x-application-key': this.options.applicationKey },
+          signal: AbortSignal.timeout(this.options.timeoutMs),
+        },
+      );
+    } catch {
+      throw new AppError(503, 'CORE_BILLING_UNAVAILABLE', 'Billing service is unavailable');
+    }
+    if (response.status === 401 || response.status === 403)
+      throw new AppError(401, 'UNAUTHORIZED', 'Invalid or expired access token');
+    if (!response.ok)
+      throw new AppError(503, 'CORE_BILLING_UNAVAILABLE', 'Billing service is unavailable');
+    const parsed = minuteGrantsSchema.safeParse(await response.json().catch(() => undefined));
+    if (!parsed.success)
+      throw new AppError(503, 'CORE_BILLING_INVALID_RESPONSE', 'Billing service returned an invalid response');
     return parsed.data;
   }
 }

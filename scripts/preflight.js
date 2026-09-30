@@ -82,6 +82,13 @@ export async function verifyRuntimeSchema(client, { strictRole = true } = {}) {
       'revoked_at',
     ],
     addon_lesson_reservations: ['lesson_id', 'cycle_id', 'reserved_at', 'released_at'],
+    private_lesson_minute_grants: [
+      'application_id', 'application_user_id', 'source_kind', 'source_id',
+      'starts_at', 'ends_at', 'seconds_total', 'seconds_used', 'revoked_at',
+    ],
+    private_lesson_minute_reservations: [
+      'lesson_id', 'grant_id', 'seconds_reserved', 'released_at',
+    ],
     private_lesson_sessions: [
       'id',
       'application_id',

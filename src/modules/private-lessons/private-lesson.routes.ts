@@ -50,6 +50,7 @@ export function createPrivateLessonRoutes(
       ...(await service.createSession(
         request.gotitAuth!,
         parseInput(privateLessonInputSchema, request.body),
+        request.gotitCoreAccessToken,
       )),
       requestId: request.id,
     });

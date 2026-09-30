@@ -131,7 +131,9 @@ export function createRoutes(dependencies: AppDependencies) {
         'reading.ai',
         dependencies.enforcePaidEntitlements === true,
       );
-  const requireLesson = dependencies.enforceAddonEntitlements
+  const requireLesson = dependencies.minuteWallet
+    ? (_req: import('express').Request, _res: import('express').Response, next: import('express').NextFunction) => next()
+    : dependencies.enforceAddonEntitlements
     ? requireBoth(
         requirePractice,
         createRequireAddonMiddleware(dependencies.addonAccess!, 'private_lessons'),
@@ -159,6 +161,10 @@ export function createRoutes(dependencies: AppDependencies) {
       res.json({ enabled: true, ai, privateLessons, requestId: req.id });
     },
   );
+  if (dependencies.minuteWallet)
+    router.get('/api/v1/private-lesson-minutes', async (req, res) => {
+      res.json({ ...(await dependencies.minuteWallet!.balance(req.gotitAuth!, req.gotitCoreAccessToken!)), requestId: req.id });
+    });
   router.get('/api/v1/capabilities', async (req, res) => {
     const profile = await dependencies.profileService.getProfile(req.gotitAuth!);
     res.json({

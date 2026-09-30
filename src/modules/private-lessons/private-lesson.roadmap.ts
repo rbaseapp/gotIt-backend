@@ -23,7 +23,7 @@ export type PrivateLessonPreferences = Pick<
   | 'customFocus'
   | 'correctionMode'
   | 'vocabularyMode'
-> & { requestedDurationMinutes: 1 | 5 | 10 | 15; teachingLanguage: 'target' | 'support' };
+> & { requestedDurationMinutes: 1 | 5 | 10 | 15 | 20; teachingLanguage: 'target' | 'support' };
 
 export type PrivateLessonMilestone = {
   id: string;
@@ -94,7 +94,7 @@ export class PostgresPrivateLessonRoadmapStore implements PrivateLessonRoadmapSt
         typeof row.support_language_code === 'string' ? row.support_language_code : null,
       lessonMode: row.lesson_mode === 'absolute_beginner' ? 'absolute_beginner' : 'standard',
       teachingLanguage: row.teaching_language === 'support' ? 'support' : 'target',
-      requestedDurationMinutes: Number(row.requested_duration_minutes) as 1 | 5 | 10 | 15,
+      requestedDurationMinutes: Number(row.requested_duration_minutes) as 1 | 5 | 10 | 15 | 20,
       teacherVoice: row.teacher_voice,
       speechRate: row.speech_rate,
       focusAreas: row.focus_areas,
@@ -110,7 +110,7 @@ export class PostgresPrivateLessonRoadmapStore implements PrivateLessonRoadmapSt
       supportLanguageCode: plan.supportLanguageCode,
       lessonMode: plan.lessonMode,
       teachingLanguage: plan.teachingLanguage,
-      requestedDurationMinutes: Math.round(plan.durationSeconds / 60) as 1 | 5 | 10 | 15,
+      requestedDurationMinutes: Math.round(plan.durationSeconds / 60) as 1 | 5 | 10 | 15 | 20,
       teacherVoice: plan.teacherVoice,
       speechRate: plan.speechRate,
       correctionMode: plan.correctionMode,
