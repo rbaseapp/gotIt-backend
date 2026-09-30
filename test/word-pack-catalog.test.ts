@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { reviewedPacks } from '../migrations/data/word-pack-expansion.js';
 // Keep declarations outside the migrations directory: the runner loads every file there.
-const migrationPath = '../migrations/1789488020000_word-pack-catalog-expansion.js';
+const migrationPath = '../migrations/1790800001000_word-pack-catalog-expansion.js';
 const { up, down } = (await import(migrationPath)) as {
   up(pgm: { sql(statement: string): void }): void;
   down(pgm: { sql(statement: string): void }): void;
