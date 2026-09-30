@@ -23,7 +23,7 @@ and [`payment`](https://en.wiktionary.org/wiki/%D7%AA%D7%A9%D7%9C%D7%95%D7%9D)
 resolve gaps in the English translation tables. Example sentences were left
 empty because none were separately reviewed.
 
-The product language picker exposes 29 language codes, including regional
+The product language picker exposes 30 language codes, including regional
 Portuguese and Chinese variants. The interface itself has 8 translations.
 Neither set means that word-pack translations exist for those languages.
 For every learning direction other than English → Hebrew, content still needs
