@@ -5,7 +5,6 @@ export const addSchema = z
   .object({
     entryIds: z
       .array(uuidSchema)
-      .min(1)
       .max(100)
       .refine((ids) => new Set(ids).size === ids.length, 'Duplicate entries'),
   })

@@ -304,6 +304,29 @@ test(
           ).expect(200);
           assert.equal(packLibrary.body.items.length, 11);
 
+          const remainingIds = selectedEntries.slice(1).map((entry: { id: string }) => entry.id);
+          await packCall('post', `/word-packs/${pack.id}/add`, {
+            entryIds: remainingIds,
+          }).expect(201);
+          let selection = await packCall('get', `/word-packs/${pack.id}`).expect(200);
+          assert.equal(selection.body.pack.progress.linked, 10);
+          assert.ok(selection.body.entries[0].excludedAt);
+          await packCall('post', `/word-packs/${pack.id}/add`, { entryIds: [] }).expect(201);
+          selection = await packCall('get', `/word-packs/${pack.id}`).expect(200);
+          assert.equal(selection.body.pack.progress.linked, 0);
+          assert.equal(
+            selection.body.entries.filter(
+              (entry: { excludedAt: string | null; learningItemId: string | null }) =>
+                !entry.excludedAt && entry.learningItemId,
+            ).length,
+            0,
+          );
+          await packCall('post', `/word-packs/${pack.id}/add`, {
+            entryIds: selectedEntries.map((entry: { id: string }) => entry.id),
+          }).expect(201);
+          selection = await packCall('get', `/word-packs/${pack.id}`).expect(200);
+          assert.equal(selection.body.pack.progress.linked, 11);
+
           const knownEntry = selectedEntries[0].id as string;
           await packCall('put', `/word-packs/${pack.id}/known`, {
             entryIds: [knownEntry],

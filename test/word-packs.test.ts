@@ -110,9 +110,9 @@ test('word pack removal defaults to safe archival and supports keeping words', (
   assert.equal(removalSchema.parse({ mode: 'keep_words' }).mode, 'keep_words');
 });
 
-test('word pack additions require a unique, non-empty entry selection', () => {
+test('word pack selection accepts empty to remove the last selected word', () => {
   assert.equal(addSchema.safeParse({ entryIds: [id] }).success, true);
-  assert.equal(addSchema.safeParse({ entryIds: [] }).success, false);
+  assert.equal(addSchema.safeParse({ entryIds: [] }).success, true);
   assert.equal(addSchema.safeParse({ entryIds: [id, id] }).success, false);
 });
 
