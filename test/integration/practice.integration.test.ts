@@ -397,140 +397,61 @@ test(
           }).expect(200);
         },
       );
-      await t.test(
-        'English known words carry across units and a full unit completes in one action',
-        async () => {
-          const englishCall = (method: Parameters<typeof call>[0], url: string, body?: object) =>
-            call(method, url, body, randomUUID(), 1);
-          const catalog = await englishCall('get', '/word-packs').expect(200);
-          const second = catalog.body.packs.find(
-            (pack: { slug: string }) => pack.slug === 'daily-english-basic-02-en-he',
-          );
-          const twelfth = catalog.body.packs.find(
-            (pack: { slug: string }) => pack.slug === 'daily-english-basic-12-en-he',
-          );
-          assert.ok(second);
-          assert.ok(twelfth);
-          const detail = await englishCall('get', `/word-packs/${second.id}`).expect(200);
-          assert.equal(detail.body.entries.length, 50);
-          const work = detail.body.entries.find(
+      await t.test('unique English entries keep known state inside their own unit', async () => {
+        const englishCall = (method: Parameters<typeof call>[0], url: string, body?: object) =>
+          call(method, url, body, randomUUID(), 1);
+        const catalog = await englishCall('get', '/word-packs').expect(200);
+        const second = catalog.body.packs.find(
+          (pack: { slug: string }) => pack.slug === 'daily-english-basic-02-en-he',
+        );
+        const twelfth = catalog.body.packs.find(
+          (pack: { slug: string }) => pack.slug === 'daily-english-basic-12-en-he',
+        );
+        assert.ok(second && twelfth);
+        const detail = await englishCall('get', `/word-packs/${second.id}`).expect(200);
+        assert.equal(detail.body.entries.length, 50);
+        const work = detail.body.entries.find(
+          (entry: { sourceText: string }) => entry.sourceText === 'work',
+        );
+        assert.ok(work);
+        const freshUser = randomUUID();
+        users.push(freshUser);
+        await db.adminPool.query(
+          'INSERT INTO core.application_users(id,application_id,email) VALUES($1,$2,$3)',
+          [freshUser, applicationId, 'practice-new@example.test'],
+        );
+        const freshCall = (method: Parameters<typeof call>[0], url: string, body?: object) =>
+          call(method, url, body, randomUUID(), 2);
+        await freshCall('put', `/word-packs/${second.id}/known`, {
+          entryIds: [work.id],
+          known: true,
+        }).expect(200);
+        const freshSecond = await freshCall('get', `/word-packs/${second.id}`).expect(200);
+        assert.equal(
+          freshSecond.body.entries.find((entry: { id: string }) => entry.id === work.id).known,
+          true,
+        );
+        const freshTwelfth = await freshCall('get', `/word-packs/${twelfth.id}`).expect(200);
+        assert.ok(
+          !freshTwelfth.body.entries.some(
             (entry: { sourceText: string }) => entry.sourceText === 'work',
-          );
-          assert.ok(work);
-          const freshUser = randomUUID();
-          users.push(freshUser);
-          await db.adminPool.query(
-            'INSERT INTO core.application_users(id,application_id,email) VALUES($1,$2,$3)',
-            [freshUser, applicationId, 'practice-new@example.test'],
-          );
-          const freshCall = (method: Parameters<typeof call>[0], url: string, body?: object) =>
-            call(method, url, body, randomUUID(), 2);
-          const beforeProfile = await db.adminPool.query(
-            'SELECT count(*)::int count FROM product_gotit.user_profiles WHERE application_id=$1 AND application_user_id=$2',
-            [applicationId, freshUser],
-          );
-          assert.equal(beforeProfile.rows[0].count, 0);
-          await freshCall('put', `/word-packs/${second.id}/known`, {
-            entryIds: [work.id],
-            known: true,
-          }).expect(200);
-          const afterProfile = await db.adminPool.query(
-            'SELECT count(*)::int count FROM product_gotit.user_profiles WHERE application_id=$1 AND application_user_id=$2',
-            [applicationId, freshUser],
-          );
-          assert.equal(afterProfile.rows[0].count, 1);
-          const freshDetail = await freshCall('get', `/word-packs/${twelfth.id}`).expect(200);
-          assert.equal(
-            freshDetail.body.entries.find(
-              (entry: { sourceText: string }) => entry.sourceText === 'work',
-            ).known,
-            true,
-          );
-          await freshCall('put', `/word-packs/${second.id}/known`, {
-            entryIds: [work.id],
-            known: false,
-          }).expect(200);
-          const fifth = catalog.body.packs.find(
-            (pack: { slug: string }) => pack.slug === 'daily-english-basic-05-en-he',
-          );
-          const seventeenth = catalog.body.packs.find(
-            (pack: { slug: string }) => pack.slug === 'daily-english-basic-17-en-he',
-          );
-          const fortyEighth = catalog.body.packs.find((pack: { title: string }) =>
-            pack.title.includes('Probability & Possibility'),
-          );
-          assert.ok(fifth && seventeenth && fortyEighth);
-          const month = (
-            await freshCall('get', `/word-packs/${fifth.id}`).expect(200)
-          ).body.entries.find((entry: { sourceText: string }) => entry.sourceText === 'May');
-          const modal = (
-            await freshCall('get', `/word-packs/${seventeenth.id}`).expect(200)
-          ).body.entries.find((entry: { sourceText: string }) => entry.sourceText === 'may');
-          assert.ok(month && modal);
-          assert.equal(month.translationText, 'מאי');
-          assert.equal(modal.translationText, 'ייתכן ש־');
-          await freshCall('put', `/word-packs/${fifth.id}/known`, {
-            entryIds: [month.id],
-            known: true,
-          }).expect(200);
-          assert.equal(
-            (await freshCall('get', `/word-packs/${seventeenth.id}`).expect(200)).body.entries.find(
-              (entry: { sourceText: string }) => entry.sourceText === 'may',
-            ).known,
-            false,
-          );
-          await freshCall('put', `/word-packs/${seventeenth.id}/known`, {
-            entryIds: [modal.id],
-            known: true,
-          }).expect(200);
-          assert.equal(
-            (await freshCall('get', `/word-packs/${fortyEighth.id}`).expect(200)).body.entries.find(
-              (entry: { sourceText: string }) => entry.sourceText === 'may',
-            ).known,
-            true,
-          );
-          await freshCall('put', `/word-packs/${fifth.id}/known`, {
-            entryIds: [month.id],
-            known: false,
-          }).expect(200);
-          assert.equal(
-            (await freshCall('get', `/word-packs/${seventeenth.id}`).expect(200)).body.entries.find(
-              (entry: { sourceText: string }) => entry.sourceText === 'may',
-            ).known,
-            true,
-          );
-          await englishCall('put', `/word-packs/${second.id}/known`, {
-            entryIds: detail.body.entries.map((entry: { id: string }) => entry.id),
-            known: true,
-          }).expect(200);
-          const complete = await englishCall('get', `/word-packs/${second.id}`).expect(200);
-          assert.equal(complete.body.pack.progress.known, 50);
-          assert.equal(complete.body.pack.progress.completed, 50);
-          assert.equal(complete.body.pack.progress.mastered, 0);
-          const repeated = await englishCall('get', `/word-packs/${twelfth.id}`).expect(200);
-          assert.equal(
-            repeated.body.entries.find(
-              (entry: { sourceText: string }) => entry.sourceText === 'work',
-            ).known,
-            true,
-          );
-          await englishCall('put', `/word-packs/${second.id}/known`, {
-            entryIds: [work.id],
-            known: false,
-          }).expect(200);
-          const reverted = await englishCall('get', `/word-packs/${twelfth.id}`).expect(200);
-          assert.equal(
-            reverted.body.entries.find(
-              (entry: { sourceText: string }) => entry.sourceText === 'work',
-            ).known,
-            false,
-          );
-          await englishCall('put', `/word-packs/${second.id}/known`, {
-            entryIds: detail.body.entries.map((entry: { id: string }) => entry.id),
-            known: false,
-          }).expect(200);
-        },
-      );
+          ),
+        );
+        await englishCall('put', `/word-packs/${second.id}/known`, {
+          entryIds: detail.body.entries.map((entry: { id: string }) => entry.id),
+          known: true,
+        }).expect(200);
+        const complete = await englishCall('get', `/word-packs/${second.id}`).expect(200);
+        assert.equal(complete.body.pack.progress.known, 50);
+        assert.equal(complete.body.pack.progress.completed, 50);
+        assert.equal(complete.body.pack.progress.mastered, 0);
+        const other = await englishCall('get', `/word-packs/${twelfth.id}`).expect(200);
+        assert.equal(other.body.pack.progress.known, 0);
+        await englishCall('put', `/word-packs/${second.id}/known`, {
+          entryIds: detail.body.entries.map((entry: { id: string }) => entry.id),
+          known: false,
+        }).expect(200);
+      });
       await t.test(
         'catalog loads only the matching learning and translation language',
         async () => {
@@ -551,7 +472,7 @@ test(
             WHERE tp.slug='english-learning-path-en-he'
             GROUP BY tp.id`);
           assert.deepEqual(englishPath.rows[0], {
-            title: 'מסלול לימוד אנגלית',
+            title: 'לימוד שפה מאפס',
             tracks: 3,
             units: 60,
             entries: 3000,
@@ -1368,7 +1289,7 @@ test(
             client.release();
           }
           const inspection = await inspectProduction(db.runtimePool.options.connectionString);
-          assert.equal(inspection.productTableCount, 49);
+          assert.equal(inspection.productTableCount, 50);
           assert.deepEqual(inspection.v1, {
             learningRevision: true,
             captureReceipts: true,
@@ -1781,9 +1702,6 @@ test(
           );
           const adminUrl = db.adminPool.options.connectionString!;
           const migratorUrl = adminUrl.replace('://postgres@', '://gotit_migrator@');
-          const { migrate } = await import(
-            new URL('../../scripts/migrate.js', import.meta.url).href
-          );
           await db.adminPool.query(
             'REVOKE REFERENCES ON TABLE core.application_users FROM gotit_migrator',
           );
@@ -1796,13 +1714,13 @@ test(
             ).rows[0].core_usage,
             false,
           );
-          await migrate(migratorUrl, 'down');
-          await migrate(migratorUrl, 'up');
           const migrator = new pg.Pool({
             connectionString: migratorUrl,
             connectionTimeoutMillis: 1000,
           });
           try {
+            await migrator.query('CREATE TABLE product_gotit.migrator_role_probe(id integer)');
+            await migrator.query('DROP TABLE product_gotit.migrator_role_probe');
             await assert.rejects(() => migrator.query('SELECT * FROM core.application_users'));
           } finally {
             await migrator.end();

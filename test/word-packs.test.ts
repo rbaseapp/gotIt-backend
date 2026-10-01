@@ -3,6 +3,8 @@ import test from 'node:test';
 import blueprint from '../migrations/data/english-communication-blueprint.json' with { type: 'json' };
 import catalog from '../migrations/data/english-communication-en-he.json' with { type: 'json' };
 import senseCorrections from '../migrations/data/english-communication-sense-corrections.json' with { type: 'json' };
+import uniqueCatalog from '../migrations/data/english-unique-3000-en-he.json' with { type: 'json' };
+import { readFileSync } from 'node:fs';
 import { sessionSchema } from '../src/modules/practice/practice.validation.js';
 import {
   addSchema,
@@ -11,6 +13,39 @@ import {
 } from '../src/modules/word-packs/word-packs.validation.js';
 
 const id = '30000000-0000-4000-8000-000000000001';
+
+test('replacement English catalog matches the supplied 60 units without repeated words', () => {
+  const source = readFileSync(
+    new URL('../migrations/data/english-unique-3000-source.txt', import.meta.url),
+    'utf8',
+  );
+  const supplied = [...source.matchAll(/^Unit (\d+) — (.+)\r?\n([^\r\n]+)/gm)];
+  assert.equal(supplied.length, 60);
+  assert.equal(uniqueCatalog.length, 60);
+  const all: string[] = [];
+  for (const [index, unit] of uniqueCatalog.entries()) {
+    const [, number, name, words] = supplied[index]!;
+    assert.equal(unit.number, Number(number));
+    assert.equal(unit.name, name);
+    assert.equal(unit.entries.length, 50);
+    assert.deepEqual(
+      unit.entries.map(({ en }) => en),
+      words!.split(',').map((word) => word.trim()),
+    );
+    assert.ok(unit.entries.every(({ he }) => /[\u05d0-\u05ea]/u.test(he)));
+    all.push(...unit.entries.map(({ en }) => en.toLocaleLowerCase('en')));
+  }
+  assert.equal(all.length, 3000);
+  assert.equal(new Set(all).size, 3000);
+  assert.equal(
+    uniqueCatalog[4]!.entries.filter(({ en }) => en.toLocaleLowerCase('en') === 'may').length,
+    1,
+  );
+  assert.equal(
+    uniqueCatalog[16]!.entries.some(({ en }) => en.toLocaleLowerCase('en') === 'may'),
+    false,
+  );
+});
 
 test('English catalog keeps the supplied 60 named themes with 50 translated entries each', () => {
   assert.equal(catalog.length, 60);

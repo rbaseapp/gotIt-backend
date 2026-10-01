@@ -1,65 +1,52 @@
-# Daily English catalog (English for Hebrew speakers)
+# English learning path catalog
 
-The catalog adds three tracks to the existing word-pack API. Each track has exactly
-1,000 distinct English items in 20 ordered packs of 50. The tracks are **אנגלית
-בסיסית**, **אנגלית טובה**, and **אנגלית מתקדמת**. English is the learning/source
-language (`en`); Hebrew is the explanation/translation language (`he`). Users opt
-into packs through the existing selection flow; no 3,000-item import runs on signup.
+The current path is **לימוד שפה מאפס**. It has three tracks, 60 ordered units and
+50 English entries in each unit. `migrations/data/english-unique-3000-source.txt`
+is the learner-supplied unit list. The published catalog is
+`migrations/data/english-unique-3000-en-he.json`: all 3,000 English entries are
+unique when compared without case, including words and phrases.
 
-## Research and ordering
+English is the learning language (`en`) and Hebrew is the translation language
+(`he`). Users choose packs through the existing API; signing up does not import
+the whole path. The 60 pack IDs, slugs and entry IDs remain stable so existing
+links to packs still resolve. A changed ordinal entry ID never carries a user's
+known or practice status to a different word.
 
-- The main word pool is drawn from the freely available top-5,000 lemma sample of
-  the [Corpus of Contemporary American English (COCA)](https://www.wordfrequency.info/samples.asp).
-  We use its TV/movie, unscripted speech and overall frequency columns. The
-  weighted score is `0.65 × ln(1 + TV/movie per million + spoken per million) +
-  0.35 × ln(1 + overall per million)`. Duplicate lemmas, proper names, non-words
-  and a small set of less useful items are removed. COCA is a frequency guide,
-  not an exact ranking of usefulness for every learner.
-- The first 100 common function and survival words are moved forward for a learner
-  starting at zero. Fixed expressions were selected for conversational tasks and
-  distributed through the tracks. The [English Vocabulary Profile](https://englishprofile.org/?menu=english-vocabulary-profile)
-  and [Oxford Phrase List overview](https://www.oxfordlearnersdictionaries.com/us/about/wordlists/oxford-phrase-list.html)
-  guided the decision to include word senses and phrases alongside single words.
-  The expression order is editorial, not a measured phrase-frequency rank.
-- The track labels are product progression names. The stored CEFR ranges are broad
-  navigation hints, not a CEFR certification or proof that every item has that
-  individual level.
+## Hebrew translations
 
-## Hebrew meanings and review
+Existing reviewed translations are reused when possible. The 1,230 entries not
+covered by the previous catalogs have draft Hebrew translations from the locally
+cached `Helsinki-NLP/opus-mt-en-he` model, with explicit corrections for seven
+items that the model did not translate appropriately. The generated JSON records
+the translation source for every entry. These drafts need editorial review for
+context and natural Hebrew; the catalog test establishes coverage, not linguistic
+accuracy. The generation script is `scripts/build-english-unique-catalog.py`.
 
-The draft translations were generated locally with the Apache-2.0 licensed
-[Helsinki-NLP `opus-mt-en-he` model](https://huggingface.co/Helsinki-NLP/opus-mt-en-he).
-Verb and noun context prompts reduce part-of-speech errors. Common words,
-ambiguous senses and all first-track survival phrases have explicit Hebrew
-corrections in `scripts/build-daily-english-catalog.py`. The checked-in JSON is
-the runtime source of truth; regeneration requires an editorial review before
-replacing it. The [Wiktionary translation dataset](https://zenodo.org/records/1286991)
-was consulted as a secondary sense check and is not copied into the catalog.
+## Migration and progress
 
-Automated tests guard track and unit counts, uniqueness, nonempty Hebrew,
-representative high-use meanings, migration contents and rollback protection.
-Translations remain subject to ongoing editorial refinement, especially
-polysemous entries beyond the first units. Editing an existing catalog entry
-after users have installed it requires a separate versioned correction process;
-do not silently rewrite a learned sense in a migration.
+Migration `1790800011000_english-unique-catalog` updates the existing 60 packs
+in place to version 4 and renames the topic. It archives every prior known mark
+and learning-item pack link in `product_gotit.english_catalog_progress_archive`
+before changing entries. A known mark is restored only when both the English
+source and Hebrew meaning match a new entry. A learning link is restored only
+when the same source and meaning remain in its installed pack. Unmatched
+associations remain in the archive; their underlying learning items and practice
+history remain intact. This prevents a previously known word from marking an
+unrelated replacement word as known. A rollback is automatic only when no user
+progress is present; otherwise it requires a reviewed restore from the archive.
 
-## Rollout
+Before production migration, take the documented schema backup. After migration,
+verify the 60×50 catalog, global uniqueness, the topic title, the archive and
+remapped progress. Unit and integration tests cover the supplied list, duplicate
+regression, cross-unit known state, and migration of retained, removed and
+different-sense words.
 
-The learner-facing name is now **מסלול לימוד אנגלית** (English learning path),
-shown on the dedicated Web route `/english-learning`. The original migration is
-frozen because it was already published. Apply
-`1790800007000_english-learning-path` after it: this renames the topic and
-corrects 72 Hebrew catalog meanings. The original JSON remains the immutable
-input to migration `6000`; `migrations/data/english-learning-corrections.json`
-records each versioned correction. Existing installed learning-item meanings are
-not rewritten or regraded; the corrected meanings apply to future installations.
-The units are ordered by practical frequency, rather than falsely labeled as
-thematic chapters.
+## History
 
-Migration `1790800006000_daily-english-catalog` only inserts the new topic,
-three tracks, 60 packs and 3,000 entries. Run it with the dedicated migrator
-after backup and before backend deployment. The migration does not modify
-existing user packs. Rollback refuses to remove these packs after any user has
-installed one or has linked learning progress. Verify with an authenticated
-`GET /api/v1/word-packs` using an `en` learning / `he` translation profile, then
-inspect the first and last pack details and install a 50-entry pack on a test user.
+The initial `1790800006000_daily-english-catalog` migration created the packs
+from a frequency-oriented catalog. Migrations `1790800007000` through
+`1790800010000` added the course name, thematic units and contextual meaning
+corrections. Their data files are immutable migration inputs. The old thematic
+catalog had 3,000 positions but only 1,710 distinct case-insensitive English
+entries; repeated words could show partial progress in other units. The supplied
+replacement removes these repetitions.
