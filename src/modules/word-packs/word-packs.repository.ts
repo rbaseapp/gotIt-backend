@@ -2,6 +2,7 @@ import type { Pool } from 'pg';
 import { withTransaction, type DatabaseTransaction } from '../../shared/database/transaction.js';
 import { AppError } from '../../shared/errors/app-error.js';
 import { scopeValues } from '../library/library.repository.js';
+import { PROFILE_DEFAULTS } from '../profile/profile.constants.js';
 import type { ProfileScope } from '../profile/profile.types.js';
 import type { AddInput, KnownInput, RemovalInput } from './word-packs.validation.js';
 
@@ -127,6 +128,25 @@ export class WordPackRepository {
   async setKnown(scope: ProfileScope, id: string, input: KnownInput) {
     return withTransaction(this.pool, async (tx) => {
       await tx.lock(['word-pack', ...scopeValues(scope), id]);
+      await tx.query(
+        `INSERT INTO product_gotit.user_profiles
+          (application_id,application_user_id,default_source_language,default_translation_language,
+           timezone,daily_goal_type,daily_goal_value,default_new_items_per_day,
+           translation_method_preference,learning_preferences,created_at,updated_at)
+         VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,now(),now())
+         ON CONFLICT(application_id,application_user_id) DO NOTHING`,
+        [
+          ...scopeValues(scope),
+          PROFILE_DEFAULTS.defaultSourceLanguage,
+          PROFILE_DEFAULTS.defaultTranslationLanguage,
+          PROFILE_DEFAULTS.timezone,
+          PROFILE_DEFAULTS.dailyGoal.type,
+          PROFILE_DEFAULTS.dailyGoal.value,
+          PROFILE_DEFAULTS.defaultNewItemsPerDay,
+          PROFILE_DEFAULTS.translationMethodPreference,
+          JSON.stringify(PROFILE_DEFAULTS.learningPreferences),
+        ],
+      );
       const pack = (await this.packRows(tx, scope, id))[0];
       if (!pack) throw missingPack();
       const valid = (

@@ -394,6 +394,39 @@ test(
             (entry: { sourceText: string }) => entry.sourceText === 'work',
           );
           assert.ok(work);
+          const freshUser = randomUUID();
+          users.push(freshUser);
+          await db.adminPool.query(
+            'INSERT INTO core.application_users(id,application_id,email) VALUES($1,$2,$3)',
+            [freshUser, applicationId, 'practice-new@example.test'],
+          );
+          const freshCall = (method: Parameters<typeof call>[0], url: string, body?: object) =>
+            call(method, url, body, randomUUID(), 2);
+          const beforeProfile = await db.adminPool.query(
+            'SELECT count(*)::int count FROM product_gotit.user_profiles WHERE application_id=$1 AND application_user_id=$2',
+            [applicationId, freshUser],
+          );
+          assert.equal(beforeProfile.rows[0].count, 0);
+          await freshCall('put', `/word-packs/${second.id}/known`, {
+            entryIds: [work.id],
+            known: true,
+          }).expect(200);
+          const afterProfile = await db.adminPool.query(
+            'SELECT count(*)::int count FROM product_gotit.user_profiles WHERE application_id=$1 AND application_user_id=$2',
+            [applicationId, freshUser],
+          );
+          assert.equal(afterProfile.rows[0].count, 1);
+          const freshDetail = await freshCall('get', `/word-packs/${twelfth.id}`).expect(200);
+          assert.equal(
+            freshDetail.body.entries.find(
+              (entry: { sourceText: string }) => entry.sourceText === 'work',
+            ).known,
+            true,
+          );
+          await freshCall('put', `/word-packs/${second.id}/known`, {
+            entryIds: [work.id],
+            known: false,
+          }).expect(200);
           await englishCall('put', `/word-packs/${second.id}/known`, {
             entryIds: detail.body.entries.map((entry: { id: string }) => entry.id),
             known: true,

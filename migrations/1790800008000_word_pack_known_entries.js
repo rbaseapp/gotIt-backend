@@ -7,9 +7,9 @@ export const up = (pgm) => {
       entry_id uuid NOT NULL,
       known_at timestamptz NOT NULL DEFAULT now(),
       PRIMARY KEY(application_id,application_user_id,pack_id,entry_id),
-      CONSTRAINT user_word_pack_known_entries_user_fkey
+      CONSTRAINT user_word_pack_known_entries_profile_fkey
         FOREIGN KEY(application_id,application_user_id)
-        REFERENCES core.application_users(application_id,id) ON DELETE CASCADE,
+        REFERENCES product_gotit.user_profiles(application_id,application_user_id) ON DELETE CASCADE,
       CONSTRAINT user_word_pack_known_entries_entry_fkey
         FOREIGN KEY(pack_id,entry_id)
         REFERENCES product_gotit.word_pack_entries(pack_id,id) ON DELETE CASCADE
