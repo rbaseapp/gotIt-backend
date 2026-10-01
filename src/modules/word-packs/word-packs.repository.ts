@@ -163,6 +163,7 @@ export class WordPackRepository {
            FROM product_gotit.word_pack_entries chosen
            JOIN product_gotit.word_pack_entries target
              ON target.normalized_source_text=chosen.normalized_source_text
+             AND target.normalized_translation_text=chosen.normalized_translation_text
            JOIN product_gotit.word_packs target_pack ON target_pack.id=target.pack_id
            JOIN product_gotit.word_tracks target_track ON target_track.id=target_pack.track_id
            WHERE chosen.pack_id=$3 AND chosen.id=ANY($4::uuid[])

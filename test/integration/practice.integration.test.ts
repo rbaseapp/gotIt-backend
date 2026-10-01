@@ -427,6 +427,55 @@ test(
             entryIds: [work.id],
             known: false,
           }).expect(200);
+          const fifth = catalog.body.packs.find(
+            (pack: { slug: string }) => pack.slug === 'daily-english-basic-05-en-he',
+          );
+          const seventeenth = catalog.body.packs.find(
+            (pack: { slug: string }) => pack.slug === 'daily-english-basic-17-en-he',
+          );
+          const fortyEighth = catalog.body.packs.find((pack: { title: string }) =>
+            pack.title.includes('Probability & Possibility'),
+          );
+          assert.ok(fifth && seventeenth && fortyEighth);
+          const month = (
+            await freshCall('get', `/word-packs/${fifth.id}`).expect(200)
+          ).body.entries.find((entry: { sourceText: string }) => entry.sourceText === 'May');
+          const modal = (
+            await freshCall('get', `/word-packs/${seventeenth.id}`).expect(200)
+          ).body.entries.find((entry: { sourceText: string }) => entry.sourceText === 'may');
+          assert.ok(month && modal);
+          assert.equal(month.translationText, 'מאי');
+          assert.equal(modal.translationText, 'ייתכן ש־');
+          await freshCall('put', `/word-packs/${fifth.id}/known`, {
+            entryIds: [month.id],
+            known: true,
+          }).expect(200);
+          assert.equal(
+            (await freshCall('get', `/word-packs/${seventeenth.id}`).expect(200)).body.entries.find(
+              (entry: { sourceText: string }) => entry.sourceText === 'may',
+            ).known,
+            false,
+          );
+          await freshCall('put', `/word-packs/${seventeenth.id}/known`, {
+            entryIds: [modal.id],
+            known: true,
+          }).expect(200);
+          assert.equal(
+            (await freshCall('get', `/word-packs/${fortyEighth.id}`).expect(200)).body.entries.find(
+              (entry: { sourceText: string }) => entry.sourceText === 'may',
+            ).known,
+            true,
+          );
+          await freshCall('put', `/word-packs/${fifth.id}/known`, {
+            entryIds: [month.id],
+            known: false,
+          }).expect(200);
+          assert.equal(
+            (await freshCall('get', `/word-packs/${seventeenth.id}`).expect(200)).body.entries.find(
+              (entry: { sourceText: string }) => entry.sourceText === 'may',
+            ).known,
+            true,
+          );
           await englishCall('put', `/word-packs/${second.id}/known`, {
             entryIds: detail.body.entries.map((entry: { id: string }) => entry.id),
             known: true,
