@@ -1,7 +1,7 @@
 import { Router, type RequestHandler } from 'express';
 import { parseInput, uuidSchema } from '../capture/capture.validation.js';
 import type { WordPackRepository } from './word-packs.repository.js';
-import { addSchema, removalSchema } from './word-packs.validation.js';
+import { addSchema, knownSchema, removalSchema } from './word-packs.validation.js';
 
 export function createWordPackRoutes(service: WordPackRepository, requireWrite: RequestHandler) {
   const router = Router();
@@ -20,6 +20,16 @@ export function createWordPackRoutes(service: WordPackRepository, requireWrite: 
         req.gotitAuth!,
         parseInput(uuidSchema, req.params.id),
         parseInput(addSchema, req.body),
+      )),
+      requestId: req.id,
+    }),
+  );
+  router.put('/:id/known', requireWrite, async (req, res) =>
+    res.json({
+      ...(await service.setKnown(
+        req.gotitAuth!,
+        parseInput(uuidSchema, req.params.id),
+        parseInput(knownSchema, req.body),
       )),
       requestId: req.id,
     }),

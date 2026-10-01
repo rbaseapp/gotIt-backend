@@ -297,7 +297,11 @@ export class PracticeService {
           AND up.application_user_id=link.application_user_id AND up.pack_id=link.pack_id AND up.status='active'
         JOIN product_gotit.word_packs p ON p.id=link.pack_id AND p.is_active
         JOIN product_gotit.word_tracks tr ON tr.id=p.track_id AND tr.is_active
+        LEFT JOIN product_gotit.user_word_pack_known_entries known
+          ON known.application_id=link.application_id AND known.application_user_id=link.application_user_id
+          AND known.pack_id=link.pack_id AND known.entry_id=link.entry_id
         WHERE link.application_id=$1 AND link.application_user_id=$2 AND link.excluded_at IS NULL
+          AND known.entry_id IS NULL
           AND ${definition.predicate}`,
         [...scopeValues(scope), selection.id],
       )

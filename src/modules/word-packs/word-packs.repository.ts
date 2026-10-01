@@ -3,7 +3,7 @@ import { withTransaction, type DatabaseTransaction } from '../../shared/database
 import { AppError } from '../../shared/errors/app-error.js';
 import { scopeValues } from '../library/library.repository.js';
 import type { ProfileScope } from '../profile/profile.types.js';
-import type { AddInput, RemovalInput } from './word-packs.validation.js';
+import type { AddInput, KnownInput, RemovalInput } from './word-packs.validation.js';
 
 type Row = Record<string, any>;
 
@@ -40,6 +40,8 @@ export class WordPackRepository {
         learning: Number(row.learning_count),
         reviewing: Number(row.reviewing_count),
         mastered: Number(row.mastered_count),
+        known: Number(row.known_count),
+        completed: Number(row.completed_count),
         due: Number(row.due_count),
       },
     };
@@ -59,6 +61,9 @@ export class WordPackRepository {
           count(DISTINCT li.id) FILTER(WHERE up.status='active' AND link.excluded_at IS NULL AND li.learning_status='learning')::integer learning_count,
           count(DISTINCT li.id) FILTER(WHERE up.status='active' AND link.excluded_at IS NULL AND li.learning_status='reviewing')::integer reviewing_count,
           count(DISTINCT li.id) FILTER(WHERE up.status='active' AND link.excluded_at IS NULL AND li.learning_status='mastered')::integer mastered_count,
+          count(DISTINCT known.entry_id)::integer known_count,
+          count(DISTINCT e.id) FILTER(WHERE known.entry_id IS NOT NULL OR
+            (up.status='active' AND link.excluded_at IS NULL AND li.learning_status='mastered'))::integer completed_count,
           count(DISTINCT li.id) FILTER(WHERE up.status='active' AND link.excluded_at IS NULL AND li.next_review_at<=now())::integer due_count
         FROM product_gotit.word_packs p
         JOIN product_gotit.word_tracks tr ON tr.id=p.track_id AND tr.is_active
@@ -69,6 +74,9 @@ export class WordPackRepository {
         LEFT JOIN product_gotit.user_word_packs up ON up.application_id=$1 AND up.application_user_id=$2 AND up.pack_id=p.id
         LEFT JOIN product_gotit.learning_item_pack_entries link ON link.application_id=$1 AND link.application_user_id=$2 AND link.pack_id=p.id AND link.entry_id=e.id
         LEFT JOIN product_gotit.learning_items li ON li.application_id=$1 AND li.application_user_id=$2 AND li.id=link.learning_item_id AND li.deleted_at IS NULL
+        LEFT JOIN product_gotit.user_word_pack_known_entries known
+          ON known.application_id=$1 AND known.application_user_id=$2
+          AND known.pack_id=p.id AND known.entry_id=e.id
         WHERE p.is_active AND ($3::uuid IS NULL OR p.id=$3)
           AND (profile.default_source_language IS NULL OR
             split_part(lower(profile.default_source_language),'-',1)=split_part(lower(tr.source_language_code),'-',1))
@@ -99,10 +107,13 @@ export class WordPackRepository {
           await tx.query(
             `SELECT e.id,e.source_text AS "sourceText",e.translation_text AS "translationText",
               e.item_type AS "itemType",e.part_of_speech AS "partOfSpeech",e.example_text AS "exampleText",
-              link.learning_item_id AS "learningItemId",link.excluded_at AS "excludedAt"
+              link.learning_item_id AS "learningItemId",link.excluded_at AS "excludedAt",
+              (known.entry_id IS NOT NULL) AS "known"
             FROM product_gotit.word_pack_entries e
             LEFT JOIN product_gotit.learning_item_pack_entries link
               ON link.application_id=$1 AND link.application_user_id=$2 AND link.pack_id=e.pack_id AND link.entry_id=e.id
+            LEFT JOIN product_gotit.user_word_pack_known_entries known
+              ON known.application_id=$1 AND known.application_user_id=$2 AND known.pack_id=e.pack_id AND known.entry_id=e.id
             WHERE e.pack_id=$3 ORDER BY e.sort_order,e.id`,
             [...scopeValues(scope), id],
           )
@@ -111,6 +122,64 @@ export class WordPackRepository {
       },
       true,
     );
+  }
+
+  async setKnown(scope: ProfileScope, id: string, input: KnownInput) {
+    return withTransaction(this.pool, async (tx) => {
+      await tx.lock(['word-pack', ...scopeValues(scope), id]);
+      const pack = (await this.packRows(tx, scope, id))[0];
+      if (!pack) throw missingPack();
+      const valid = (
+        await tx.query(
+          'SELECT count(*)::integer count FROM product_gotit.word_pack_entries WHERE pack_id=$1 AND id=ANY($2::uuid[])',
+          [id, input.entryIds],
+        )
+      ).rows[0]?.count as number | undefined;
+      if (valid !== input.entryIds.length)
+        throw new AppError(400, 'VALIDATION_ERROR', 'A selected word is not part of this pack');
+      const acrossEnglishPath = pack.topic_slug === 'english-learning-path-en-he';
+      const targets = acrossEnglishPath
+        ? `SELECT DISTINCT target.pack_id,target.id AS entry_id
+           FROM product_gotit.word_pack_entries chosen
+           JOIN product_gotit.word_pack_entries target
+             ON target.normalized_source_text=chosen.normalized_source_text
+           JOIN product_gotit.word_packs target_pack ON target_pack.id=target.pack_id
+           JOIN product_gotit.word_tracks target_track ON target_track.id=target_pack.track_id
+           WHERE chosen.pack_id=$3 AND chosen.id=ANY($4::uuid[])
+             AND target_track.topic_id=$5::uuid`
+        : `SELECT e.pack_id,e.id AS entry_id FROM product_gotit.word_pack_entries e
+           WHERE e.pack_id=$3 AND e.id=ANY($4::uuid[])`;
+      const targetValues = [
+        ...scopeValues(scope),
+        id,
+        input.entryIds,
+        ...(acrossEnglishPath ? [pack.topic_id] : []),
+      ];
+      if (input.known) {
+        await tx.query(
+          `INSERT INTO product_gotit.user_word_pack_known_entries
+            (application_id,application_user_id,pack_id,entry_id)
+          SELECT $1,$2,target.pack_id,target.entry_id FROM (${targets}) target
+          ON CONFLICT DO NOTHING`,
+          targetValues,
+        );
+      } else {
+        await tx.query(
+          `DELETE FROM product_gotit.user_word_pack_known_entries
+          WHERE application_id=$1 AND application_user_id=$2
+            AND (pack_id,entry_id) IN (${targets})`,
+          targetValues,
+        );
+      }
+      const knownCount = (
+        await tx.query(
+          `SELECT count(*)::integer count FROM product_gotit.user_word_pack_known_entries
+          WHERE application_id=$1 AND application_user_id=$2 AND pack_id=$3`,
+          [...scopeValues(scope), id],
+        )
+      ).rows[0]?.count as number | undefined;
+      return { packId: id, knownCount: knownCount ?? 0 };
+    });
   }
 
   async add(scope: ProfileScope, id: string, input: AddInput) {

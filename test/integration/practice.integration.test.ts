@@ -304,17 +304,54 @@ test(
           ).expect(200);
           assert.equal(packLibrary.body.items.length, 11);
 
+          const knownEntry = selectedEntries[0].id as string;
+          await packCall('put', `/word-packs/${pack.id}/known`, {
+            entryIds: [knownEntry],
+            known: true,
+          }).expect(200);
+          await packCall('put', `/word-packs/${pack.id}/known`, {
+            entryIds: [knownEntry],
+            known: true,
+          }).expect(200);
+          const knownDetail = await packCall('get', `/word-packs/${pack.id}`).expect(200);
+          assert.equal(knownDetail.body.entries[0].known, true);
+          assert.equal(knownDetail.body.pack.progress.known, 1);
+          assert.equal(knownDetail.body.pack.progress.mastered, 0);
+          const otherUserDetail = await call(
+            'get',
+            `/word-packs/${pack.id}`,
+            undefined,
+            randomUUID(),
+            0,
+          ).expect(200);
+          assert.equal(otherUserDetail.body.pack.progress.known, 0);
+          await packCall('put', `/word-packs/${pack.id}/known`, {
+            entryIds: [randomUUID()],
+            known: true,
+          }).expect(400);
+
           const scoped = await packCall('post', '/practice/sessions', {
             sessionType: 'smart_review',
             count: 5,
             scope: { type: 'pack', id: pack.id },
           }).expect(201);
-          assert.equal(scoped.body.session.itemCount, 11);
+          assert.equal(scoped.body.session.itemCount, 10);
           assert.deepEqual(scoped.body.session.scope, {
             type: 'pack',
             id: pack.id,
             title: pack.title,
           });
+
+          await packCall('put', `/word-packs/${pack.id}/known`, {
+            entryIds: [knownEntry],
+            known: false,
+          }).expect(200);
+          const restoredScope = await packCall('post', '/practice/sessions', {
+            sessionType: 'smart_review',
+            count: 5,
+            scope: { type: 'pack', id: pack.id },
+          }).expect(201);
+          assert.equal(restoredScope.body.session.itemCount, 11);
 
           const removed = await packCall(
             'delete',
@@ -325,7 +362,7 @@ test(
             'get',
             `/practice/sessions/${scoped.body.session.id}/study`,
           ).expect(200);
-          assert.equal(activeSnapshot.body.cards.length, 11);
+          assert.equal(activeSnapshot.body.cards.length, 10);
           await packCall('post', '/practice/sessions', {
             sessionType: 'smart_review',
             count: 5,
@@ -334,6 +371,58 @@ test(
           await packCall('post', '/learning-items/bulk', {
             ids: packLibrary.body.items.map((item: { id: string }) => item.id),
             action: 'delete',
+          }).expect(200);
+        },
+      );
+      await t.test(
+        'English known words carry across units and a full unit completes in one action',
+        async () => {
+          const englishCall = (method: Parameters<typeof call>[0], url: string, body?: object) =>
+            call(method, url, body, randomUUID(), 1);
+          const catalog = await englishCall('get', '/word-packs').expect(200);
+          const second = catalog.body.packs.find(
+            (pack: { slug: string }) => pack.slug === 'daily-english-basic-02-en-he',
+          );
+          const twelfth = catalog.body.packs.find(
+            (pack: { slug: string }) => pack.slug === 'daily-english-basic-12-en-he',
+          );
+          assert.ok(second);
+          assert.ok(twelfth);
+          const detail = await englishCall('get', `/word-packs/${second.id}`).expect(200);
+          assert.equal(detail.body.entries.length, 50);
+          const work = detail.body.entries.find(
+            (entry: { sourceText: string }) => entry.sourceText === 'work',
+          );
+          assert.ok(work);
+          await englishCall('put', `/word-packs/${second.id}/known`, {
+            entryIds: detail.body.entries.map((entry: { id: string }) => entry.id),
+            known: true,
+          }).expect(200);
+          const complete = await englishCall('get', `/word-packs/${second.id}`).expect(200);
+          assert.equal(complete.body.pack.progress.known, 50);
+          assert.equal(complete.body.pack.progress.completed, 50);
+          assert.equal(complete.body.pack.progress.mastered, 0);
+          const repeated = await englishCall('get', `/word-packs/${twelfth.id}`).expect(200);
+          assert.equal(
+            repeated.body.entries.find(
+              (entry: { sourceText: string }) => entry.sourceText === 'work',
+            ).known,
+            true,
+          );
+          await englishCall('put', `/word-packs/${second.id}/known`, {
+            entryIds: [work.id],
+            known: false,
+          }).expect(200);
+          const reverted = await englishCall('get', `/word-packs/${twelfth.id}`).expect(200);
+          assert.equal(
+            reverted.body.entries.find(
+              (entry: { sourceText: string }) => entry.sourceText === 'work',
+            ).known,
+            false,
+          );
+          await englishCall('put', `/word-packs/${second.id}/known`, {
+            entryIds: detail.body.entries.map((entry: { id: string }) => entry.id),
+            known: false,
           }).expect(200);
         },
       );
@@ -362,10 +451,31 @@ test(
             units: 60,
             entries: 3000,
           });
-          const bathroom = await db.adminPool
-            .query(`SELECT translation_text FROM product_gotit.word_pack_entries
-            WHERE id='d4000000-0000-4000-8000-000000000054'`);
-          assert.equal(bathroom.rows[0]?.translation_text, 'שירותים; חדר אמבטיה');
+          const firstUnit = await db.adminPool
+            .query(`SELECT p.title,e.source_text,e.translation_text
+            FROM product_gotit.word_packs p
+            JOIN product_gotit.word_pack_entries e ON e.pack_id=p.id
+            WHERE p.id='d3000000-0000-4000-8000-000000000001'
+            ORDER BY e.sort_order`);
+          assert.equal(firstUnit.rows[0]?.title, 'יחידה 1: Building Your First Sentences');
+          assert.equal(firstUnit.rows[0]?.source_text, 'I');
+          assert.equal(firstUnit.rows[0]?.translation_text, 'אני');
+          assert.equal(firstUnit.rows.length, 50);
+          const fifthUnit = await db.adminPool.query(`SELECT source_text,translation_text
+            FROM product_gotit.word_pack_entries
+            WHERE pack_id='d3000000-0000-4000-8000-000000000005'
+            ORDER BY sort_order`);
+          assert.ok(
+            fifthUnit.rows.some(
+              (row) => row.source_text === 'Monday' && row.translation_text === 'יום שני',
+            ),
+          );
+          assert.ok(
+            fifthUnit.rows.some(
+              (row) => row.source_text === 'January' && row.translation_text === 'ינואר',
+            ),
+          );
+          assert.ok(!fifthUnit.rows.some((row) => row.source_text === 'satellite'));
           const duplicates = await db.adminPool.query(`SELECT pack_id
           FROM product_gotit.word_pack_entries
           GROUP BY pack_id, normalized_source_text, normalized_translation_text
@@ -1153,7 +1263,7 @@ test(
             client.release();
           }
           const inspection = await inspectProduction(db.runtimePool.options.connectionString);
-          assert.equal(inspection.productTableCount, 48);
+          assert.equal(inspection.productTableCount, 49);
           assert.deepEqual(inspection.v1, {
             learningRevision: true,
             captureReceipts: true,
