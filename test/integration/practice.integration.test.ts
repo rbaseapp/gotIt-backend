@@ -13,6 +13,7 @@ import { EnrichmentRegistry } from '../../src/modules/enrichment/enrichment.regi
 import { SelectionProofs } from '../../src/modules/enrichment/selection-proof.js';
 import { LibraryRepository } from '../../src/modules/library/library.repository.js';
 import { PracticeService } from '../../src/modules/practice/practice.service.js';
+import { practiceLanguagePredicate } from '../../src/modules/practice/practice.language.js';
 import { policySchema } from '../../src/modules/learning/learning.policy.js';
 import { DashboardService } from '../../src/modules/dashboard/dashboard.service.js';
 import { ReadingService } from '../../src/modules/reading/reading.service.js';
@@ -146,6 +147,137 @@ test(
         }).expect(201);
         ids.push(captured.body.capture.learningItemId);
       }
+      await t.test(
+        'script guard accepts native letters, marks and explicit scripts, and rejects foreign letters',
+        async () => {
+          const cases = [
+            ['en', 'remember', true],
+            ['en-US', 'café 123!', true],
+            ['en', 'إليك', false],
+            ['en', 'hello العربية', false],
+            ['en', 'שלום', false],
+            ['en', 'привет', false],
+            ['en', '你好', false],
+            ['ar', 'إِلَيْكَ', true],
+            ['ar', 'remember', false],
+            ['he', 'שָׁלוֹם', true],
+            ['ru', 'привет', true],
+            ['zh', '你好', true],
+            ['ja', 'こんにちは漢字カタカナ', true],
+            ['ko', '안녕하세요', true],
+            ['sr-Latn', 'zdravo', true],
+            ['sr-Latn', 'здраво', false],
+            ['fr', 'crème brûlée', true],
+            ['en', 'cafe\u0301', true],
+          ] as const;
+          for (const [language, text, expected] of cases) {
+            const checked = await db.runtimePool.query(
+              `SELECT ${practiceLanguagePredicate()} AS compatible FROM (SELECT $1::text source_language_code,$2::text source_text) li`,
+              [language, text],
+            );
+            assert.equal(checked.rows[0].compatible, expected, `${language}: ${text}`);
+          }
+        },
+      );
+      await t.test(
+        'English smart practice omits Arabic mislabeled as English, including legacy sessions and distractors',
+        async () => {
+          const bad = await call('post', '/captures', {
+            item: {
+              sourceText: 'إليك',
+              sourceLanguageCode: 'en',
+              translationLanguageCode: 'he',
+              itemType: 'word',
+            },
+            translation: { text: 'הנה' },
+            context: { selectedText: 'إليك' },
+            senseDecision: { mode: 'auto' },
+          }).expect(201);
+          const badId = bad.body.capture.learningItemId;
+          try {
+            await db.adminPool.query(
+              "UPDATE product_gotit.learning_items SET created_at='2000-01-01',user_priority='high' WHERE id=$1",
+              [badId],
+            );
+            const queue = await call('get', '/learning/queue?sourceLanguageCode=en&limit=3').expect(
+              200,
+            );
+            assert.deepEqual(
+              new Set(queue.body.items.map((item: { id: string }) => item.id)),
+              new Set(ids),
+            );
+            assert.equal(
+              (await call('get', '/learning/queue?sourceLanguageCode=de').expect(200)).body.items
+                .length,
+              0,
+            );
+            await call('post', '/practice/sessions', {
+              sessionType: 'smart_review',
+              sourceLanguageCode: 'de',
+            }).expect(409);
+            await call('post', '/practice/sessions', {
+              sessionType: 'smart_review',
+              sourceLanguageCode: 'en',
+              learningItemIds: [ids[0], badId],
+            }).expect(400);
+            const created = await call('post', '/practice/sessions', {
+              sessionType: 'smart_review',
+              sourceLanguageCode: 'en',
+              count: 3,
+            }).expect(201);
+            const practiceId = created.body.session.id;
+            const study = await call('get', `/practice/sessions/${practiceId}/study`).expect(200);
+            assert.deepEqual(
+              new Set(
+                study.body.cards.map((card: { learningItemId: string }) => card.learningItemId),
+              ),
+              new Set(ids),
+            );
+
+            // Reproduce an old session snapshot made before script validation existed.
+            await db.adminPool.query(
+              'UPDATE product_gotit.practice_sessions SET selection=$2::jsonb,item_count=4 WHERE id=$1',
+              [practiceId, JSON.stringify({ itemIds: [...ids, badId] })],
+            );
+            const legacy = await call('get', `/practice/sessions/${practiceId}/study`).expect(200);
+            assert.deepEqual(
+              new Set(
+                legacy.body.cards.map((card: { learningItemId: string }) => card.learningItemId),
+              ),
+              new Set(ids),
+            );
+            await call('get', `/practice/sessions/${practiceId}/study/${badId}/image`).expect(409);
+            const exercises = await call('post', `/practice/sessions/${practiceId}/exercises`, {
+              count: 4,
+              exerciseType: 'recall',
+              kind: 'multiple_choice',
+              direction: 'translation_to_source',
+            }).expect(201);
+            assert.ok(exercises.body.exercises.length > 0);
+            for (const exercise of exercises.body.exercises) {
+              assert.notEqual(exercise.learningItemId, badId);
+              assert.ok(
+                exercise.prompt.choices.every(
+                  (choice: { text: string }) => !/\p{Script=Arabic}/u.test(choice.text),
+                ),
+              );
+            }
+            await db.adminPool.query(
+              'UPDATE product_gotit.practice_sessions SET selection=$2::jsonb,item_count=1 WHERE id=$1',
+              [practiceId, JSON.stringify({ itemIds: [badId] })],
+            );
+            await call('get', `/practice/sessions/${practiceId}/study`).expect(409);
+            await call('post', `/practice/sessions/${practiceId}/exercises`, { count: 1 }).expect(
+              409,
+            );
+            await db.adminPool.query('DELETE FROM product_gotit.practice_sessions WHERE id=$1', [
+              practiceId,
+            ]);
+          } finally {
+            await call('delete', `/learning-items/${badId}`).expect(200);
+          }
+        },
+      );
       await t.test(
         'library returns scoped pronunciation guides for the vocabulary list',
         async () => {

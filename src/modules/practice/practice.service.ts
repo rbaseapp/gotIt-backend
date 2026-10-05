@@ -30,6 +30,7 @@ import {
   type Skill,
 } from '../learning/learning.policy.js';
 import { scoreAnswer, type AnswerSpec } from './practice.scoring.js';
+import { practiceLanguagePredicate } from './practice.language.js';
 import type {
   SessionInput,
   SessionScope,
@@ -224,7 +225,8 @@ export class PracticeService {
       FROM product_gotit.learning_items li WHERE application_id=$1 AND application_user_id=$2
         AND user_status='active' AND deleted_at IS NULL
         AND ($10::uuid[] IS NULL OR li.id=ANY($10::uuid[]))
-        AND ($11::text IS NULL OR li.source_language_code=$11)), eligible AS (
+        AND ($11::text IS NULL OR li.source_language_code=$11)
+        AND ${practiceLanguagePredicate()}), eligible AS (
       SELECT * FROM candidates WHERE primary_translation IS NOT NULL AND
       (learning_status<>'new' OR new_rank<=GREATEST(0,$3-(SELECT count(DISTINCT a.learning_item_id) FROM product_gotit.practice_attempts a
        JOIN product_gotit.learning_items i ON i.application_id=a.application_id AND i.application_user_id=a.application_user_id AND i.id=a.learning_item_id
@@ -386,13 +388,14 @@ export class PracticeService {
       if (!ids.length) throw new AppError(409, 'NO_ELIGIBLE_ITEMS', 'No eligible learning items');
       const items = (
         await tx.query(
-          `SELECT id,source_language_code FROM product_gotit.learning_items WHERE application_id=$1 AND application_user_id=$2 AND id=ANY($3::uuid[]) AND user_status='active' AND deleted_at IS NULL FOR SHARE`,
+          `SELECT id,source_language_code,${practiceLanguagePredicate()} AS language_matches FROM product_gotit.learning_items li WHERE application_id=$1 AND application_user_id=$2 AND id=ANY($3::uuid[]) AND user_status='active' AND deleted_at IS NULL FOR SHARE`,
           [...scopeValues(scope), ids],
         )
       ).rows;
       if (items.length !== ids.length) throw itemNotFound();
       const languages = new Set(items.map((item) => item.source_language_code));
       if (
+        items.some((item) => !item.language_matches) ||
         languages.size > 1 ||
         (input.sourceLanguageCode && !languages.has(input.sourceLanguageCode))
       )
@@ -464,6 +467,7 @@ export class PracticeService {
       const rows = (
         await tx.query(
           `SELECT li.id,li.source_text,li.source_language_code,li.translation_language_code,
+              ${practiceLanguagePredicate()} AS language_matches,
               (SELECT translation_text FROM product_gotit.item_translations t
                 WHERE t.application_id=li.application_id AND t.application_user_id=li.application_user_id
                   AND t.learning_item_id=li.id AND t.is_current
@@ -485,8 +489,11 @@ export class PracticeService {
       ).rows;
       if (rows.length !== ids.length || rows.some((row) => !row.translation_text))
         throw new AppError(409, 'ITEM_INCOMPLETE', 'A study item is unavailable or incomplete');
+      const eligible = rows.filter((row) => row.language_matches);
+      if (!eligible.length)
+        throw new AppError(409, 'NO_ELIGIBLE_ITEMS', 'No eligible learning items');
       return {
-        cards: rows.map((row) => ({
+        cards: eligible.map((row) => ({
           learningItemId: row.id,
           sourceText: row.source_text,
           translationText: row.translation_text,
@@ -531,7 +538,7 @@ export class PracticeService {
                  ORDER BY (ex.source_kind='user') DESC,ex.created_at,ex.id LIMIT 1)) context
            FROM product_gotit.learning_items li
            WHERE li.application_id=$1 AND li.application_user_id=$2 AND li.id=$3
-             AND li.deleted_at IS NULL`,
+             AND li.deleted_at IS NULL AND ${practiceLanguagePredicate()}`,
           [...scopeValues(scope), itemId],
         )
       ).rows[0];
@@ -837,7 +844,7 @@ export class PracticeService {
           `SELECT li.*,ARRAY(SELECT translation_text FROM product_gotit.item_translations t WHERE t.application_id=li.application_id AND t.application_user_id=li.application_user_id AND t.learning_item_id=li.id AND t.is_current ORDER BY is_primary DESC,id) translations,
       COALESCE((SELECT sentence_text FROM product_gotit.item_occurrences o WHERE o.application_id=li.application_id AND o.application_user_id=li.application_user_id AND o.learning_item_id=li.id AND o.learning_revision=li.learning_revision AND sentence_text IS NOT NULL ORDER BY captured_at DESC,id LIMIT 1),
         (SELECT example_text FROM product_gotit.item_examples ex WHERE ex.application_id=li.application_id AND ex.application_user_id=li.application_user_id AND ex.learning_item_id=li.id AND ex.learning_revision=li.learning_revision ORDER BY (ex.source_kind='user') DESC,ex.created_at,ex.id LIMIT 1)) context
-      FROM product_gotit.learning_items li WHERE application_id=$1 AND application_user_id=$2 AND id=ANY($3::uuid[]) AND deleted_at IS NULL ORDER BY next_review_at NULLS LAST,created_at,id`,
+      FROM product_gotit.learning_items li WHERE application_id=$1 AND application_user_id=$2 AND id=ANY($3::uuid[]) AND deleted_at IS NULL AND ${practiceLanguagePredicate()} ORDER BY next_review_at NULLS LAST,created_at,id`,
           [...scopeValues(scope), ids],
         )
       ).rows;
@@ -884,6 +891,7 @@ export class PracticeService {
                    WHERE li.application_id=$1 AND li.application_user_id=$2
                      AND NOT(li.id=ANY($3::uuid[]))
                      AND li.user_status='active' AND li.deleted_at IS NULL
+                     AND ${practiceLanguagePredicate()}
                      AND EXISTS(SELECT 1 FROM product_gotit.learning_items target
                        WHERE target.application_id=li.application_id
                          AND target.application_user_id=li.application_user_id
