@@ -261,6 +261,14 @@ the flag without current grants fails closed with `402 ADDON_REQUIRED`.
 
 ## HTTP, deployment and verification
 
+Authenticated Google translation previews (`POST /api/v1/captures/preview` with
+`translationMethod: "dictionary"`) are available to free accounts without a
+`vocabulary.write` entitlement. They retain input validation, scoped enrichment
+traces and rate limits. Saving a word still requires `vocabulary.write`. Explicit
+AI previews retain paid-tier/add-on checks; `auto` and omitted-method previews
+retain the write gate because configured routing or profile preferences can select AI.
+This server change works with existing Chrome Store clients and needs no migration.
+
 AI provider calls have per-user daily caps at the provider boundary: course generation
 (40), course transcription (40), private lesson briefs (60), private lesson reports (60),
 AI translations (100), image briefs (60), and generated images (20). Reading generation

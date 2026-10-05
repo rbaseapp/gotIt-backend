@@ -15,7 +15,12 @@ export function createCaptureRoutes(
   });
   router.post(
     '/preview',
-    requireWrite,
+    (request, response, next) => {
+      // Explicit dictionary previews use only non-AI providers and do not save a
+      // learning item. Keep auto/profile routing gated: it can select paid AI.
+      if (request.body?.translationMethod === 'dictionary') return next();
+      return requireWrite(request, response, next);
+    },
     (request, response, next) => {
       if (request.body?.translationMethod === 'ai' && requirePaidAiTranslation)
         return requirePaidAiTranslation(request, response, next);
