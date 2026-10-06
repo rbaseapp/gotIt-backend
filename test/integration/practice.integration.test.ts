@@ -1538,6 +1538,84 @@ test(
         },
       );
       await t.test(
+        'matching rounds cover unseen words before recycling after review dates change',
+        async () => {
+          const words: string[] = [];
+          for (const suffix of [
+            'one',
+            'two',
+            'three',
+            'four',
+            'five',
+            'six',
+            'seven',
+            'eight',
+            'nine',
+            'ten',
+          ]) {
+            const captured = await call('post', '/captures', {
+              item: {
+                sourceText: `matching round ${suffix}`,
+                sourceLanguageCode: 'en',
+                translationLanguageCode: 'he',
+                itemType: 'phrase',
+              },
+              translation: { text: `משמעות ${words.length + 1}` },
+              context: { selectedText: `matching round ${suffix}` },
+              senseDecision: { mode: 'auto' },
+            }).expect(201);
+            words.push(captured.body.capture.learningItemId);
+          }
+          await db.adminPool.query(
+            `UPDATE product_gotit.learning_items SET learning_status='mastered',review_stage=2,
+             overall_mastery_score=90,next_review_at=now()-interval '1 day'
+             WHERE id=ANY($1::uuid[])`,
+            [words],
+          );
+          const session = (
+            await call('post', '/practice/sessions', {
+              sessionType: 'matching',
+              learningItemIds: words,
+            }).expect(201)
+          ).body.session;
+          const seen = new Set<string>();
+          for (const count of [3, 3, 4]) {
+            const board = await call('post', `/practice/sessions/${session.id}/exercises`, {
+              count,
+            }).expect(201);
+            assert.equal(board.body.exercises.length, count);
+            for (const exercise of board.body.exercises) {
+              assert.equal(
+                seen.has(exercise.learningItemId),
+                false,
+                'must exhaust unseen words before repeating',
+              );
+              seen.add(exercise.learningItemId);
+              const meaning = `משמעות ${words.indexOf(exercise.learningItemId) + 1}`;
+              const choice = board.body.matchingGroup.choices.find(
+                (value: { text: string }) => value.text === meaning,
+              );
+              assert.ok(choice);
+              const result = await call('post', '/practice/attempts', {
+                exerciseId: exercise.id,
+                choiceId: choice.id,
+              }).expect(201);
+              assert.equal(result.body.attempt.result, 'correct');
+            }
+          }
+          assert.deepEqual(seen, new Set(words));
+          const dates = await db.adminPool.query(
+            'SELECT next_review_at FROM product_gotit.learning_items WHERE id=ANY($1::uuid[])',
+            [words],
+          );
+          assert.ok(dates.rows.every((row) => row.next_review_at > new Date()));
+          const closed = await call('patch', `/practice/sessions/${session.id}`, {
+            status: 'completed',
+          }).expect(200);
+          assert.equal(closed.body.session.attemptCount, 10);
+        },
+      );
+      await t.test(
         'late attempt failure rolls back evidence, progress, XP, daily counters and exercise consumption; retry uses the same key',
         async () => {
           const session = (

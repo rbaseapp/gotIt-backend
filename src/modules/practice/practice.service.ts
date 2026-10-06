@@ -849,7 +849,10 @@ export class PracticeService {
         )
       ).rows;
       if (!rows.length) throw new AppError(409, 'NO_ELIGIBLE_ITEMS', 'No eligible learning items');
-      if (session.session_type === 'smart_review' && !input.learningItemIds) {
+      const preferUnseen =
+        (session.session_type === 'smart_review' || session.session_type === 'matching') &&
+        !input.learningItemIds;
+      if (preferUnseen) {
         const issued = new Set(
           (
             await tx.query(
@@ -874,8 +877,7 @@ export class PracticeService {
         const rank = (itemId: string) => (!issued.has(itemId) ? 0 : succeeded.has(itemId) ? 2 : 1);
         rows = [...rows].sort((a, b) => rank(a.id) - rank(b.id));
       }
-      const startIndex =
-        session.session_type === 'smart_review' && !input.learningItemIds ? 0 : issuedCount;
+      const startIndex = preferUnseen ? 0 : issuedCount;
       const choiceRows =
         session.session_type === 'smart_review'
           ? [
