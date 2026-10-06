@@ -28,6 +28,7 @@ export const sessionSchema = z
     scope: sessionScopeSchema.optional(),
     sourceLanguageCode: languageSchema.optional(),
     count: z.number().int().min(1).max(100).default(10),
+    includeNewItems: z.boolean().optional(),
   })
   .strict()
   .superRefine((v, ctx) => {

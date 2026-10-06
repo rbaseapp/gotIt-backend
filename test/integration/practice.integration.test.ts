@@ -472,6 +472,50 @@ test(
           assert.equal(knownDetail.body.entries[0].known, true);
           assert.equal(knownDetail.body.pack.progress.known, 1);
           assert.equal(knownDetail.body.pack.progress.mastered, 0);
+          const catalogItemIds = packLibrary.body.items.map((item: { id: string }) => item.id);
+          const vocabularyQueue = await packCall(
+            'get',
+            '/learning/queue?limit=100&sourceLanguageCode=en',
+          ).expect(200);
+          assert.ok(
+            vocabularyQueue.body.items.every(
+              (item: { id: string }) => !catalogItemIds.includes(item.id),
+            ),
+            'automatic vocabulary practice must not borrow words from installed packs',
+          );
+          const independentlyCaptured = packLibrary.body.items[1].id as string;
+          await db.adminPool.query(
+            `INSERT INTO product_gotit.item_occurrences(application_id,application_user_id,learning_item_id,source_type,selected_text)
+             VALUES($1,$2,$3,'chrome_extension','independently captured')`,
+            [applicationId, users[1], independentlyCaptured],
+          );
+          await db.adminPool.query(
+            `UPDATE product_gotit.learning_items SET learning_status='learning',next_review_at=now(),manual_hard=true
+             WHERE application_id=$1 AND application_user_id=$2 AND id=$3`,
+            [applicationId, users[1], independentlyCaptured],
+          );
+          const vocabularySession = await packCall('post', '/practice/sessions', {
+            sessionType: 'smart_review',
+            sourceLanguageCode: 'en',
+            count: 100,
+            includeNewItems: false,
+          }).expect(201);
+          const vocabularyStudy = await packCall(
+            'get',
+            `/practice/sessions/${vocabularySession.body.session.id}/study`,
+          ).expect(200);
+          assert.ok(
+            vocabularyStudy.body.cards.some(
+              (card: { learningItemId: string }) => card.learningItemId === independentlyCaptured,
+            ),
+          );
+          assert.ok(
+            vocabularyStudy.body.cards.every(
+              (card: { learningItemId: string }) =>
+                card.learningItemId === independentlyCaptured ||
+                !catalogItemIds.includes(card.learningItemId),
+            ),
+          );
           const otherUserDetail = await call(
             'get',
             `/word-packs/${pack.id}`,
@@ -512,7 +556,8 @@ test(
             'delete',
             `/word-packs/${pack.id}?mode=archive_exclusive`,
           ).expect(200);
-          assert.equal(removed.body.archived, 11);
+          assert.equal(removed.body.archived, 10);
+          assert.equal(removed.body.retained, 1);
           const activeSnapshot = await packCall(
             'get',
             `/practice/sessions/${scoped.body.session.id}/study`,

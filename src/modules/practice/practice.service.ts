@@ -178,6 +178,7 @@ export class PracticeService {
     count: number,
     eligibleIds?: string[],
     languageCode?: string,
+    includeNewItems = true,
   ) {
     const rows = (
       await tx.query(
@@ -226,6 +227,20 @@ export class PracticeService {
         AND user_status='active' AND deleted_at IS NULL
         AND ($10::uuid[] IS NULL OR li.id=ANY($10::uuid[]))
         AND ($11::text IS NULL OR li.source_language_code=$11)
+        AND ($12::boolean OR li.learning_status<>'new')
+        AND ($10::uuid[] IS NOT NULL OR
+          NOT EXISTS(SELECT 1 FROM product_gotit.learning_item_pack_entries catalog_link
+            JOIN product_gotit.user_word_packs membership
+              ON membership.application_id=catalog_link.application_id
+              AND membership.application_user_id=catalog_link.application_user_id
+              AND membership.pack_id=catalog_link.pack_id AND membership.status='active'
+            WHERE catalog_link.application_id=li.application_id
+              AND catalog_link.application_user_id=li.application_user_id
+              AND catalog_link.learning_item_id=li.id AND catalog_link.excluded_at IS NULL)
+          OR EXISTS(SELECT 1 FROM product_gotit.item_occurrences occurrence
+            WHERE occurrence.application_id=li.application_id
+              AND occurrence.application_user_id=li.application_user_id
+              AND occurrence.learning_item_id=li.id))
         AND ${practiceLanguagePredicate()}), eligible AS (
       SELECT * FROM candidates WHERE primary_translation IS NOT NULL AND
       (learning_status<>'new' OR new_rank<=GREATEST(0,$3-(SELECT count(DISTINCT a.learning_item_id) FROM product_gotit.practice_attempts a
@@ -246,6 +261,7 @@ export class PracticeService {
           count,
           eligibleIds ?? null,
           languageCode ?? null,
+          includeNewItems,
         ],
       )
     ).rows;
@@ -383,7 +399,15 @@ export class PracticeService {
       }
       if (!ids)
         ids = (
-          await this.queueRows(tx, scope, profile, input.count, undefined, input.sourceLanguageCode)
+          await this.queueRows(
+            tx,
+            scope,
+            profile,
+            input.count,
+            undefined,
+            input.sourceLanguageCode,
+            input.includeNewItems,
+          )
         ).map((r) => r.id);
       if (!ids.length) throw new AppError(409, 'NO_ELIGIBLE_ITEMS', 'No eligible learning items');
       const items = (
