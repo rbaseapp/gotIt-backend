@@ -10,6 +10,7 @@ import type { RateLimitContract } from '../middleware/rate-limit.js';
 import type { ProfileServiceContract } from '../../modules/profile/profile.types.js';
 import type { CoreAuthClient } from '../core/core-auth.client.js';
 import type { WordPackRepository } from '../../modules/word-packs/word-packs.repository.js';
+import type { WordPackStudyService } from '../../modules/word-packs/word-pack-study.service.js';
 import type { PrivateLessonService } from '../../modules/private-lessons/private-lesson.service.js';
 import type { CourseService } from '../../modules/courses/course.service.js';
 import type { AddonAccessContract } from '../../modules/addons/addon-access.js';
@@ -30,6 +31,7 @@ export type AppDependencies = {
   readingService?: ReadingService;
   speechService?: SpeechService;
   wordPackService?: WordPackRepository;
+  wordPackStudyService?: WordPackStudyService;
   privateLessonService?: PrivateLessonService;
   courseService?: CourseService;
   addonAccess?: AddonAccessContract;
