@@ -29,6 +29,7 @@ export const sessionSchema = z
     sourceLanguageCode: languageSchema.optional(),
     count: z.number().int().min(1).max(100).default(10),
     includeNewItems: z.boolean().optional(),
+    curriculumOrder: z.boolean().optional(),
   })
   .strict()
   .superRefine((v, ctx) => {

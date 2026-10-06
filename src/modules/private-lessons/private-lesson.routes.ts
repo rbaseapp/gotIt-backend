@@ -59,7 +59,13 @@ export function createPrivateLessonRoutes(
   router.get('/', requireLessonAccess, async (request, response) => {
     const input = parseInput(privateLessonListSchema, request.query);
     response.json({
-      ...(await service.listSessions(request.gotitAuth!, input.limit, input.courseId)),
+      ...(await service.listSessions(
+        request.gotitAuth!,
+        input.limit,
+        input.courseId,
+        input.packId,
+        input.targetLanguageCode,
+      )),
       requestId: request.id,
     });
   });

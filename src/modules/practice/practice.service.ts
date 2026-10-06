@@ -31,6 +31,7 @@ import {
 } from '../learning/learning.policy.js';
 import { scoreAnswer, type AnswerSpec } from './practice.scoring.js';
 import { practiceLanguagePredicate } from './practice.language.js';
+import { unitLearnedPredicate } from '../word-packs/unit-learning.js';
 import type {
   SessionInput,
   SessionScope,
@@ -267,6 +268,49 @@ export class PracticeService {
     ).rows;
     return rows;
   }
+  private async curriculumBatch(
+    tx: DatabaseTransaction,
+    scope: ProfileScope,
+    packId: string,
+    ids: string[],
+    count: number,
+    includeNew: boolean,
+  ) {
+    const rows = (
+      await tx.query(
+        `SELECT li.id,li.learning_status,${unitLearnedPredicate('li', '$3::uuid')} AS learned
+       FROM product_gotit.learning_item_pack_entries link
+       JOIN product_gotit.word_pack_entries entry ON entry.id=link.entry_id AND entry.pack_id=link.pack_id
+       JOIN product_gotit.learning_items li ON li.id=link.learning_item_id
+         AND li.application_id=link.application_id AND li.application_user_id=link.application_user_id
+       WHERE link.application_id=$1 AND link.application_user_id=$2 AND link.pack_id=$3
+         AND li.id=ANY($4::uuid[]) AND li.user_status='active' AND li.deleted_at IS NULL
+         AND ${practiceLanguagePredicate()}
+       ORDER BY entry.sort_order,entry.id`,
+        [...scopeValues(scope), packId, ids],
+      )
+    ).rows;
+    const seen = new Set<string>();
+    const ordered = rows.filter((row) => {
+      if (seen.has(row.id)) return false;
+      seen.add(row.id);
+      return true;
+    });
+    const firstUnfinished = ordered.findIndex((row) => !row.learned);
+    // Once the unit is finished, this same entry can revisit its first batch.
+    const start = firstUnfinished < 0 ? 0 : Math.floor(firstUnfinished / count) * count;
+    const currentBatch = ordered
+      .slice(start, start + count)
+      .filter((row) => firstUnfinished < 0 || !row.learned);
+    const selected: string[] = [];
+    for (const row of currentBatch) {
+      // Daily preferences size the batch; they never block another unit session.
+      // An explicit review-only request still stops before introducing a new word.
+      if (!includeNew && row.learning_status === 'new') break;
+      selected.push(row.id);
+    }
+    return selected;
+  }
   private async resolveSessionScope(
     tx: DatabaseTransaction,
     scope: ProfileScope,
@@ -343,6 +387,7 @@ export class PracticeService {
       correctCount: row.correct_count,
       xpEarned: row.xp_earned,
       algorithmVersion: row.algorithm_version,
+      curriculumOrder: selection.curriculumOrder === true,
       scope: selection.scope ?? null,
     };
   }
@@ -359,6 +404,7 @@ export class PracticeService {
   async createSession(scope: ProfileScope, key: string, input: SessionInput) {
     const profile = await this.profiles.getProfile(scope);
     const hash = fingerprint(input);
+    const curriculumOrder = input.sessionType === 'smart_review' && input.scope?.type === 'pack';
     return withTransaction(this.pool, async (tx) => {
       await tx.lock(['practice-session-event', ...scopeValues(scope), key]);
       const prior = (
@@ -397,6 +443,15 @@ export class PracticeService {
         scopeSnapshot = resolved.snapshot;
         ids = resolved.ids;
       }
+      if (curriculumOrder && input.scope?.type === 'pack')
+        ids = await this.curriculumBatch(
+          tx,
+          scope,
+          input.scope.id,
+          ids ?? [],
+          input.count,
+          input.includeNewItems ?? true,
+        );
       if (!ids)
         ids = (
           await this.queueRows(
@@ -454,6 +509,7 @@ export class PracticeService {
               itemIds: ids,
               readingId: input.readingId ?? null,
               scope: scopeSnapshot,
+              curriculumOrder,
             }),
           ],
         )
@@ -731,7 +787,13 @@ export class PracticeService {
         : null,
     };
   }
-  async sessions(scope: ProfileScope, limit: number, cursor?: string, languageCode?: string) {
+  async sessions(
+    scope: ProfileScope,
+    limit: number,
+    cursor?: string,
+    languageCode?: string,
+    packId?: string,
+  ) {
     return withTransaction(
       this.pool,
       async (tx) => {
@@ -740,10 +802,11 @@ export class PracticeService {
             await tx.query(
               `SELECT count(*)::integer AS count FROM product_gotit.practice_sessions session
                WHERE session.application_id=$1 AND session.application_user_id=$2
+                 AND ($4::uuid IS NULL OR (session.selection->'scope'->>'type'='pack' AND session.selection->'scope'->>'id'=$4::text))
                  AND ($3::text IS NULL OR EXISTS(SELECT 1 FROM product_gotit.learning_items item
                    WHERE item.application_id=$1 AND item.application_user_id=$2
                      AND item.id=(session.selection->'itemIds'->>0)::uuid AND item.source_language_code=$3))`,
-              [...scopeValues(scope), languageCode ?? null],
+              [...scopeValues(scope), languageCode ?? null, packId ?? null],
             )
           ).rows[0]?.count ?? 0,
         );
@@ -751,6 +814,7 @@ export class PracticeService {
           await tx.query(
             `SELECT session.* FROM product_gotit.practice_sessions session
              WHERE session.application_id=$1 AND session.application_user_id=$2
+               AND ($6::uuid IS NULL OR (session.selection->'scope'->>'type'='pack' AND session.selection->'scope'->>'id'=$6::text))
                AND ($5::text IS NULL OR EXISTS(SELECT 1 FROM product_gotit.learning_items item
                  WHERE item.application_id=$1 AND item.application_user_id=$2
                    AND item.id=(session.selection->'itemIds'->>0)::uuid AND item.source_language_code=$5))
@@ -759,7 +823,13 @@ export class PracticeService {
                  WHERE cursor.application_id=$1 AND cursor.application_user_id=$2 AND cursor.id=$3
                ))
              ORDER BY session.started_at DESC,session.id DESC LIMIT $4`,
-            [...scopeValues(scope), cursor ?? null, limit + 1, languageCode ?? null],
+            [
+              ...scopeValues(scope),
+              cursor ?? null,
+              limit + 1,
+              languageCode ?? null,
+              packId ?? null,
+            ],
           )
         ).rows;
         return {
@@ -832,6 +902,16 @@ export class PracticeService {
       const session = await this.session(tx, scope, id);
       if (session.status !== 'active')
         throw new AppError(409, 'SESSION_CLOSED', 'Session is closed');
+      if (
+        session.session_type === 'smart_review' &&
+        session.selection.scope?.type === 'pack' &&
+        session.selection.curriculumOrder !== true
+      )
+        throw new AppError(
+          409,
+          'UNIT_SESSION_ORDER_CHANGED',
+          'This unit session predates curriculum ordering. Return to the unit and start a new practice session.',
+        );
       const open = await tx.query(
         `SELECT count(*)::integer count FROM product_gotit.practice_exercises WHERE application_id=$1 AND application_user_id=$2 AND practice_session_id=$3 AND consumed_at IS NULL AND expires_at>now()`,
         [...scopeValues(scope), id],
@@ -873,6 +953,8 @@ export class PracticeService {
         )
       ).rows;
       if (!rows.length) throw new AppError(409, 'NO_ELIGIBLE_ITEMS', 'No eligible learning items');
+      if (session.selection.curriculumOrder)
+        rows.sort((left, right) => ids.indexOf(left.id) - ids.indexOf(right.id));
       const preferUnseen =
         (session.session_type === 'smart_review' || session.session_type === 'matching') &&
         !input.learningItemIds;
@@ -916,6 +998,7 @@ export class PracticeService {
                    FROM product_gotit.learning_items li
                    WHERE li.application_id=$1 AND li.application_user_id=$2
                      AND NOT(li.id=ANY($3::uuid[]))
+                     AND ($4::uuid[] IS NULL OR li.id=ANY($4::uuid[]))
                      AND li.user_status='active' AND li.deleted_at IS NULL
                      AND ${practiceLanguagePredicate()}
                      AND EXISTS(SELECT 1 FROM product_gotit.learning_items target
@@ -925,7 +1008,7 @@ export class PracticeService {
                          AND target.source_language_code=li.source_language_code
                          AND target.translation_language_code=li.translation_language_code)
                    ORDER BY li.created_at,id LIMIT 50`,
-                  [...scopeValues(scope), ids],
+                  [...scopeValues(scope), ids, session.selection.scope ? sessionIds : null],
                 )
               ).rows,
             ]
@@ -1209,7 +1292,11 @@ export class PracticeService {
           expiresAt,
         });
       }
-      if (session.session_type === 'smart_review') {
+      if (session.selection.curriculumOrder) {
+        exercises.sort(
+          (left, right) => ids.indexOf(left.learningItemId) - ids.indexOf(right.learningItemId),
+        );
+      } else if (session.session_type === 'smart_review') {
         const rank = new Map(SMART_LEARNING_ORDER.map((type, index) => [type, index]));
         exercises.sort(
           (left, right) =>

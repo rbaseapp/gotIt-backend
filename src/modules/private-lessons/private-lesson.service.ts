@@ -471,9 +471,17 @@ export class PrivateLessonService {
     }
   }
 
-  async listSessions(scope: ProfileScope, limit: number, courseId?: string) {
+  async listSessions(
+    scope: ProfileScope,
+    limit: number,
+    courseId?: string,
+    packId?: string,
+    targetLanguageCode?: string,
+  ) {
     return {
-      lessons: (await this.requireJournal().list(scope, limit, courseId)).map(publicStoredLesson),
+      lessons: (
+        await this.requireJournal().list(scope, limit, courseId, packId, targetLanguageCode)
+      ).map(publicStoredLesson),
     };
   }
 
@@ -688,6 +696,7 @@ export class PrivateLessonService {
 
 function publicStoredLesson(lesson: StoredPrivateLesson) {
   return {
+    wordPack: lesson.wordPack ?? null,
     course: lesson.course ?? null,
     id: lesson.id,
     targetLanguageCode: lesson.targetLanguageCode,

@@ -5,6 +5,7 @@ import { scopeValues } from '../library/library.repository.js';
 import { PROFILE_DEFAULTS } from '../profile/profile.constants.js';
 import type { ProfileScope } from '../profile/profile.types.js';
 import type { AddInput, KnownInput, RemovalInput } from './word-packs.validation.js';
+import { unitLearnedPredicate } from './unit-learning.js';
 
 type Row = Record<string, any>;
 
@@ -64,7 +65,7 @@ export class WordPackRepository {
           count(DISTINCT li.id) FILTER(WHERE up.status='active' AND link.excluded_at IS NULL AND li.learning_status='mastered')::integer mastered_count,
           count(DISTINCT known.entry_id)::integer known_count,
           count(DISTINCT e.id) FILTER(WHERE known.entry_id IS NOT NULL OR
-            (up.status='active' AND link.excluded_at IS NULL AND li.learning_status='mastered'))::integer completed_count,
+            (up.status='active' AND link.excluded_at IS NULL AND (li.learning_status='mastered' OR ${unitLearnedPredicate('li', 'p.id')})))::integer completed_count,
           count(DISTINCT li.id) FILTER(WHERE up.status='active' AND link.excluded_at IS NULL AND li.next_review_at<=now())::integer due_count
         FROM product_gotit.word_packs p
         JOIN product_gotit.word_tracks tr ON tr.id=p.track_id AND tr.is_active
@@ -109,12 +110,14 @@ export class WordPackRepository {
             `SELECT e.id,e.source_text AS "sourceText",e.translation_text AS "translationText",
               e.item_type AS "itemType",e.part_of_speech AS "partOfSpeech",e.example_text AS "exampleText",
               link.learning_item_id AS "learningItemId",link.excluded_at AS "excludedAt",
+              (link.excluded_at IS NULL AND li.user_status='active' AND ${unitLearnedPredicate('li', 'e.pack_id')}) IS TRUE AS "learned",
               (known.entry_id IS NOT NULL) AS "known"
             FROM product_gotit.word_pack_entries e
             LEFT JOIN product_gotit.learning_item_pack_entries link
               ON link.application_id=$1 AND link.application_user_id=$2 AND link.pack_id=e.pack_id AND link.entry_id=e.id
             LEFT JOIN product_gotit.user_word_pack_known_entries known
               ON known.application_id=$1 AND known.application_user_id=$2 AND known.pack_id=e.pack_id AND known.entry_id=e.id
+            LEFT JOIN product_gotit.learning_items li ON li.application_id=$1 AND li.application_user_id=$2 AND li.id=link.learning_item_id AND li.deleted_at IS NULL
             WHERE e.pack_id=$3 ORDER BY e.sort_order,e.id`,
             [...scopeValues(scope), id],
           )

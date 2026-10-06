@@ -9,6 +9,7 @@ import {
 } from './private-lesson.summary.js';
 
 export type StoredPrivateLesson = PrivateLessonPlan & {
+  wordPack?: Record<string, unknown> | null;
   status: 'active' | 'summarizing' | 'completed' | 'report_failed';
   startedAt: string;
   endedAt: string | null;
@@ -37,7 +38,13 @@ export type PrivateLessonReportFailureCode =
 export interface PrivateLessonJournal {
   create(scope: ProfileScope, plan: PrivateLessonPlan): Promise<void>;
   get(scope: ProfileScope, id: string): Promise<StoredPrivateLesson | null>;
-  list(scope: ProfileScope, limit: number, courseId?: string): Promise<StoredPrivateLesson[]>;
+  list(
+    scope: ProfileScope,
+    limit: number,
+    courseId?: string,
+    packId?: string,
+    targetLanguageCode?: string,
+  ): Promise<StoredPrivateLesson[]>;
   claim(scope: ProfileScope, id: string, duration: number): Promise<StoredPrivateLesson | null>;
   complete(
     scope: ProfileScope,
@@ -131,14 +138,29 @@ export class PostgresPrivateLessonJournal implements PrivateLessonJournal {
     return row ? storedLesson(row) : null;
   }
 
-  async list(scope: ProfileScope, limit: number, courseId?: string) {
+  async list(
+    scope: ProfileScope,
+    limit: number,
+    courseId?: string,
+    packId?: string,
+    targetLanguageCode?: string,
+  ) {
     const rows = (
       await this.pool.query(
         `${selectFields} WHERE s.application_id=$1 AND s.application_user_id=$2 AND s.deleted_at IS NULL
            AND s.status<>'active'
            AND ($4::uuid IS NULL OR s.course_context->>'courseId'=$4::text)
+           AND ($5::uuid IS NULL OR to_jsonb(s)->'word_pack_context'->>'packId'=$5::text)
+           AND ($6::text IS NULL OR lower(split_part(s.target_language_code,'-',1))=$6)
          ORDER BY s.started_at DESC,s.id DESC LIMIT $3`,
-        [scope.applicationId, scope.applicationUserId, limit, courseId ?? null],
+        [
+          scope.applicationId,
+          scope.applicationUserId,
+          limit,
+          courseId ?? null,
+          packId ?? null,
+          targetLanguageCode ? new Intl.Locale(targetLanguageCode).language.toLowerCase() : null,
+        ],
       )
     ).rows;
     return rows.map(storedLesson);
@@ -196,7 +218,7 @@ export class PostgresPrivateLessonJournal implements PrivateLessonJournal {
 }
 
 const selectFields = `SELECT s.id,s.target_language_code,s.support_language_code,s.level,s.topic,s.grammar_focus,
- s.focus_areas,s.custom_focus,s.correction_mode,s.vocabulary_mode,s.lesson_mode,s.teaching_language,s.continuity,s.roadmap_id,s.milestone_id,s.course_context,
+ s.focus_areas,s.custom_focus,s.correction_mode,s.vocabulary_mode,s.lesson_mode,s.teaching_language,s.continuity,s.roadmap_id,s.milestone_id,s.course_context,to_jsonb(s)->'word_pack_context' AS word_pack_context,
  s.teacher_voice,s.speech_rate,s.planned_duration_seconds,s.target_words,s.status,s.started_at,s.ended_at,
  s.actual_duration_seconds,s.report,r.goal_title,m.milestone_key,m.communication_objective,m.grammar_topics,
  m.success_criteria,m.evidence_lesson_count
@@ -212,6 +234,7 @@ function storedLesson(row: Record<string, unknown>): StoredPrivateLesson {
     row.report && typeof row.report === 'object' ? (row.report as Record<string, unknown>) : null;
   return {
     course: (row.course_context as PrivateLessonPlan['course']) ?? null,
+    wordPack: (row.word_pack_context as Record<string, unknown>) ?? null,
     id: String(row.id),
     durationSeconds: Number(row.planned_duration_seconds),
     targetLanguageCode: String(row.target_language_code),
