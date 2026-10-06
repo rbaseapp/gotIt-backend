@@ -1189,7 +1189,7 @@ test('course HTTP routes enforce Core identity, entitlement, strict input and pr
     new Set(API_ROUTES.map(({ method, path }) => `${method} ${path}`)).size,
     API_ROUTES.length,
   );
-  assert.equal(API_ROUTES.length, 87);
+  assert.equal(API_ROUTES.length, 89);
 });
 
 test('course session resolves approved language and objective before creating the Realtime session', async () => {
