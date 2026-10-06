@@ -104,7 +104,6 @@ test(
           scope: { type: 'pack', id },
           count: 10,
           includeNewItems: true,
-          curriculumOrder: true,
         }),
         { code: 'UNIT_DAILY_NEW_LIMIT' },
         'a used daily allowance explains the block instead of skipping to later unit words',
@@ -124,8 +123,12 @@ test(
           sourceLanguageCode: 'en',
           count,
           includeNewItems: true,
-          curriculumOrder: true,
         });
+        assert.equal(
+          batch.curriculumOrder,
+          true,
+          'unit ordering is a server default for legacy clients',
+        );
         const { cards } = await practice.studyCards(scope, batch.id);
         assert.equal(cards.length, count);
         assert.deepEqual(
@@ -147,6 +150,22 @@ test(
           cards.slice(0, 3).map((card) => card.learningItemId),
           'the actual game round, not only the study selection, keeps curriculum order',
         );
+        if (count === 10) {
+          await db.adminPool.query(
+            `UPDATE product_gotit.practice_sessions SET selection=selection-'curriculumOrder' WHERE id=$1`,
+            [batch.id],
+          );
+          assert.equal((await practice.getSession(scope, batch.id)).curriculumOrder, false);
+          await assert.rejects(
+            practice.issueExercises(scope, batch.id, {
+              count: 3,
+              exerciseType: 'matching',
+              kind: 'multiple_choice',
+            }),
+            { code: 'UNIT_SESSION_ORDER_CHANGED' },
+            'legacy unordered pools must not continue issuing later curriculum words',
+          );
+        }
       }
       for (const sessionType of [
         'recall',

@@ -413,6 +413,7 @@ export class PracticeService {
       correctCount: row.correct_count,
       xpEarned: row.xp_earned,
       algorithmVersion: row.algorithm_version,
+      curriculumOrder: selection.curriculumOrder === true,
       scope: selection.scope ?? null,
     };
   }
@@ -429,6 +430,7 @@ export class PracticeService {
   async createSession(scope: ProfileScope, key: string, input: SessionInput) {
     const profile = await this.profiles.getProfile(scope);
     const hash = fingerprint(input);
+    const curriculumOrder = input.sessionType === 'smart_review' && input.scope?.type === 'pack';
     return withTransaction(this.pool, async (tx) => {
       await tx.lock(['practice-session-event', ...scopeValues(scope), key]);
       const prior = (
@@ -483,7 +485,7 @@ export class PracticeService {
         )
           throw new AppError(400, 'VALIDATION_ERROR', 'A session must contain one source language');
       }
-      if (input.curriculumOrder && input.scope?.type === 'pack')
+      if (curriculumOrder && input.scope?.type === 'pack')
         ids = await this.curriculumBatch(
           tx,
           scope,
@@ -551,7 +553,7 @@ export class PracticeService {
               itemIds: ids,
               readingId: input.readingId ?? null,
               scope: scopeSnapshot,
-              curriculumOrder: input.curriculumOrder === true,
+              curriculumOrder,
             }),
           ],
         )
@@ -944,6 +946,16 @@ export class PracticeService {
       const session = await this.session(tx, scope, id);
       if (session.status !== 'active')
         throw new AppError(409, 'SESSION_CLOSED', 'Session is closed');
+      if (
+        session.session_type === 'smart_review' &&
+        session.selection.scope?.type === 'pack' &&
+        session.selection.curriculumOrder !== true
+      )
+        throw new AppError(
+          409,
+          'UNIT_SESSION_ORDER_CHANGED',
+          'This unit session predates curriculum ordering. Return to the unit and start a new practice session.',
+        );
       const open = await tx.query(
         `SELECT count(*)::integer count FROM product_gotit.practice_exercises WHERE application_id=$1 AND application_user_id=$2 AND practice_session_id=$3 AND consumed_at IS NULL AND expires_at>now()`,
         [...scopeValues(scope), id],

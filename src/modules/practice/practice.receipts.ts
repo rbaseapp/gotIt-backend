@@ -19,6 +19,7 @@ export const sessionReceiptSchema = z
         correctCount: count,
         xpEarned: count,
         algorithmVersion: z.string().min(1).max(100),
+        curriculumOrder: z.boolean().optional(),
         scope: z
           .object({
             type: z.enum(['pack', 'track', 'topic']),

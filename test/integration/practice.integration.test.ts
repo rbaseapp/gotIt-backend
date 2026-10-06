@@ -655,7 +655,12 @@ test(
             count: 5,
             scope: { type: 'pack', id: pack.id },
           }).expect(201);
-          assert.equal(scoped.body.session.itemCount, 10);
+          assert.equal(
+            scoped.body.session.itemCount,
+            5,
+            'unit smart practice honors the requested batch count',
+          );
+          assert.equal(scoped.body.session.curriculumOrder, true);
           assert.deepEqual(scoped.body.session.scope, {
             type: 'pack',
             id: pack.id,
@@ -671,7 +676,7 @@ test(
             count: 5,
             scope: { type: 'pack', id: pack.id },
           }).expect(201);
-          assert.equal(restoredScope.body.session.itemCount, 11);
+          assert.equal(restoredScope.body.session.itemCount, 5);
 
           const removed = await packCall(
             'delete',
@@ -682,7 +687,7 @@ test(
             'get',
             `/practice/sessions/${scoped.body.session.id}/study`,
           ).expect(200);
-          assert.equal(activeSnapshot.body.cards.length, 10);
+          assert.equal(activeSnapshot.body.cards.length, 5);
           await packCall('post', '/practice/sessions', {
             sessionType: 'smart_review',
             count: 5,
