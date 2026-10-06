@@ -124,6 +124,12 @@ export class WordPackStudyService {
     return { exampleText: await work, generated: true };
   }
 
+  /** Read-only: pronouns must not expose stale lexical images from owned items. */
+  async cachedImage(scope: ProfileScope, packId: string, entryId: string) {
+    const input = await this.input(scope, packId, entryId);
+    return input.visual ? { image: null } : this.packs.image(scope, packId, entryId);
+  }
+
   async image(scope: ProfileScope, packId: string, entryId: string) {
     const input = await this.input(scope, packId, entryId);
     const cached = input.visual ? { image: null } : await this.packs.image(scope, packId, entryId);

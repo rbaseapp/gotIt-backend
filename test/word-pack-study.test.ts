@@ -172,6 +172,10 @@ test('authenticated app mounts GET image and both study POST routes with trusted
       },
     } as never,
     wordPackStudyService: {
+      cachedImage: async (...args: unknown[]) => {
+        calls.push(args);
+        return { image: null };
+      },
       image: async (...args: unknown[]) => {
         calls.push(args);
         return { image: { url: 'data:image/png;base64,aQ==', alt: 'I' } };

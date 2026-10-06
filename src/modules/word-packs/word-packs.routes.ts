@@ -38,7 +38,7 @@ export function createWordPackRoutes(
   );
   router.get('/:id/entries/:entryId/image', async (req, res) =>
     res.set('Cache-Control', 'private, no-store').json({
-      ...(await service.image(
+      ...(await (study ? study.cachedImage.bind(study) : service.image.bind(service))(
         req.gotitAuth!,
         parseInput(uuidSchema, req.params.id),
         parseInput(uuidSchema, req.params.entryId),

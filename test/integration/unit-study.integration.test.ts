@@ -55,6 +55,8 @@ test(
         },
       });
       const entryId = String(initial.entries[0]!.id);
+      assert.deepEqual(await study.cachedImage(scope, id, entryId), { image: null });
+      assert.equal(images, 0, 'GET cache lookup does not contact a provider');
       const media = await study.image(scope, id, entryId);
       assert.ok(media.image?.url.startsWith('data:image/png'));
       assert.deepEqual(await study.example(scope, id, entryId), {
