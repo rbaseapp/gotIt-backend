@@ -39,6 +39,9 @@ export const privateLessonTeachingLanguages = ['target', 'support'] as const;
 export const privateLessonInputSchema = z
   .object({
     courseId: z.uuid().optional(),
+    packId: z.uuid().optional(),
+    station: z.enum(['supported', 'review']).optional(),
+    interactionMode: z.enum(['guided', 'conversation']).optional(),
     targetLanguageCode: languageSchema,
     supportLanguageCode: languageSchema.nullable().optional(),
     lessonMode: z.enum(privateLessonModes).optional(),
@@ -63,6 +66,14 @@ export const privateLessonInputSchema = z
   })
   .strict()
   .superRefine((value, context) => {
+    if (value.interactionMode === 'conversation' && (value.courseId || value.packId))
+      context.addIssue({
+        code: 'custom',
+        path: ['interactionMode'],
+        message: 'A program lesson uses guided interaction',
+      });
+    if ((value.courseId && value.packId) || (value.station && !value.packId))
+      context.addIssue({ code: 'custom', path: ['packId'], message: 'Choose one lesson context' });
     if (value.lessonMode === 'absolute_beginner' && value.teachingLanguage === 'target')
       context.addIssue({
         code: 'custom',
@@ -82,6 +93,9 @@ export const privateLessonInputSchema = z
   });
 
 export type PrivateLessonInput = z.output<typeof privateLessonInputSchema>;
+export const lessonReplaySchema = z
+  .object({ kind: z.enum(['original', 'translation']), rate: z.enum(['normal', 'slow']) })
+  .strict();
 
 export const privateLessonPreferencesInputSchema = z
   .object({
@@ -89,7 +103,13 @@ export const privateLessonPreferencesInputSchema = z
     supportLanguageCode: languageSchema.nullable(),
     lessonMode: z.enum(privateLessonModes).default('standard'),
     teachingLanguage: z.enum(privateLessonTeachingLanguages).optional(),
-    requestedDurationMinutes: z.union([z.literal(1), z.literal(5), z.literal(10), z.literal(15), z.literal(20)]),
+    requestedDurationMinutes: z.union([
+      z.literal(1),
+      z.literal(5),
+      z.literal(10),
+      z.literal(15),
+      z.literal(20),
+    ]),
     teacherVoice: z.enum(['female', 'male']),
     speechRate: z.enum(privateLessonSpeechRates),
     focusAreas: z
@@ -135,6 +155,9 @@ export const privateLessonPreferencesInputSchema = z
 export type PrivateLessonPreferencesInput = z.output<typeof privateLessonPreferencesInputSchema>;
 
 export const privateLessonSetupSchema = z.object({ targetLanguageCode: languageSchema }).strict();
+export const privateLessonVoiceSampleSchema = z
+  .object({ teacherVoice: z.enum(['female', 'male']) })
+  .strict();
 export const privateLessonRoadmapInputSchema = z
   .object({
     targetLanguageCode: languageSchema,
@@ -176,6 +199,8 @@ export const privateLessonListSchema = z
   .object({
     limit: z.coerce.number().int().min(1).max(50).default(20),
     courseId: z.uuid().optional(),
+    packId: z.uuid().optional(),
+    targetLanguageCode: languageSchema.optional(),
   })
   .strict();
 

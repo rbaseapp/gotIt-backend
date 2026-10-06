@@ -100,12 +100,12 @@ test(
       }
 
       await t.test(
-        'fresh bootstrap creates the 20 baseline tables plus thirty GotIt operational tables',
+        'fresh bootstrap creates the 20 baseline tables plus thirty-two GotIt operational tables',
         async () => {
           const tables = await database.adminPool
             .query(`SELECT count(*)::integer AS count FROM information_schema.tables
           WHERE table_schema = 'product_gotit' AND table_type = 'BASE TABLE'`);
-          assert.equal(tables.rows[0].count, 50);
+          assert.equal(tables.rows[0].count, 52);
           await assert.rejects(
             () => database.runtimePool.query('SELECT id FROM core.application_users'),
             (error: unknown) => error instanceof Error && 'code' in error && error.code === '42501',
@@ -135,6 +135,50 @@ test(
           const persisted = await snapshot(patchFirstUser);
           assert.equal(persisted.profile.length, 1);
           assert.equal(persisted.profile[0].timezone, 'Europe/Paris');
+        },
+      );
+
+      await t.test(
+        'interface preferences persist by owner and survive a legacy skill-only patch',
+        async () => {
+          const preferences = {
+            enabledSkills: ['recognition'],
+            uiLocale: 'ar',
+            textScale: 'large',
+            reducedMotion: true,
+            sounds: false,
+          };
+          await patch('test-user-a', { learningPreferences: preferences }).expect(200);
+          assert.deepEqual(
+            (await get('test-user-a')).body.profile.learningPreferences,
+            preferences,
+          );
+          assert.equal(
+            (await get('test-user-b')).body.profile.learningPreferences.uiLocale,
+            undefined,
+          );
+          const legacy = await patch('test-user-a', {
+            learningPreferences: { enabledSkills: ['recall'] },
+          }).expect(200);
+          assert.deepEqual(legacy.body.profile.learningPreferences, {
+            ...preferences,
+            enabledSkills: ['recall'],
+          });
+          for (const invalid of [
+            { uiLocale: 'xx' },
+            { textScale: 'giant' },
+            { sounds: 'false' },
+            { reducedMotion: 1 },
+            { arbitrary: true },
+          ]) {
+            await patch('test-user-a', {
+              learningPreferences: { enabledSkills: ['recall'], ...invalid },
+            }).expect(400);
+          }
+          assert.deepEqual(
+            (await get('test-user-a')).body.profile.learningPreferences,
+            legacy.body.profile.learningPreferences,
+          );
         },
       );
 

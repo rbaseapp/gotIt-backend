@@ -133,6 +133,24 @@ export async function verifyRuntimeSchema(client, { strictRole = true } = {}) {
       'started_at',
       'deleted_at',
       'course_context',
+      'word_pack_context',
+    ],
+    private_lesson_activities: [
+      'application_id',
+      'application_user_id',
+      'lesson_id',
+      'revision',
+      'plan',
+      'snapshot',
+      'updated_at',
+    ],
+    private_lesson_activity_commands: [
+      'application_id',
+      'application_user_id',
+      'lesson_id',
+      'event_id',
+      'fingerprint',
+      'snapshot',
     ],
     learning_documents: [
       'application_id',
@@ -309,7 +327,7 @@ export async function verifyRuntimeSchema(client, { strictRole = true } = {}) {
     schema: 'ok',
     privileges: 'ok',
     role: strictRole ? 'product-only' : 'not-enforced',
-    operationalTables: 17,
+    operationalTables: Object.keys(requirements).length,
   };
 }
 

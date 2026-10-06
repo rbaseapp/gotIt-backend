@@ -123,11 +123,11 @@ export class ProfileRepository {
           patch.translationMethodPreference !== undefined
             ? patch.translationMethodPreference
             : current.translation_method_preference,
-          JSON.stringify(
-            patch.learningPreferences ??
-              current.learning_preferences ??
-              defaults.learningPreferences,
-          ),
+          JSON.stringify({
+            ...defaults.learningPreferences,
+            ...current.learning_preferences,
+            ...patch.learningPreferences,
+          }),
         ],
       );
 

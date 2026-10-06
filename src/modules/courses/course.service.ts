@@ -14,6 +14,7 @@ import {
   type LearningDocumentStore,
 } from './course.repository.js';
 import type { CourseGenerator } from './course.provider.js';
+import type { CourseWordSource } from './course.words.js';
 import {
   REALTIME_CONNECT_PATH,
   type RealtimeCallGuard,
@@ -113,6 +114,7 @@ export class CourseService {
       fetchImpl?: typeof fetch;
       callGuard?: RealtimeCallGuard;
     },
+    private readonly wordSource?: CourseWordSource,
   ) {}
   get available() {
     return Boolean(this.generator);
@@ -142,6 +144,26 @@ export class CourseService {
   }
   async deleteCourse(scope: ProfileScope, id: string) {
     if (!(await this.store.deleteCourse(scope, id))) throw courseNotFound();
+  }
+  async unitWords(scope: ProfileScope, id: string, unitKey: string) {
+    const course = await this.course(scope, id);
+    const version = course.versions.find((entry) => entry.version === course.activeVersion);
+    const unit = version?.plan.units.find((entry) => entry.key === unitKey);
+    if (!unit || !version) throw courseNotFound();
+    if (!this.wordSource)
+      throw new AppError(503, 'COURSE_WORDS_UNAVAILABLE', 'Course vocabulary is unavailable');
+    return {
+      title: unit.title,
+      unitKey: unit.key,
+      targetLanguageCode: version.preferences.targetLanguageCode,
+      supportLanguageCode: version.preferences.supportLanguageCode,
+      words: await this.wordSource.resolve(
+        scope,
+        unit.vocabulary,
+        version.preferences.targetLanguageCode,
+        version.preferences.supportLanguageCode,
+      ),
+    };
   }
   async realtimeSession(scope: ProfileScope, id: string) {
     const course = await this.course(scope, id);

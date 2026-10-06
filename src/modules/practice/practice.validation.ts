@@ -28,9 +28,16 @@ export const sessionSchema = z
     scope: sessionScopeSchema.optional(),
     sourceLanguageCode: languageSchema.optional(),
     count: z.number().int().min(1).max(100).default(10),
+    includeNewItems: z.boolean().optional(),
   })
   .strict()
   .superRefine((v, ctx) => {
+    if (v.includeNewItems !== undefined && v.sessionType !== 'smart_review')
+      ctx.addIssue({
+        code: 'custom',
+        path: ['includeNewItems'],
+        message: 'Scheduling options require smart review',
+      });
     if ((v.sessionType === 'article_quiz') !== Boolean(v.readingId))
       ctx.addIssue({ code: 'custom', message: 'Article quiz requires readingId' });
     if (v.scope && (v.learningItemIds || v.readingId))

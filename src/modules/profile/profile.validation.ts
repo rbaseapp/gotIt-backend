@@ -47,6 +47,10 @@ export const profilePatchSchema = z
           .min(1)
           .max(5)
           .refine((v) => new Set(v).size === v.length, 'Duplicate enabled skills'),
+        uiLocale: z.enum(['ar', 'de', 'en', 'es', 'fr', 'he', 'ru', 'zh']).optional(),
+        textScale: z.enum(['normal', 'large']).optional(),
+        reducedMotion: z.boolean().optional(),
+        sounds: z.boolean().optional(),
       })
       .strict()
       .optional(),

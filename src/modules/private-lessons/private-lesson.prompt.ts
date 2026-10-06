@@ -25,6 +25,7 @@ export type PrivateLessonTarget = {
 };
 
 export type PrivateLessonPlan = {
+  wordPack?: PrivateLessonWordPackContext | null;
   course?: CourseLessonContext | null;
   teachingBrief?: PrivateLessonBrief;
   id: string;
@@ -62,6 +63,24 @@ export type PrivateLessonPlan = {
     evidenceLessonCount: number;
     isFirstMilestoneLesson: boolean;
   } | null;
+};
+
+export type PrivateLessonWordPackContext = {
+  packId: string;
+  title: string;
+  moduleNumber: number;
+  targetLanguageCode: string;
+  supportLanguageCode: string;
+  level: CefrLevel;
+  station: 'supported' | 'review';
+  completed: number;
+  total: number;
+  words: {
+    sourceText: string;
+    translationText: string;
+    exampleText: string | null;
+    introduced: boolean;
+  }[];
 };
 
 export type LessonLanguage = {
@@ -188,6 +207,7 @@ ${standardSupportLanguagePolicy}`;
         text: target.sourceText,
         meaning: target.translationText,
       })),
+      wordPack: plan.wordPack ?? null,
       previousLesson: plan.continuity,
       learningRoadmap: plan.roadmap,
       course: plan.course ?? null,

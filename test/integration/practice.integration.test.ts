@@ -148,6 +148,113 @@ test(
         ids.push(captured.body.capture.learningItemId);
       }
       await t.test(
+        'smart pace schedules within the selected words, omits new words for review-only, and validates ownership first',
+        async () => {
+          const selected: string[] = [];
+          try {
+            for (const text of ['coffee', 'water', 'tea']) {
+              const captured = await call(
+                'post',
+                '/captures',
+                {
+                  item: {
+                    sourceText: text,
+                    sourceLanguageCode: 'en',
+                    translationLanguageCode: 'he',
+                    itemType: 'word',
+                  },
+                  translation: { text: 'fixture meaning' },
+                  context: { selectedText: text },
+                  senseDecision: { mode: 'auto' },
+                },
+                randomUUID(),
+                1,
+              ).expect(201);
+              selected.push(captured.body.capture.learningItemId);
+            }
+            await db.adminPool.query(
+              "UPDATE product_gotit.learning_items SET learning_status='learning',next_review_at=now()-interval '1 day' WHERE id=$1",
+              [selected[1]],
+            );
+            await db.adminPool.query(
+              "UPDATE product_gotit.learning_items SET learning_status='mastered',overall_mastery_score=100,next_review_at=now()+interval '30 days' WHERE id=$1",
+              [selected[2]],
+            );
+            const review = await call(
+              'post',
+              '/practice/sessions',
+              {
+                sessionType: 'smart_review',
+                learningItemIds: selected,
+                count: 10,
+                includeNewItems: false,
+              },
+              randomUUID(),
+              1,
+            ).expect(201);
+            assert.equal(review.body.session.itemCount, 1);
+            const row = (
+              await db.runtimePool.query(
+                'SELECT selection FROM product_gotit.practice_sessions WHERE id=$1',
+                [review.body.session.id],
+              )
+            ).rows[0];
+            assert.deepEqual(row.selection.itemIds, [selected[1]]);
+            const eventId = randomUUID();
+            const input = {
+              sessionType: 'smart_review',
+              learningItemIds: selected,
+              count: 1,
+              includeNewItems: true,
+            };
+            const first = await call('post', '/practice/sessions', input, eventId, 1).expect(201);
+            assert.equal(first.body.session.itemCount, 1);
+            assert.equal(
+              (await call('post', '/practice/sessions', input, eventId, 1).expect(200)).body.session
+                .id,
+              first.body.session.id,
+            );
+            await call(
+              'post',
+              '/practice/sessions',
+              { ...input, includeNewItems: false },
+              eventId,
+              1,
+            ).expect(409);
+            await call(
+              'post',
+              '/practice/sessions',
+              { ...input, learningItemIds: [selected[1], ids[0]] },
+              randomUUID(),
+              1,
+            ).expect(404);
+            await call(
+              'post',
+              '/practice/sessions',
+              { ...input, sessionType: 'recall' },
+              randomUUID(),
+              1,
+            ).expect(400);
+            await call(
+              'post',
+              '/practice/sessions',
+              { ...input, learningItemIds: [selected[0]], includeNewItems: false },
+              randomUUID(),
+              1,
+            ).expect(409);
+          } finally {
+            await db.adminPool.query(
+              'DELETE FROM product_gotit.practice_sessions WHERE application_id=$1 AND application_user_id=$2',
+              [applicationId, users[1]],
+            );
+            await db.adminPool.query(
+              'DELETE FROM product_gotit.learning_items WHERE application_id=$1 AND application_user_id=$2 AND id=ANY($3::uuid[])',
+              [applicationId, users[1], selected],
+            );
+          }
+        },
+      );
+      await t.test(
         'script guard accepts native letters, marks and explicit scripts, and rejects foreign letters',
         async () => {
           const cases = [
@@ -1421,7 +1528,7 @@ test(
             client.release();
           }
           const inspection = await inspectProduction(db.runtimePool.options.connectionString);
-          assert.equal(inspection.productTableCount, 50);
+          assert.equal(inspection.productTableCount, 52);
           assert.deepEqual(inspection.v1, {
             learningRevision: true,
             captureReceipts: true,

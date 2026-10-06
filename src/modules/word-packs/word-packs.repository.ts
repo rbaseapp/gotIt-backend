@@ -109,12 +109,15 @@ export class WordPackRepository {
             `SELECT e.id,e.source_text AS "sourceText",e.translation_text AS "translationText",
               e.item_type AS "itemType",e.part_of_speech AS "partOfSpeech",e.example_text AS "exampleText",
               link.learning_item_id AS "learningItemId",link.excluded_at AS "excludedAt",
+              li.learning_status AS "learningStatus",li.user_status AS "userStatus",
               (known.entry_id IS NOT NULL) AS "known"
             FROM product_gotit.word_pack_entries e
             LEFT JOIN product_gotit.learning_item_pack_entries link
               ON link.application_id=$1 AND link.application_user_id=$2 AND link.pack_id=e.pack_id AND link.entry_id=e.id
             LEFT JOIN product_gotit.user_word_pack_known_entries known
               ON known.application_id=$1 AND known.application_user_id=$2 AND known.pack_id=e.pack_id AND known.entry_id=e.id
+            LEFT JOIN product_gotit.learning_items li
+              ON li.application_id=$1 AND li.application_user_id=$2 AND li.id=link.learning_item_id AND li.deleted_at IS NULL
             WHERE e.pack_id=$3 ORDER BY e.sort_order,e.id`,
             [...scopeValues(scope), id],
           )

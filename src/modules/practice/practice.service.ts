@@ -178,6 +178,7 @@ export class PracticeService {
     count: number,
     eligibleIds?: string[],
     languageCode?: string,
+    includeNewItems = true,
   ) {
     const rows = (
       await tx.query(
@@ -237,7 +238,7 @@ export class PracticeService {
        ORDER BY last_matching_success_at NULLS FIRST,queue_score DESC,created_at,id LIMIT $9`,
         [
           ...scopeValues(scope),
-          profile.defaultNewItemsPerDay,
+          includeNewItems ? profile.defaultNewItemsPerDay : 0,
           profile.timezone,
           this.policy.minimumScoredAttempts,
           this.policy.minimumActiveRecallSuccesses,
@@ -381,9 +382,33 @@ export class PracticeService {
         scopeSnapshot = resolved.snapshot;
         ids = resolved.ids;
       }
-      if (!ids)
+      if (input.includeNewItems !== undefined && input.learningItemIds) {
+        const selected = (
+          await tx.query(
+            `SELECT id,source_language_code,${practiceLanguagePredicate()} AS language_matches
+          FROM product_gotit.learning_items li WHERE application_id=$1 AND application_user_id=$2
+          AND id=ANY($3::uuid[]) AND user_status='active' AND deleted_at IS NULL FOR SHARE`,
+            [...scopeValues(scope), input.learningItemIds],
+          )
+        ).rows;
+        if (selected.length !== input.learningItemIds.length) throw itemNotFound();
+        if (
+          selected.some((item) => !item.language_matches) ||
+          new Set(selected.map((item) => item.source_language_code)).size > 1
+        )
+          throw new AppError(400, 'VALIDATION_ERROR', 'A session must contain one source language');
+      }
+      if (!ids || input.includeNewItems !== undefined)
         ids = (
-          await this.queueRows(tx, scope, profile, input.count, undefined, input.sourceLanguageCode)
+          await this.queueRows(
+            tx,
+            scope,
+            profile,
+            input.count,
+            ids,
+            input.sourceLanguageCode,
+            input.includeNewItems ?? true,
+          )
         ).map((r) => r.id);
       if (!ids.length) throw new AppError(409, 'NO_ELIGIBLE_ITEMS', 'No eligible learning items');
       const items = (
@@ -707,7 +732,13 @@ export class PracticeService {
         : null,
     };
   }
-  async sessions(scope: ProfileScope, limit: number, cursor?: string, languageCode?: string) {
+  async sessions(
+    scope: ProfileScope,
+    limit: number,
+    cursor?: string,
+    languageCode?: string,
+    packId?: string,
+  ) {
     return withTransaction(
       this.pool,
       async (tx) => {
@@ -716,10 +747,11 @@ export class PracticeService {
             await tx.query(
               `SELECT count(*)::integer AS count FROM product_gotit.practice_sessions session
                WHERE session.application_id=$1 AND session.application_user_id=$2
+                 AND ($4::uuid IS NULL OR (session.selection->'scope'->>'type'='pack' AND session.selection->'scope'->>'id'=$4::text))
                  AND ($3::text IS NULL OR EXISTS(SELECT 1 FROM product_gotit.learning_items item
                    WHERE item.application_id=$1 AND item.application_user_id=$2
                      AND item.id=(session.selection->'itemIds'->>0)::uuid AND item.source_language_code=$3))`,
-              [...scopeValues(scope), languageCode ?? null],
+              [...scopeValues(scope), languageCode ?? null, packId ?? null],
             )
           ).rows[0]?.count ?? 0,
         );
@@ -727,6 +759,7 @@ export class PracticeService {
           await tx.query(
             `SELECT session.* FROM product_gotit.practice_sessions session
              WHERE session.application_id=$1 AND session.application_user_id=$2
+               AND ($6::uuid IS NULL OR (session.selection->'scope'->>'type'='pack' AND session.selection->'scope'->>'id'=$6::text))
                AND ($5::text IS NULL OR EXISTS(SELECT 1 FROM product_gotit.learning_items item
                  WHERE item.application_id=$1 AND item.application_user_id=$2
                    AND item.id=(session.selection->'itemIds'->>0)::uuid AND item.source_language_code=$5))
@@ -735,7 +768,13 @@ export class PracticeService {
                  WHERE cursor.application_id=$1 AND cursor.application_user_id=$2 AND cursor.id=$3
                ))
              ORDER BY session.started_at DESC,session.id DESC LIMIT $4`,
-            [...scopeValues(scope), cursor ?? null, limit + 1, languageCode ?? null],
+            [
+              ...scopeValues(scope),
+              cursor ?? null,
+              limit + 1,
+              languageCode ?? null,
+              packId ?? null,
+            ],
           )
         ).rows;
         return {

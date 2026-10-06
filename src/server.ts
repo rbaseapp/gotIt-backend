@@ -32,7 +32,13 @@ import { PixabayStudyImageProvider } from './modules/practice/pixabay-study-imag
 import { FallbackStudyImageProvider } from './modules/practice/study-image.provider.js';
 import { WordPackRepository } from './modules/word-packs/word-packs.repository.js';
 import { PrivateLessonService } from './modules/private-lessons/private-lesson.service.js';
+import { PostgresPrivateLessonWordPackSource } from './modules/private-lessons/private-lesson.word-pack.js';
+import {
+  LessonActivityService,
+  PostgresLessonActivityStore,
+} from './modules/private-lessons/private-lesson.activity.js';
 import { CourseService } from './modules/courses/course.service.js';
+import { PostgresCourseWordSource } from './modules/courses/course.words.js';
 import { PostgresLearningDocumentStore } from './modules/courses/course.repository.js';
 import { OpenAiCourseGenerator } from './modules/courses/course.provider.js';
 import { PostgresPrivateLessonRoadmapStore } from './modules/private-lessons/private-lesson.roadmap.js';
@@ -241,8 +247,16 @@ const courseService = new CourseService(
         callGuard: realtimeCallGuard,
       }
     : undefined,
+  new PostgresCourseWordSource(pool),
 );
 const privateLessonService = new PrivateLessonService({
+  wordPacks: new PostgresPrivateLessonWordPackSource(pool),
+  activities: privateLessonContentGenerator
+    ? new LessonActivityService(
+        new PostgresLessonActivityStore(pool),
+        privateLessonContentGenerator,
+      )
+    : undefined,
   courses: courseService,
   lessonContentGenerator: privateLessonContentGenerator,
   apiKey: env.OPENAI_REALTIME_API_KEY ?? env.OPENAI_API_KEY,

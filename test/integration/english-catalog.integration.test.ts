@@ -11,6 +11,8 @@ test(
   async () => {
     const db = await createTestDatabase();
     try {
+      // Remove the guided-lesson migration before exercising the catalog migration.
+      await db.migrate('down');
       await db.migrate('down');
       const applicationId = randomUUID();
       const userId = randomUUID();

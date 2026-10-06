@@ -1184,12 +1184,12 @@ test('course HTTP routes enforce Core identity, entitlement, strict input and pr
     .set('Authorization', 'Bearer fixture')
     .expect(204);
   assert.equal(await store.get(scope, course.id), null);
-  assert.equal(API_ROUTES.filter(({ path }) => path.startsWith('/api/v1/courses')).length, 14);
+  assert.equal(API_ROUTES.filter(({ path }) => path.startsWith('/api/v1/courses')).length, 15);
   assert.equal(
     new Set(API_ROUTES.map(({ method, path }) => `${method} ${path}`)).size,
     API_ROUTES.length,
   );
-  assert.equal(API_ROUTES.length, 80);
+  assert.equal(API_ROUTES.length, 86);
 });
 
 test('course session resolves approved language and objective before creating the Realtime session', async () => {

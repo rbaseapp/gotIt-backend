@@ -58,6 +58,22 @@ export function createCourseRoutes(service: CourseService, requireAccess: Reques
       ),
     }),
   );
+  router.get('/:id/units/:unitKey/words', async (req, res) =>
+    res.json(
+      await service.unitWords(
+        req.gotitAuth!,
+        parseInput(uuidSchema, req.params.id),
+        parseInput(
+          z
+            .string()
+            .min(1)
+            .max(70)
+            .regex(/^[a-z0-9-]+$/),
+          req.params.unitKey,
+        ),
+      ),
+    ),
+  );
   router.delete('/:id', async (req, res) => {
     await service.deleteCourse(req.gotitAuth!, parseInput(uuidSchema, req.params.id));
     res.status(204).end();
