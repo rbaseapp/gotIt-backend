@@ -14,6 +14,23 @@ import {
 
 const id = '30000000-0000-4000-8000-000000000001';
 
+test('curriculum order is restricted to unit-owned smart practice', () => {
+  assert.equal(
+    sessionSchema.safeParse({
+      sessionType: 'smart_review',
+      scope: { type: 'pack', id },
+      curriculumOrder: true,
+    }).success,
+    true,
+  );
+  for (const input of [
+    { sessionType: 'smart_review', curriculumOrder: true },
+    { sessionType: 'recall', scope: { type: 'pack', id }, curriculumOrder: true },
+    { sessionType: 'smart_review', scope: { type: 'track', id }, curriculumOrder: true },
+  ])
+    assert.equal(sessionSchema.safeParse(input).success, false);
+});
+
 test('replacement English catalog matches the supplied 60 units without repeated words', () => {
   const source = readFileSync(
     new URL('../migrations/data/english-unique-3000-source.txt', import.meta.url),

@@ -7,6 +7,7 @@ import type { ProfileScope } from '../profile/profile.types.js';
 import type { AddInput, KnownInput, RemovalInput } from './word-packs.validation.js';
 
 import { wordPackJourney } from './word-pack-journey.js';
+import { unitLearnedPredicate } from './unit-learning.js';
 
 type Row = Record<string, any>;
 
@@ -117,6 +118,7 @@ export class WordPackRepository {
               e.item_type AS "itemType",e.part_of_speech AS "partOfSpeech",e.example_text AS "exampleText",
               link.learning_item_id AS "learningItemId",link.excluded_at AS "excludedAt",
               li.learning_status AS "learningStatus",li.user_status AS "userStatus",
+              (link.excluded_at IS NULL AND li.user_status='active' AND ${unitLearnedPredicate('li', 'e.pack_id')}) IS TRUE AS "learned",
               (known.entry_id IS NOT NULL) AS "known"
             FROM product_gotit.word_pack_entries e
             LEFT JOIN product_gotit.learning_item_pack_entries link

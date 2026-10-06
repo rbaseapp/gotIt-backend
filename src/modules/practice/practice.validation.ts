@@ -29,9 +29,12 @@ export const sessionSchema = z
     sourceLanguageCode: languageSchema.optional(),
     count: z.number().int().min(1).max(100).default(10),
     includeNewItems: z.boolean().optional(),
+    curriculumOrder: z.boolean().optional(),
   })
   .strict()
   .superRefine((v, ctx) => {
+    if (v.curriculumOrder && (v.sessionType !== 'smart_review' || v.scope?.type !== 'pack'))
+      ctx.addIssue({ code: 'custom', message: 'Curriculum order requires unit smart practice' });
     if (v.includeNewItems !== undefined && v.sessionType !== 'smart_review')
       ctx.addIssue({
         code: 'custom',

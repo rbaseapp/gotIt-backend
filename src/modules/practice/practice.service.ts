@@ -31,6 +31,7 @@ import {
 } from '../learning/learning.policy.js';
 import { scoreAnswer, type AnswerSpec } from './practice.scoring.js';
 import { practiceLanguagePredicate } from './practice.language.js';
+import { unitLearnedPredicate } from '../word-packs/unit-learning.js';
 import type {
   SessionInput,
   SessionScope,
@@ -266,6 +267,68 @@ export class PracticeService {
     ).rows;
     return rows;
   }
+  private async curriculumBatch(
+    tx: DatabaseTransaction,
+    scope: ProfileScope,
+    profile: GotItProfile,
+    packId: string,
+    ids: string[],
+    count: number,
+    includeNew: boolean,
+  ) {
+    const rows = (
+      await tx.query(
+        `SELECT li.id,li.learning_status,${unitLearnedPredicate('li', '$3::uuid')} AS learned
+       FROM product_gotit.learning_item_pack_entries link
+       JOIN product_gotit.word_pack_entries entry ON entry.id=link.entry_id AND entry.pack_id=link.pack_id
+       JOIN product_gotit.learning_items li ON li.id=link.learning_item_id
+         AND li.application_id=link.application_id AND li.application_user_id=link.application_user_id
+       WHERE link.application_id=$1 AND link.application_user_id=$2 AND link.pack_id=$3
+         AND li.id=ANY($4::uuid[]) AND li.user_status='active' AND li.deleted_at IS NULL
+         AND ${practiceLanguagePredicate()}
+       ORDER BY entry.sort_order,entry.id`,
+        [...scopeValues(scope), packId, ids],
+      )
+    ).rows;
+    const seen = new Set<string>();
+    const ordered = rows.filter((row) => {
+      if (seen.has(row.id)) return false;
+      seen.add(row.id);
+      return true;
+    });
+    const firstUnfinished = ordered.findIndex((row) => !row.learned);
+    // Once the unit is finished, this same entry can revisit its first batch.
+    const start = firstUnfinished < 0 ? 0 : Math.floor(firstUnfinished / count) * count;
+    const currentBatch = ordered
+      .slice(start, start + count)
+      .filter((row) => firstUnfinished < 0 || !row.learned);
+    const used = Number(
+      (
+        await tx.query(
+          `SELECT count(DISTINCT a.learning_item_id)::integer count
+       FROM product_gotit.practice_attempts a
+       WHERE a.application_id=$1 AND a.application_user_id=$2 AND a.result<>'skipped'
+         AND (a.created_at AT TIME ZONE $3)::date=(now() AT TIME ZONE $3)::date
+         AND NOT EXISTS(SELECT 1 FROM product_gotit.practice_attempts older
+           WHERE older.application_id=a.application_id AND older.application_user_id=a.application_user_id
+             AND older.learning_item_id=a.learning_item_id AND older.result<>'skipped'
+             AND (older.created_at AT TIME ZONE $3)::date<(now() AT TIME ZONE $3)::date)`,
+          [...scopeValues(scope), profile.timezone],
+        )
+      ).rows[0]!.count,
+    );
+    let newRemaining = includeNew ? Math.max(0, profile.defaultNewItemsPerDay - used) : 0;
+    const selected: string[] = [];
+    for (const row of currentBatch) {
+      // Do not jump over an earlier new word to fill the batch with later words.
+      if (row.learning_status === 'new') {
+        if (!newRemaining) break;
+        newRemaining--;
+      }
+      selected.push(row.id);
+    }
+    return selected;
+  }
   private async resolveSessionScope(
     tx: DatabaseTransaction,
     scope: ProfileScope,
@@ -412,7 +475,17 @@ export class PracticeService {
         )
           throw new AppError(400, 'VALIDATION_ERROR', 'A session must contain one source language');
       }
-      if (!ids || input.includeNewItems !== undefined)
+      if (input.curriculumOrder && input.scope?.type === 'pack')
+        ids = await this.curriculumBatch(
+          tx,
+          scope,
+          profile,
+          input.scope.id,
+          ids ?? [],
+          input.count,
+          input.includeNewItems ?? true,
+        );
+      else if (!ids || input.includeNewItems !== undefined)
         ids = (
           await this.queueRows(
             tx,
@@ -470,6 +543,7 @@ export class PracticeService {
               itemIds: ids,
               readingId: input.readingId ?? null,
               scope: scopeSnapshot,
+              curriculumOrder: input.curriculumOrder === true,
             }),
           ],
         )
@@ -903,6 +977,8 @@ export class PracticeService {
         )
       ).rows;
       if (!rows.length) throw new AppError(409, 'NO_ELIGIBLE_ITEMS', 'No eligible learning items');
+      if (session.selection.curriculumOrder)
+        rows.sort((left, right) => ids.indexOf(left.id) - ids.indexOf(right.id));
       const preferUnseen =
         (session.session_type === 'smart_review' || session.session_type === 'matching') &&
         !input.learningItemIds;
@@ -1240,7 +1316,11 @@ export class PracticeService {
           expiresAt,
         });
       }
-      if (session.session_type === 'smart_review') {
+      if (session.selection.curriculumOrder) {
+        exercises.sort(
+          (left, right) => ids.indexOf(left.learningItemId) - ids.indexOf(right.learningItemId),
+        );
+      } else if (session.session_type === 'smart_review') {
         const rank = new Map(SMART_LEARNING_ORDER.map((type, index) => [type, index]));
         exercises.sort(
           (left, right) =>
