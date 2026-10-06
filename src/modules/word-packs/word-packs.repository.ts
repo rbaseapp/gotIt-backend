@@ -6,6 +6,8 @@ import { PROFILE_DEFAULTS } from '../profile/profile.constants.js';
 import type { ProfileScope } from '../profile/profile.types.js';
 import type { AddInput, KnownInput, RemovalInput } from './word-packs.validation.js';
 
+import { wordPackJourney } from './word-pack-journey.js';
+
 type Row = Record<string, any>;
 
 const missingPack = () => new AppError(404, 'NOT_FOUND', 'Word pack not found');
@@ -23,6 +25,7 @@ export class WordPackRepository {
       version: row.version,
       wordCount: Number(row.word_count),
       installed: row.installed_status === 'active',
+      teacherStations: wordPackJourney(Number(row.word_count), Number(row.introduced_count)),
       installedVersion: row.installed_version === null ? null : Number(row.installed_version),
       topic: { id: row.topic_id, slug: row.topic_slug, title: row.topic_title },
       track: {
@@ -36,6 +39,7 @@ export class WordPackRepository {
         translationLanguageCode: row.translation_language_code,
       },
       progress: {
+        introduced: Number(row.introduced_count),
         linked: Number(row.linked_count),
         new: Number(row.new_count),
         learning: Number(row.learning_count),
@@ -63,6 +67,9 @@ export class WordPackRepository {
           count(DISTINCT li.id) FILTER(WHERE up.status='active' AND link.excluded_at IS NULL AND li.learning_status='reviewing')::integer reviewing_count,
           count(DISTINCT li.id) FILTER(WHERE up.status='active' AND link.excluded_at IS NULL AND li.learning_status='mastered')::integer mastered_count,
           count(DISTINCT known.entry_id)::integer known_count,
+          count(DISTINCT e.id) FILTER(WHERE known.entry_id IS NOT NULL OR
+            (up.status='active' AND link.excluded_at IS NULL AND li.user_status='active'
+              AND li.learning_status IN ('learning','reviewing','mastered')))::integer introduced_count,
           count(DISTINCT e.id) FILTER(WHERE known.entry_id IS NOT NULL OR
             (up.status='active' AND link.excluded_at IS NULL AND li.learning_status='mastered'))::integer completed_count,
           count(DISTINCT li.id) FILTER(WHERE up.status='active' AND link.excluded_at IS NULL AND li.next_review_at<=now())::integer due_count
@@ -123,6 +130,53 @@ export class WordPackRepository {
           )
         ).rows;
         return { pack: this.dto(row), entries };
+      },
+      true,
+    );
+  }
+
+  async image(scope: ProfileScope, id: string, entryId: string) {
+    const detail = await this.detail(scope, id);
+    if (!detail.entries.some((entry) => entry.id === entryId)) throw missingPack();
+    return withTransaction(
+      this.pool,
+      async (tx) => {
+        const row = (
+          await tx.query(
+            `SELECT li.source_text,li.study_image_data,li.study_image_content_type,
+        li.study_image_kind,li.study_image_provider,li.study_image_source_url,li.study_image_creator
+        FROM product_gotit.learning_item_pack_entries link
+        JOIN product_gotit.learning_items li ON li.id=link.learning_item_id
+          AND li.application_id=link.application_id AND li.application_user_id=link.application_user_id
+        WHERE link.application_id=$1 AND link.application_user_id=$2 AND link.pack_id=$3
+          AND link.entry_id=$4 AND link.excluded_at IS NULL AND li.deleted_at IS NULL
+          AND li.study_image_revision=li.learning_revision`,
+            [...scopeValues(scope), id, entryId],
+          )
+        ).rows[0];
+        if (
+          !row ||
+          !Buffer.isBuffer(row.study_image_data) ||
+          !row.study_image_data.length ||
+          row.study_image_data.length > 3_000_000 ||
+          !['image/png', 'image/jpeg', 'image/webp'].includes(row.study_image_content_type) ||
+          !['generated', 'stock'].includes(row.study_image_kind) ||
+          typeof row.study_image_provider !== 'string' ||
+          !row.study_image_provider.length ||
+          (row.study_image_kind === 'stock' &&
+            !/^https:\/\//i.test(row.study_image_source_url ?? ''))
+        )
+          return { image: null };
+        return {
+          image: {
+            url: `data:${row.study_image_content_type};base64,${row.study_image_data.toString('base64')}`,
+            alt: row.source_text,
+            generated: row.study_image_kind === 'generated',
+            provider: row.study_image_provider,
+            sourceUrl: row.study_image_source_url,
+            creator: row.study_image_creator,
+          },
+        };
       },
       true,
     );

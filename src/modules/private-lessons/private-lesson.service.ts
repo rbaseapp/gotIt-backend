@@ -233,6 +233,22 @@ export class PrivateLessonService {
     const unit = input.packId
       ? await this.options.wordPacks!.context(scope, input.packId, input.station ?? 'supported')
       : null;
+    if (unit) {
+      const station = unit.context.teacherStations?.find(
+        (step) => step.station === (input.station ?? 'supported'),
+      );
+      if (!station?.available)
+        throw new AppError(
+          409,
+          'UNIT_WORDS_REQUIRED',
+          'Study the unit words before this teacher meeting',
+          {
+            requiredWords: station?.requiredWords ?? 10,
+            introducedWords: unit.context.introduced ?? 0,
+          },
+        );
+      input.requestedDurationMinutes = station.durationMinutes;
+    }
     if (unit)
       input = {
         ...input,
@@ -666,7 +682,7 @@ export class PrivateLessonService {
   async getUnit(
     scope: ProfileScope,
     packId: string,
-    station: 'supported' | 'review' = 'supported',
+    station: 'supported' | 'midpoint' | 'review' = 'supported',
   ) {
     if (!this.options.wordPacks)
       throw new AppError(503, 'PRIVATE_LESSON_UNIT_UNAVAILABLE', 'Unit lessons are unavailable');

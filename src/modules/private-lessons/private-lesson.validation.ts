@@ -40,7 +40,7 @@ export const privateLessonInputSchema = z
   .object({
     courseId: z.uuid().optional(),
     packId: z.uuid().optional(),
-    station: z.enum(['supported', 'review']).optional(),
+    station: z.enum(['supported', 'midpoint', 'review']).optional(),
     interactionMode: z.enum(['guided', 'conversation']).optional(),
     targetLanguageCode: languageSchema,
     supportLanguageCode: languageSchema.nullable().optional(),

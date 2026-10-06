@@ -30,6 +30,7 @@ export const API_ROUTES = [
   ['DELETE', '/tags/:id'],
   ['GET', '/word-packs'],
   ['GET', '/word-packs/:id'],
+  ['GET', '/word-packs/:id/entries/:entryId/image'],
   ['POST', '/word-packs/:id/add'],
   ['DELETE', '/word-packs/:id'],
   ['GET', '/practice/sessions'],

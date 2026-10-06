@@ -6,6 +6,7 @@ import { privateLessonInputSchema } from '../src/modules/private-lessons/private
 import type { PrivateLessonWordPackContext } from '../src/modules/private-lessons/private-lesson.prompt.js';
 import type { ProfileServiceContract } from '../src/modules/profile/profile.types.js';
 import { AppError } from '../src/shared/errors/app-error.js';
+import { wordPackJourney } from '../src/modules/word-packs/word-pack-journey.js';
 
 const scope = { applicationId: randomUUID(), applicationUserId: randomUUID() };
 const unit: PrivateLessonWordPackContext = {
@@ -17,6 +18,8 @@ const unit: PrivateLessonWordPackContext = {
   level: 'A1',
   station: 'supported',
   completed: 0,
+  introduced: 50,
+  teacherStations: wordPackJourney(50, 50),
   total: 50,
   words: [
     { sourceText: '水', translationText: 'ماء', exampleText: '水をください。', introduced: false },
@@ -97,6 +100,76 @@ test('unit and approved-course contexts cannot be forged or combined', () => {
       privateLessonInputSchema.safeParse({ targetLanguageCode: 'ja', ...input }).success,
       false,
     );
+});
+
+test('teacher stations require actual word progress before provider calls or minute reservations', async () => {
+  let effects = 0;
+  for (const [station, introduced] of [
+    ['supported', 0],
+    ['supported', 9],
+    ['midpoint', 24],
+    ['review', 49],
+  ] as const) {
+    const service = new PrivateLessonService({
+      apiKey: 'fixture',
+      model: 'fixture',
+      voice: 'fixture',
+      transcriptionModel: 'fixture',
+      profiles,
+      vocabulary: { learned: async () => ({ items: [] }) },
+      wordPacks: {
+        context: async () => ({
+          context: {
+            ...unit,
+            station,
+            introduced,
+            teacherStations: wordPackJourney(50, introduced),
+          },
+          targets: [],
+        }),
+      },
+      minuteWallet: {
+        reserve: async () => {
+          effects++;
+        },
+      } as never,
+      fetchImpl: async () => {
+        effects++;
+        return Response.json({ value: 'fixture' });
+      },
+    });
+    await assert.rejects(
+      service.createSession(scope, { targetLanguageCode: 'ja', packId: unit.packId, station }),
+      (error) =>
+        error instanceof AppError &&
+        error.code === 'UNIT_WORDS_REQUIRED' &&
+        error.statusCode === 409,
+    );
+  }
+  assert.equal(effects, 0);
+});
+
+test('journey exposes boundary availability and planned durations without awarding mastery', () => {
+  assert.deepEqual(
+    wordPackJourney(50, 0).map((step) => step.available),
+    [false, false, false],
+  );
+  assert.deepEqual(
+    wordPackJourney(50, 10).map((step) => step.available),
+    [true, false, false],
+  );
+  assert.deepEqual(
+    wordPackJourney(50, 25).map((step) => step.available),
+    [true, true, false],
+  );
+  assert.deepEqual(
+    wordPackJourney(50, 50).map((step) => step.available),
+    [true, true, true],
+  );
+  assert.deepEqual(
+    wordPackJourney(50, 50).map((step) => step.durationMinutes),
+    [5, 5, 10],
+  );
 });
 
 test('missing or inaccessible units fail before creating or charging a voice session', async () => {

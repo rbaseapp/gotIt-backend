@@ -7,7 +7,7 @@ export interface PrivateLessonWordPackSource {
   context(
     scope: ProfileScope,
     packId: string,
-    station: 'supported' | 'review',
+    station: 'supported' | 'midpoint' | 'review',
   ): Promise<{ context: PrivateLessonWordPackContext; targets: PrivateLessonTarget[] }>;
 }
 
@@ -18,7 +18,7 @@ export class PostgresPrivateLessonWordPackSource implements PrivateLessonWordPac
     this.packs = new WordPackRepository(pool);
   }
 
-  async context(scope: ProfileScope, packId: string, station: 'supported' | 'review') {
+  async context(scope: ProfileScope, packId: string, station: 'supported' | 'midpoint' | 'review') {
     const { pack, entries } = await this.packs.detail(scope, packId);
     const introduced = (entry: (typeof entries)[number]) =>
       entry.known ||
@@ -28,7 +28,7 @@ export class PostgresPrivateLessonWordPackSource implements PrivateLessonWordPac
           entry.userStatus === 'active' &&
           entry.learningStatus !== 'new',
       );
-    // A small model context, not a readiness threshold or a change to the SRS queue.
+    // Keep the provider vocabulary bounded; readiness counts the full owned unit.
     const ordered = [...entries]
       .sort((a, b) => Number(introduced(b)) - Number(introduced(a)))
       .slice(0, 12);
@@ -40,6 +40,8 @@ export class PostgresPrivateLessonWordPackSource implements PrivateLessonWordPac
       supportLanguageCode: String(pack.track.translationLanguageCode),
       level: pack.track.cefrFrom ?? 'A1',
       station,
+      introduced: pack.progress.introduced,
+      teacherStations: pack.teacherStations,
       completed: pack.progress.completed,
       total: pack.wordCount,
       words: ordered.map((entry) => ({

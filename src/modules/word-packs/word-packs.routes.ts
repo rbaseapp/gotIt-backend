@@ -14,6 +14,16 @@ export function createWordPackRoutes(service: WordPackRepository, requireWrite: 
       requestId: req.id,
     }),
   );
+  router.get('/:id/entries/:entryId/image', async (req, res) =>
+    res.set('Cache-Control', 'private, no-store').json({
+      ...(await service.image(
+        req.gotitAuth!,
+        parseInput(uuidSchema, req.params.id),
+        parseInput(uuidSchema, req.params.entryId),
+      )),
+      requestId: req.id,
+    }),
+  );
   router.post('/:id/add', requireWrite, async (req, res) =>
     res.status(201).json({
       ...(await service.add(

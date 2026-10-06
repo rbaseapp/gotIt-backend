@@ -72,7 +72,9 @@ export type PrivateLessonWordPackContext = {
   targetLanguageCode: string;
   supportLanguageCode: string;
   level: CefrLevel;
-  station: 'supported' | 'review';
+  station: 'supported' | 'midpoint' | 'review';
+  introduced?: number;
+  teacherStations?: ReturnType<typeof import('../word-packs/word-pack-journey.js').wordPackJourney>;
   completed: number;
   total: number;
   words: {
