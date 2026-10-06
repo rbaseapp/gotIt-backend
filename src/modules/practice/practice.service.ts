@@ -270,7 +270,6 @@ export class PracticeService {
   private async curriculumBatch(
     tx: DatabaseTransaction,
     scope: ProfileScope,
-    profile: GotItProfile,
     packId: string,
     ids: string[],
     count: number,
@@ -302,37 +301,11 @@ export class PracticeService {
     const currentBatch = ordered
       .slice(start, start + count)
       .filter((row) => firstUnfinished < 0 || !row.learned);
-    const used = Number(
-      (
-        await tx.query(
-          `SELECT count(DISTINCT a.learning_item_id)::integer count
-       FROM product_gotit.practice_attempts a
-       WHERE a.application_id=$1 AND a.application_user_id=$2 AND a.result<>'skipped'
-         AND (a.created_at AT TIME ZONE $3)::date=(now() AT TIME ZONE $3)::date
-         AND NOT EXISTS(SELECT 1 FROM product_gotit.practice_attempts older
-           WHERE older.application_id=a.application_id AND older.application_user_id=a.application_user_id
-             AND older.learning_item_id=a.learning_item_id AND older.result<>'skipped'
-             AND (older.created_at AT TIME ZONE $3)::date<(now() AT TIME ZONE $3)::date)`,
-          [...scopeValues(scope), profile.timezone],
-        )
-      ).rows[0]!.count,
-    );
-    let newRemaining = includeNew ? Math.max(0, profile.defaultNewItemsPerDay - used) : 0;
     const selected: string[] = [];
     for (const row of currentBatch) {
-      // Do not jump over an earlier new word to fill the batch with later words.
-      if (row.learning_status === 'new') {
-        if (!newRemaining) {
-          if (includeNew && !selected.length)
-            throw new AppError(
-              409,
-              'UNIT_DAILY_NEW_LIMIT',
-              'The next unit word is new and the daily new-word allowance has been used',
-            );
-          break;
-        }
-        newRemaining--;
-      }
+      // Daily preferences size the batch; they never block another unit session.
+      // An explicit review-only request still stops before introducing a new word.
+      if (!includeNew && row.learning_status === 'new') break;
       selected.push(row.id);
     }
     return selected;
@@ -489,7 +462,6 @@ export class PracticeService {
         ids = await this.curriculumBatch(
           tx,
           scope,
-          profile,
           input.scope.id,
           ids ?? [],
           input.count,

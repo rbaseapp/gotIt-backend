@@ -98,17 +98,34 @@ test(
         () => true,
       );
       await repository.patch(scope, PROFILE_DEFAULTS, { defaultNewItemsPerDay: 0 });
+      for (let repeat = 0; repeat < 2; repeat++) {
+        const { session: unrestricted } = await practice.createSession(scope, randomUUID(), {
+          sessionType: 'smart_review',
+          scope: { type: 'pack', id },
+          count: 10,
+          includeNewItems: true,
+        });
+        const { cards } = await practice.studyCards(scope, unrestricted.id);
+        assert.equal(cards.length, 10, 'a zero daily allowance must not block unit practice');
+        assert.deepEqual(
+          cards.map((card) => card.learningItemId),
+          selected.entries
+            .filter((entry) => !entry.known)
+            .slice(0, 10)
+            .map((entry) => entry.learningItemId),
+          'repeated unit starts keep the first curriculum batch without a daily gate',
+        );
+      }
       await assert.rejects(
         practice.createSession(scope, randomUUID(), {
           sessionType: 'smart_review',
           scope: { type: 'pack', id },
           count: 10,
-          includeNewItems: true,
+          includeNewItems: false,
         }),
-        { code: 'UNIT_DAILY_NEW_LIMIT' },
-        'a used daily allowance explains the block instead of skipping to later unit words',
+        { code: 'NO_ELIGIBLE_ITEMS' },
+        'explicit review-only still does not introduce new words',
       );
-      await repository.patch(scope, PROFILE_DEFAULTS, { defaultNewItemsPerDay: 20 });
       await db.adminPool.query(
         `UPDATE product_gotit.learning_items li SET next_review_at=now()+make_interval(days=>100-entry.sort_order)
          FROM product_gotit.learning_item_pack_entries link
