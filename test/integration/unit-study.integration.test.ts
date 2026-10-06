@@ -97,6 +97,18 @@ test(
         undefined,
         () => true,
       );
+      await repository.patch(scope, PROFILE_DEFAULTS, { defaultNewItemsPerDay: 0 });
+      await assert.rejects(
+        practice.createSession(scope, randomUUID(), {
+          sessionType: 'smart_review',
+          scope: { type: 'pack', id },
+          count: 10,
+          includeNewItems: true,
+          curriculumOrder: true,
+        }),
+        { code: 'UNIT_DAILY_NEW_LIMIT' },
+        'a used daily allowance explains the block instead of skipping to later unit words',
+      );
       await repository.patch(scope, PROFILE_DEFAULTS, { defaultNewItemsPerDay: 20 });
       await db.adminPool.query(
         `UPDATE product_gotit.learning_items li SET next_review_at=now()+make_interval(days=>100-entry.sort_order)

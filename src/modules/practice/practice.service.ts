@@ -322,7 +322,15 @@ export class PracticeService {
     for (const row of currentBatch) {
       // Do not jump over an earlier new word to fill the batch with later words.
       if (row.learning_status === 'new') {
-        if (!newRemaining) break;
+        if (!newRemaining) {
+          if (includeNew && !selected.length)
+            throw new AppError(
+              409,
+              'UNIT_DAILY_NEW_LIMIT',
+              'The next unit word is new and the daily new-word allowance has been used',
+            );
+          break;
+        }
         newRemaining--;
       }
       selected.push(row.id);
