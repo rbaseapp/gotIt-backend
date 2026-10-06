@@ -11,8 +11,13 @@ import {
   pageSchema,
 } from './library.validation.js';
 import type { LibraryRepository } from './library.repository.js';
+import { readingGuideRequest } from './reading-guide.js';
 export function createLibraryRoutes(service: LibraryRepository, requireWrite: RequestHandler) {
   const router = Router();
+  router.post('/reading-guides', requireWrite, async (req, res) => {
+    const { ids } = parseInput(readingGuideRequest, req.body);
+    res.json({ guides: await service.readingGuides.get(req.gotitAuth!, ids), requestId: req.id });
+  });
   router.get('/', async (req, res) =>
     res.json({
       ...(await service.list(req.gotitAuth!, parseInput(listSchema, req.query))),

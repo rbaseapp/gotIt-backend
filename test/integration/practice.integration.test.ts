@@ -12,6 +12,7 @@ import { saveSchema } from '../../src/modules/capture/capture.validation.js';
 import { EnrichmentRegistry } from '../../src/modules/enrichment/enrichment.registry.js';
 import { SelectionProofs } from '../../src/modules/enrichment/selection-proof.js';
 import { LibraryRepository } from '../../src/modules/library/library.repository.js';
+import { ReadingGuideService } from '../../src/modules/library/reading-guide.js';
 import { PracticeService } from '../../src/modules/practice/practice.service.js';
 import { practiceLanguagePredicate } from '../../src/modules/practice/practice.language.js';
 import { policySchema } from '../../src/modules/learning/learning.policy.js';
@@ -408,6 +409,63 @@ test(
             `UPDATE product_gotit.learning_items SET phonetic_text=NULL,phonetic_scheme=NULL
              WHERE application_id=$1 AND application_user_id=$2 AND id=$3`,
             [applicationId, users[0], ids[0]],
+          );
+        },
+      );
+      await t.test(
+        'reading guides are cached, owner scoped and reject stale generation',
+        async () => {
+          const scope = { applicationId, applicationUserId: users[0]! };
+          let calls = 0;
+          const service = new ReadingGuideService(db.runtimePool, {
+            generate: async (items) => {
+              calls++;
+              assert.equal(items[0]!.nativeLanguage, 'he');
+              return items.map((item) => ({ id: item.id, text: 'הֶלוֹ' }));
+            },
+          });
+          const [first, concurrent] = await Promise.all([
+            service.get(scope, [ids[0]!]),
+            service.get(scope, [ids[0]!]),
+          ]);
+          assert.equal(first[0]!.phoneticText, 'הֶלוֹ');
+          assert.deepEqual(first, concurrent);
+          assert.deepEqual(await service.get(scope, [ids[0]!]), first);
+          assert.equal(calls, 1);
+          await assert.rejects(
+            service.get({ applicationId, applicationUserId: users[1]! }, [ids[0]!]),
+            { code: 'NOT_FOUND' },
+          );
+          await assert.rejects(
+            service.get({ applicationId: randomUUID(), applicationUserId: users[0]! }, [ids[0]!]),
+            { code: 'NOT_FOUND' },
+          );
+          assert.equal(calls, 1);
+          await call('post', '/learning-items/reading-guides', { ids: [ids[0]] }).expect(200);
+          await call('post', '/learning-items/reading-guides', { ids: [] }).expect(400);
+          await db.adminPool.query(
+            'UPDATE product_gotit.learning_items SET phonetic_text=NULL,phonetic_scheme=NULL WHERE id=$1',
+            [ids[0]],
+          );
+          const stale = new ReadingGuideService(db.runtimePool, {
+            generate: async (items) => {
+              await db.adminPool.query(
+                'UPDATE product_gotit.learning_items SET learning_revision=learning_revision+1 WHERE id=$1',
+                [ids[0]],
+              );
+              return items.map((item) => ({ id: item.id, text: 'stale' }));
+            },
+          });
+          assert.deepEqual(await stale.get(scope, [ids[0]!]), []);
+          const stored = await db.adminPool.query(
+            'SELECT phonetic_text FROM product_gotit.learning_items WHERE id=$1',
+            [ids[0]],
+          );
+          assert.equal(stored.rows[0].phonetic_text, null);
+          // Restore this disposable fixture for the lifecycle cases that follow.
+          await db.adminPool.query(
+            'UPDATE product_gotit.learning_items SET learning_revision=learning_revision-1 WHERE id=$1',
+            [ids[0]],
           );
         },
       );
