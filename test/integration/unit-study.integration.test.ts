@@ -97,6 +97,26 @@ test(
         undefined,
         () => true,
       );
+      await repository.patch(scope, PROFILE_DEFAULTS, { defaultNewItemsPerDay: 20 });
+      for (const count of [10, 20]) {
+        const { session: batch } = await practice.createSession(scope, randomUUID(), {
+          sessionType: 'smart_review',
+          scope: { type: 'pack', id },
+          sourceLanguageCode: 'en',
+          count,
+          includeNewItems: true,
+        });
+        const { cards } = await practice.studyCards(scope, batch.id);
+        assert.equal(cards.length, count);
+        assert.deepEqual(
+          cards.map((card) => card.learningItemId),
+          selected.entries
+            .filter((entry) => !entry.known)
+            .slice(0, count)
+            .map((entry) => entry.learningItemId),
+          'daily batches follow unit order and omit the known first word, even with other units installed',
+        );
+      }
       for (const sessionType of [
         'recall',
         'matching',

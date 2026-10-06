@@ -179,10 +179,18 @@ export class PracticeService {
     eligibleIds?: string[],
     languageCode?: string,
     includeNewItems = true,
+    packId?: string,
   ) {
     const rows = (
       await tx.query(
-        `WITH candidates AS(SELECT li.*,
+        `WITH pack_order AS (
+          SELECT link.learning_item_id,min(entry.sort_order) unit_order
+          FROM product_gotit.learning_item_pack_entries link
+          JOIN product_gotit.word_pack_entries entry ON entry.id=link.entry_id AND entry.pack_id=link.pack_id
+          WHERE link.application_id=$1 AND link.application_user_id=$2 AND link.pack_id=$12::uuid
+            AND link.excluded_at IS NULL
+          GROUP BY link.learning_item_id
+        ), candidates AS(SELECT li.*,pack_order.unit_order,
       (SELECT translation_text FROM product_gotit.item_translations t WHERE t.application_id=li.application_id AND t.application_user_id=li.application_user_id AND t.learning_item_id=li.id AND t.is_current AND is_primary) primary_translation,
       (SELECT max(recent.created_at) FROM product_gotit.practice_attempts recent
         WHERE recent.application_id=li.application_id AND recent.application_user_id=li.application_user_id
@@ -222,8 +230,10 @@ export class PracticeService {
                AND EXISTS(SELECT 1 FROM product_gotit.attempt_skill_effects effect
                  WHERE effect.practice_attempt_id=successful.id AND effect.skill_type='recall'))<$7)
          THEN 120 ELSE 0 END) queue_score,
-      row_number() OVER(PARTITION BY learning_status ORDER BY created_at,id) new_rank
-      FROM product_gotit.learning_items li WHERE application_id=$1 AND application_user_id=$2
+      row_number() OVER(PARTITION BY learning_status ORDER BY pack_order.unit_order NULLS LAST,li.created_at,li.id) new_rank
+      FROM product_gotit.learning_items li
+      LEFT JOIN pack_order ON pack_order.learning_item_id=li.id
+      WHERE application_id=$1 AND application_user_id=$2
         AND user_status='active' AND deleted_at IS NULL
         AND ($10::uuid[] IS NULL OR li.id=ANY($10::uuid[]))
         AND ($11::text IS NULL OR li.source_language_code=$11)
@@ -235,7 +245,10 @@ export class PracticeService {
        AND (learning_status<>'mastered' OR next_review_at<=now()))
        SELECT * FROM eligible WHERE $11::text IS NOT NULL OR source_language_code=(
          SELECT source_language_code FROM eligible ORDER BY last_matching_success_at NULLS FIRST,queue_score DESC,created_at,id LIMIT 1)
-       ORDER BY last_matching_success_at NULLS FIRST,queue_score DESC,created_at,id LIMIT $9`,
+       ORDER BY
+         CASE WHEN $12::uuid IS NOT NULL THEN CASE WHEN learning_status='new' THEN 1 ELSE 0 END END,
+         CASE WHEN $12::uuid IS NOT NULL THEN unit_order END,
+         last_matching_success_at NULLS FIRST,queue_score DESC,created_at,id LIMIT $9`,
         [
           ...scopeValues(scope),
           includeNewItems ? profile.defaultNewItemsPerDay : 0,
@@ -247,6 +260,7 @@ export class PracticeService {
           count,
           eligibleIds ?? null,
           languageCode ?? null,
+          packId ?? null,
         ],
       )
     ).rows;
@@ -408,6 +422,7 @@ export class PracticeService {
             ids,
             input.sourceLanguageCode,
             input.includeNewItems ?? true,
+            input.scope?.type === 'pack' ? input.scope.id : undefined,
           )
         ).map((r) => r.id);
       if (!ids.length) throw new AppError(409, 'NO_ELIGIBLE_ITEMS', 'No eligible learning items');
