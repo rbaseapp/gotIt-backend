@@ -14,6 +14,7 @@ import {
   type LearningPolicy,
 } from '../learning/learning.policy.js';
 import type { ListInput, EditInput, BulkInput } from './library.validation.js';
+import { ReadingGuideService, type ReadingGuideProvider } from './reading-guide.js';
 export const scopeValues = (scope: ProfileScope) => [scope.applicationId, scope.applicationUserId];
 export const itemNotFound = () => new AppError(404, 'NOT_FOUND', 'Learning item not found');
 const cursorSchema = z
@@ -51,10 +52,14 @@ export function itemSnapshot(row: Record<string, unknown>, translations: unknown
   });
 }
 export class LibraryRepository {
+  readonly readingGuides: ReadingGuideService;
   constructor(
     readonly pool: Pool,
     readonly policy: LearningPolicy = DEFAULT_LEARNING_POLICY,
-  ) {}
+    readingGuideProvider?: ReadingGuideProvider,
+  ) {
+    this.readingGuides = new ReadingGuideService(pool, readingGuideProvider);
+  }
   private async requirements(tx: DatabaseTransaction, scope: ProfileScope, ids: string[]) {
     if (!ids.length) return new Map<string, ReturnType<typeof masteryRequirements>>();
     const timezone = (

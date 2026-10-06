@@ -6,6 +6,7 @@ import { createNotificationSender } from './modules/notifications/notification.p
 import { CaptureRepository } from './modules/capture/capture.repository.js';
 import { CaptureService } from './modules/capture/capture.service.js';
 import { createEnrichment } from './modules/enrichment/enrichment.config.js';
+import { OpenAiReadingGuideProvider } from './modules/library/reading-guide.js';
 import { LibraryRepository } from './modules/library/library.repository.js';
 import { PracticeService } from './modules/practice/practice.service.js';
 import { DashboardService } from './modules/dashboard/dashboard.service.js';
@@ -309,7 +310,17 @@ const app = createApp({
   profileService,
   notificationService,
   captureService,
-  libraryService: new LibraryRepository(pool, learningPolicy),
+  libraryService: new LibraryRepository(
+    pool,
+    learningPolicy,
+    env.OPENAI_API_KEY && env.OPENAI_TRANSLATION_MODEL
+      ? new OpenAiReadingGuideProvider(
+          env.OPENAI_API_KEY,
+          env.OPENAI_TRANSLATION_MODEL,
+          aiDailyQuota,
+        )
+      : undefined,
+  ),
   practiceService,
   dashboardService: new DashboardService(pool, profileService, learningPolicy),
   transferPool: pool,

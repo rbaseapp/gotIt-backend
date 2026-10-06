@@ -16,6 +16,7 @@ export const API_ROUTES = [
   ['PATCH', '/learning-items/:id'],
   ['DELETE', '/learning-items/:id'],
   ['POST', '/learning-items/bulk'],
+  ['POST', '/learning-items/reading-guides'],
   ['POST', '/learning-items/:id/restore'],
   ['POST', '/learning-items/:id/mastery'],
   ['PUT', '/learning-items/:id/tags'],
