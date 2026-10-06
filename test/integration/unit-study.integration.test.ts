@@ -120,6 +120,30 @@ test(
         );
         assert.equal(session.scope?.id, id);
       }
+      const { session: scopedSmart } = await practice.createSession(scope, randomUUID(), {
+        sessionType: 'smart_review',
+        scope: { type: 'pack', id },
+        sourceLanguageCode: 'en',
+        count: 2,
+        includeNewItems: true,
+      });
+      const { cards: scopedCards } = await practice.studyCards(scope, scopedSmart.id);
+      const scopedMeanings = new Set(
+        scopedCards.flatMap((card) => [card.sourceText, card.translationText]),
+      );
+      const { exercises: scopedExercises } = await practice.issueExercises(scope, scopedSmart.id, {
+        count: 1,
+        exerciseType: 'recall',
+        direction: 'source_to_translation',
+        kind: 'multiple_choice',
+      });
+      const scopedChoices = scopedExercises[0]!.prompt.choices;
+      assert.ok(Array.isArray(scopedChoices));
+      assert.ok(scopedChoices.length >= 2);
+      assert.ok(
+        scopedChoices.every((choice: { text: string }) => scopedMeanings.has(choice.text)),
+        'a unit game must not import distractors from the general vocabulary library',
+      );
       await packs.setKnown(scope, id, {
         entryIds: initial.entries.map((entry) => String(entry.id)),
         known: true,

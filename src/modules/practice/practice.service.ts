@@ -931,6 +931,7 @@ export class PracticeService {
                    FROM product_gotit.learning_items li
                    WHERE li.application_id=$1 AND li.application_user_id=$2
                      AND NOT(li.id=ANY($3::uuid[]))
+                     AND ($4::uuid[] IS NULL OR li.id=ANY($4::uuid[]))
                      AND li.user_status='active' AND li.deleted_at IS NULL
                      AND ${practiceLanguagePredicate()}
                      AND EXISTS(SELECT 1 FROM product_gotit.learning_items target
@@ -940,7 +941,7 @@ export class PracticeService {
                          AND target.source_language_code=li.source_language_code
                          AND target.translation_language_code=li.translation_language_code)
                    ORDER BY li.created_at,id LIMIT 50`,
-                  [...scopeValues(scope), ids],
+                  [...scopeValues(scope), ids, session.selection.scope ? sessionIds : null],
                 )
               ).rows,
             ]
