@@ -128,6 +128,53 @@ export class WordPackRepository {
     );
   }
 
+  async image(scope: ProfileScope, id: string, entryId: string) {
+    const detail = await this.detail(scope, id);
+    if (!detail.entries.some((entry) => entry.id === entryId)) throw missingPack();
+    return withTransaction(
+      this.pool,
+      async (tx) => {
+        const row = (
+          await tx.query(
+            `SELECT li.source_text,li.study_image_data,li.study_image_content_type,
+        li.study_image_kind,li.study_image_provider,li.study_image_source_url,li.study_image_creator
+        FROM product_gotit.learning_item_pack_entries link
+        JOIN product_gotit.learning_items li ON li.id=link.learning_item_id
+          AND li.application_id=link.application_id AND li.application_user_id=link.application_user_id
+        WHERE link.application_id=$1 AND link.application_user_id=$2 AND link.pack_id=$3
+          AND link.entry_id=$4 AND link.excluded_at IS NULL AND li.deleted_at IS NULL
+          AND li.study_image_revision=li.learning_revision`,
+            [...scopeValues(scope), id, entryId],
+          )
+        ).rows[0];
+        if (
+          !row ||
+          !Buffer.isBuffer(row.study_image_data) ||
+          !row.study_image_data.length ||
+          row.study_image_data.length > 3_000_000 ||
+          !['image/png', 'image/jpeg', 'image/webp'].includes(row.study_image_content_type) ||
+          !['generated', 'stock'].includes(row.study_image_kind) ||
+          typeof row.study_image_provider !== 'string' ||
+          !row.study_image_provider.length ||
+          (row.study_image_kind === 'stock' &&
+            !/^https:\/\//i.test(row.study_image_source_url ?? ''))
+        )
+          return { image: null };
+        return {
+          image: {
+            url: `data:${row.study_image_content_type};base64,${row.study_image_data.toString('base64')}`,
+            alt: row.source_text,
+            generated: row.study_image_kind === 'generated',
+            provider: row.study_image_provider,
+            sourceUrl: row.study_image_source_url,
+            creator: row.study_image_creator,
+          },
+        };
+      },
+      true,
+    );
+  }
+
   async setKnown(scope: ProfileScope, id: string, input: KnownInput) {
     return withTransaction(this.pool, async (tx) => {
       await tx.lock(['word-pack', ...scopeValues(scope), id]);
