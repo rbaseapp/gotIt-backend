@@ -678,6 +678,18 @@ test('private lesson prepares Sol teaching content before opening Realtime', asy
     'gpt-transcribe-test',
     async (_url, init) => {
       contentRequest = JSON.parse(String(init?.body)) as Record<string, unknown>;
+      const wireSchema = (
+        contentRequest.text as {
+          format: { schema: { properties: Record<string, unknown>; required: string[] } };
+        }
+      ).format.schema;
+      // Strict Structured Outputs rejects a declared but non-required property.
+      // Real DEV returned invalid_json_schema for the optional shortTitle.
+      if (Object.keys(wireSchema.properties).some((key) => !wireSchema.required.includes(key)))
+        return Response.json(
+          { error: { code: 'invalid_json_schema', message: 'Every property must be required' } },
+          { status: 400 },
+        );
       return Response.json({
         status: 'completed',
         output: [
@@ -686,6 +698,7 @@ test('private lesson prepares Sol teaching content before opening Realtime', asy
               {
                 type: 'output_text',
                 text: JSON.stringify({
+                  shortTitle: 'Finished actions yesterday',
                   openingExplanation: 'Use the past simple to describe a finished event yesterday.',
                   examples: [
                     {
@@ -1860,6 +1873,7 @@ test('wrong-script practice examples are regenerated before opening Realtime', a
               {
                 type: 'output_text',
                 text: JSON.stringify({
+                  shortTitle: 'Finished actions yesterday',
                   openingExplanation: 'Use the past simple for a finished event yesterday.',
                   examples: [
                     { targetText, meaningAndReason: 'This marks a completed action.' },
@@ -1922,6 +1936,7 @@ test('wrong-script practice examples fail closed after a bounded repair', async 
               {
                 type: 'output_text',
                 text: JSON.stringify({
+                  shortTitle: 'Finished actions yesterday',
                   openingExplanation: 'Use the past simple for a finished event yesterday.',
                   examples: [
                     {

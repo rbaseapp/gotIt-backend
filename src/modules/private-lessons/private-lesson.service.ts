@@ -399,7 +399,9 @@ export class PrivateLessonService {
         for (let attempt = 0; attempt < 2; attempt++) {
           const teachingBrief = await this.options.lessonContentGenerator.generate(
             scope,
-            privateLessonBriefSchema,
+            // OpenAI strict output requires every declared property, including
+            // the new title. Stored legacy briefs may still omit that title.
+            privateLessonBriefSchema.required(),
             'private_lesson_brief',
             privateLessonBriefInstruction,
             { ...privateLessonBriefInput(plan), revisionFeedback: languageIssue },
