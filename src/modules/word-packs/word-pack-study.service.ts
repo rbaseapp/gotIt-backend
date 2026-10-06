@@ -10,6 +10,16 @@ import { literalStudyImageBrief } from '../practice/study-image.provider.js';
 import { AppError } from '../../shared/errors/app-error.js';
 import { validWordExample, type WordPackExampleProvider } from './word-pack-example.provider.js';
 
+const pronounSubjects: Record<string, string> = {
+  i: 'one person pointing to their own chest to identify themselves as the speaker',
+  you: 'one friendly person pointing toward the viewer they are addressing',
+  he: 'one man standing alone, the male person being referred to',
+  she: 'one woman standing alone, the female person being referred to',
+  it: 'one hand pointing to a single small object being referred to',
+  we: 'two people together, one indicating themselves and their companion as a group',
+  they: 'two people together, the other people being referred to',
+};
+
 function imageDto(image: GeneratedStudyImage, source: string) {
   if (
     !Buffer.isBuffer(image.data) ||
@@ -51,6 +61,11 @@ export class WordPackStudyService {
     const { pack, entries } = await this.packs.detail(scope, packId);
     const entry = entries.find((entry) => entry.id === entryId);
     if (!entry) throw new AppError(404, 'NOT_FOUND', 'Word pack entry not found');
+    const pronoun = entry.sourceText.toLowerCase();
+    const subject =
+      pack.track.sourceLanguageCode === 'en' && entry.partOfSpeech === 'pronoun'
+        ? pronounSubjects[pronoun]
+        : undefined;
     return {
       sourceText: entry.sourceText,
       translationText: entry.translationText,
@@ -58,6 +73,18 @@ export class WordPackStudyService {
       translationLanguageCode: pack.track.translationLanguageCode,
       context: entry.exampleText,
       scope,
+      ...(subject
+        ? {
+            visual: {
+              senseKey: `unit-pronoun-v1.${pronoun}`,
+              subject,
+              visualDescription: subject,
+              searchQueries: [],
+              includeTags: [],
+              excludeTags: ['letters', 'numerals', 'seal', 'certificate', 'typography'],
+            },
+          }
+        : {}),
     };
   }
 
@@ -99,7 +126,7 @@ export class WordPackStudyService {
 
   async image(scope: ProfileScope, packId: string, entryId: string) {
     const input = await this.input(scope, packId, entryId);
-    const cached = await this.packs.image(scope, packId, entryId);
+    const cached = input.visual ? { image: null } : await this.packs.image(scope, packId, entryId);
     if (cached.image || !this.images) return cached;
     const key = this.key(input);
     let work = this.pendingImages.get(key);
@@ -116,7 +143,7 @@ export class WordPackStudyService {
       input.sourceText.normalize('NFKC').trim().toLowerCase(),
       input.translationLanguageCode,
       input.translationText.normalize('NFC'),
-      this.images!.id,
+      this.images!.id + (input.visual ? ':unit-pronouns-v1' : ''),
     ];
     const cached = (
       await this.pool.query(
