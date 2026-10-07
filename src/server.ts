@@ -31,6 +31,8 @@ import { OpenAiStudyImageBriefResolver } from './modules/practice/openai-study-i
 import { PixabayStudyImageProvider } from './modules/practice/pixabay-study-image.provider.js';
 import { FallbackStudyImageProvider } from './modules/practice/study-image.provider.js';
 import { WordPackRepository } from './modules/word-packs/word-packs.repository.js';
+import { WordPackStudyService } from './modules/word-packs/word-pack-study.service.js';
+import { OpenAiWordPackExampleProvider } from './modules/word-packs/word-pack-example.provider.js';
 import { PrivateLessonService } from './modules/private-lessons/private-lesson.service.js';
 import { CourseService } from './modules/courses/course.service.js';
 import { PostgresLearningDocumentStore } from './modules/courses/course.repository.js';
@@ -178,14 +180,29 @@ const studyImageBriefResolver =
         aiDailyQuota,
       )
     : undefined;
+const studyImageProvider = studyImageProviders.length
+  ? new FallbackStudyImageProvider(studyImageProviders, studyImageBriefResolver)
+  : undefined;
+const wordPackService = new WordPackRepository(pool);
+const wordPackStudyService = new WordPackStudyService(
+  pool,
+  wordPackService,
+  studyImageProvider,
+  env.OPENAI_API_KEY && env.OPENAI_TRANSLATION_MODEL
+    ? new OpenAiWordPackExampleProvider(
+        env.OPENAI_API_KEY,
+        env.OPENAI_TRANSLATION_MODEL,
+        fetch,
+        aiDailyQuota,
+      )
+    : undefined,
+);
 const practiceService: PracticeService = new PracticeService(
   pool,
   profileService,
   learningPolicy,
   (...args): boolean => speechService.supports(...args),
-  studyImageProviders.length
-    ? new FallbackStudyImageProvider(studyImageProviders, studyImageBriefResolver)
-    : undefined,
+  studyImageProvider,
 );
 const googleSpeechAccessToken =
   env.GOOGLE_SERVICE_ACCOUNT_JSON || env.GOOGLE_APPLICATION_CREDENTIALS
@@ -300,7 +317,8 @@ const app = createApp({
   minuteWallet,
   realtimeCallGuard,
   enforceAddonEntitlements: env.ENFORCE_ADDON_ENTITLEMENTS,
-  wordPackService: new WordPackRepository(pool),
+  wordPackService,
+  wordPackStudyService,
   enforcePaidEntitlements: env.ENFORCE_PAID_ENTITLEMENTS,
   rateLimiter,
   corsOrigins: env.CORS_ORIGINS,
