@@ -46,6 +46,8 @@ export const API_ROUTES = [
   ['POST', '/realtime/connect'],
   ['POST', '/realtime/end'],
   ['GET', '/private-lessons/setup'],
+  ['GET', '/private-lessons/units/:id'],
+  ['GET', '/private-lessons/units/:id/map'],
   ['PUT', '/private-lessons/preferences'],
   ['POST', '/private-lessons/roadmaps'],
   ['GET', '/private-lessons'],

@@ -43,6 +43,7 @@ import { setupPayload } from './private-lesson.roadmap.js';
 import type { PrivateLessonProficiencyStore } from './private-lesson.proficiency.js';
 import type { PrivateLessonGoalKind } from './private-lesson.curriculum.js';
 import type { CourseService } from '../courses/course.service.js';
+import { buildUnitLearningPath } from '../word-packs/unit-learning-path.js';
 import type { CourseGenerator } from '../courses/course.provider.js';
 import type { WordPackRepository } from '../word-packs/word-packs.repository.js';
 import {
@@ -126,6 +127,40 @@ export class PrivateLessonService {
     return this.options.wordPacks.lessonUnit(scope, id);
   }
 
+  async getLearningMap(scope: ProfileScope, id: string) {
+    const unit = await this.getUnit(scope, id);
+    const lessons = this.options.journal?.unitHistory
+      ? await this.options.journal.unitHistory(scope, id)
+      : ((await this.options.journal?.list(scope, 1000, undefined, id)) ?? []);
+    const assignments = await Promise.all(
+      lessons.map(
+        (lesson) =>
+          this.options.courses?.homework(scope, lesson.id).catch((error: unknown) => {
+            if (error instanceof AppError && error.statusCode === 404) return null;
+            throw error;
+          }) ?? null,
+      ),
+    );
+    return buildUnitLearningPath(
+      unit,
+      lessons,
+      assignments.filter((item) => item !== null),
+    );
+  }
+
+  async getPreparedUnit(scope: ProfileScope, id: string) {
+    const unit = await this.getUnit(scope, id);
+    const path = await this.getLearningMap(scope, id);
+    return {
+      ...unit,
+      teacherStations: path.stations,
+      station:
+        path.nextAction.station ??
+        path.stations.find((step) => step.available)?.station ??
+        unit.station,
+    };
+  }
+
   async savePreferences(scope: ProfileScope, input: PrivateLessonPreferencesInput) {
     if (!this.options.roadmaps)
       throw new AppError(
@@ -151,14 +186,21 @@ export class PrivateLessonService {
       throw new AppError(503, 'COURSE_AI_UNAVAILABLE', 'Courses are unavailable');
     const wordPack = input.packId ? await this.getUnit(scope, input.packId) : null;
     if (wordPack) {
-      wordPack.station = input.station ?? 'supported';
-      const station = wordPack.teacherStations.find((step) => step.station === wordPack.station);
+      const path = await this.getLearningMap(scope, input.packId!);
+      wordPack.station =
+        input.station ??
+        path.stations.find((step) => step.available && !step.meetingCompleted)?.station ??
+        'supported';
+      const station = path.stations.find((step) => step.station === wordPack.station);
       if (!station?.available)
         throw new AppError(
           409,
           'PRIVATE_LESSON_STATION_LOCKED',
           'Complete the preceding words first',
         );
+      wordPack.words =
+        wordPack.stageWordsByStation?.[wordPack.station]?.filter((word) => word.introduced) ??
+        wordPack.words;
       input = {
         ...input,
         targetLanguageCode: wordPack.targetLanguageCode,

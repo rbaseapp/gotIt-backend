@@ -52,6 +52,7 @@ import { taskLevelForPlan } from '../src/modules/private-lessons/private-lesson.
 import type { AddonAccessContract } from '../src/modules/addons/addon-access.js';
 import type { MinuteWallet } from '../src/modules/private-lessons/minute-wallet.js';
 import { teacherStations, type LessonUnit } from '../src/modules/word-packs/teacher-stations.js';
+import { unitLesson, unitHistoryFixture } from './helpers/unit-path-fixtures.js';
 
 test('lesson history accepts a scoped course filter and rejects invalid IDs', () => {
   const courseId = '10000000-0000-4000-8000-000000000001';
@@ -2103,6 +2104,8 @@ test('mixed RTL language pairs keep lesson examples in the selected target langu
 test('unit summary meetings enforce availability and use the server unit scope', async () => {
   const packId = '30000000-0000-4000-8000-000000000001';
   for (const introduced of [49, 50]) {
+    const history = unitHistoryFixture([unitLesson('supported'), unitLesson('midpoint')]);
+    history.seed(identity);
     let calls = 0;
     let prompt = '';
     const unit: LessonUnit = {
@@ -2141,6 +2144,8 @@ test('unit summary meetings enforce availability and use the server unit scope',
           return structuredClone(unit);
         },
       },
+      journal: history.journal,
+      courses: history.courses,
       fetchImpl: async (_url, init) => {
         calls++;
         prompt = JSON.parse(String(init?.body)).session.instructions;

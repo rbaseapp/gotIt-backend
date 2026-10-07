@@ -153,6 +153,10 @@ export const homeworkContentSchema = z
     tasks: z.array(homeworkTaskSchema).min(12).max(MAX_HOMEWORK_TASKS),
   })
   .strict();
+export const unitHomeworkContentSchema = homeworkContentSchema.extend({
+  estimatedMinutes: z.number().int().min(2).max(5),
+  tasks: z.array(homeworkTaskSchema).min(3).max(6),
+});
 export type HomeworkTask = z.infer<typeof homeworkTaskSchema>;
 export const homeworkJudgmentSchema = z
   .object({
@@ -169,6 +173,13 @@ export type HomeworkAttempt = {
   createdAt: string;
 };
 export type HomeworkDocument = {
+  wordPack?: { packId: string; station: 'supported' | 'midpoint' | 'review' };
+  review?: {
+    taskIndex: number;
+    result: 'correct' | 'retry' | 'uncertain';
+    feedback: string;
+    hint: string | null;
+  };
   kind: 'homework';
   id: string;
   revision: number;
@@ -201,6 +212,7 @@ export const courseTurnSchema = commandSchema.extend({
   answerIndex: z.number().int().min(0).max(5).optional(),
 });
 export const homeworkActionSchema = commandSchema.extend({
+  review: z.boolean().optional(),
   taskIndex: z
     .number()
     .int()

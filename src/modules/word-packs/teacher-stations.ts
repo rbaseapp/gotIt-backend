@@ -34,4 +34,15 @@ export type LessonUnit = {
     introduced: boolean;
     learningItemId: string | null;
   }>;
+  stageWords?: LessonUnit['words'];
+  stageWordsByStation?: Partial<Record<TeacherStation, LessonUnit['words']>>;
 };
+
+export function currentWordStage(total: number, introduced: number) {
+  const thresholds = [
+    ...new Set(teacherStations(total, introduced).map((step) => step.requiredWords)),
+  ];
+  const end = thresholds.find((threshold) => introduced < threshold) ?? total;
+  const start = thresholds.filter((threshold) => threshold < end).at(-1) ?? 0;
+  return { start, end };
+}

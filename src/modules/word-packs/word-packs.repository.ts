@@ -5,7 +5,7 @@ import { scopeValues } from '../library/library.repository.js';
 import { PROFILE_DEFAULTS } from '../profile/profile.constants.js';
 import type { ProfileScope } from '../profile/profile.types.js';
 import type { AddInput, KnownInput, RemovalInput } from './word-packs.validation.js';
-import { teacherStations, type LessonUnit } from './teacher-stations.js';
+import { currentWordStage, teacherStations, type LessonUnit } from './teacher-stations.js';
 
 type Row = Record<string, any>;
 
@@ -45,6 +45,10 @@ export class WordPackRepository {
         known: Number(row.known_count),
         completed: Number(row.completed_count),
         introduced: Number(row.introduced_count),
+        unitCompleted:
+          Number(row.word_count) > 0 &&
+          Number(row.completed_count) === Number(row.word_count) &&
+          Number(row.prepared_meetings) === 3,
         due: Number(row.due_count),
       },
       teacherStations:
@@ -75,7 +79,24 @@ export class WordPackRepository {
             (up.status='active' AND link.excluded_at IS NULL AND li.learning_status<>'new'))::integer introduced_count,
           count(DISTINCT e.id) FILTER(WHERE known.entry_id IS NOT NULL OR
             (up.status='active' AND link.excluded_at IS NULL AND li.learning_status='mastered'))::integer completed_count,
-          count(DISTINCT li.id) FILTER(WHERE up.status='active' AND link.excluded_at IS NULL AND li.next_review_at<=now())::integer due_count
+          count(DISTINCT li.id) FILTER(WHERE up.status='active' AND link.excluded_at IS NULL AND li.next_review_at<=now())::integer due_count,
+          (SELECT count(*) FROM (
+            SELECT DISTINCT ON (s.word_pack_context->>'station') s.id
+            FROM product_gotit.private_lesson_sessions s
+            JOIN product_gotit.learning_documents d ON d.application_id=s.application_id
+              AND d.application_user_id=s.application_user_id AND d.id=s.id AND d.kind='homework'
+            WHERE s.application_id=$1 AND s.application_user_id=$2 AND s.deleted_at IS NULL
+              AND s.word_pack_context->>'packId'=p.id::text AND s.status='completed'
+              AND s.report->'assessment'->'lessonPerformance'->>'evidenceQuality'<>'insufficient'
+              AND s.word_pack_context->>'station' IN ('supported','midpoint','review')
+            ORDER BY s.word_pack_context->>'station',s.started_at,s.id
+          ) checkpoint
+          JOIN product_gotit.learning_documents d ON d.application_id=$1 AND d.application_user_id=$2
+            AND d.id=checkpoint.id AND d.kind='homework'
+          WHERE jsonb_array_length(d.document->'content'->'tasks') > 0
+            AND jsonb_array_length(d.document->'progress')=jsonb_array_length(d.document->'content'->'tasks')
+            AND NOT EXISTS (SELECT 1 FROM jsonb_array_elements(d.document->'progress') task WHERE task->>'done' IS DISTINCT FROM 'true')
+          )::integer prepared_meetings
         FROM product_gotit.word_packs p
         JOIN product_gotit.word_tracks tr ON tr.id=p.track_id AND tr.is_active
         JOIN product_gotit.word_topics tp ON tp.id=tr.topic_id AND tp.is_active
@@ -143,6 +164,21 @@ export class WordPackRepository {
   async lessonUnit(scope: ProfileScope, id: string): Promise<LessonUnit> {
     const { pack, entries } = await this.detail(scope, id);
     if (!pack.teacherStations.length) throw missingPack();
+    const stage = currentWordStage(pack.wordCount, pack.progress.introduced);
+    const stageEntries = entries.slice(stage.start, stage.end).filter((entry) => !entry.excludedAt);
+    const pending = stageEntries.findIndex((entry) => !entry.introduced);
+    const stageWords = stageEntries
+      .slice(
+        Math.max(0, pending < 0 ? stageEntries.length - 6 : pending),
+        Math.max(0, pending < 0 ? stageEntries.length - 6 : pending) + 6,
+      )
+      .map((entry) => ({
+        sourceText: entry.sourceText,
+        translationText: entry.translationText,
+        exampleText: entry.exampleText,
+        introduced: entry.introduced,
+        learningItemId: entry.learningItemId,
+      }));
     return {
       packId: pack.id,
       title: pack.title,
@@ -155,6 +191,27 @@ export class WordPackRepository {
       completed: pack.progress.completed,
       total: pack.wordCount,
       teacherStations: pack.teacherStations,
+      stageWords,
+      stageWordsByStation: Object.fromEntries(
+        pack.teacherStations.map((station, index) => {
+          const start = index ? pack.teacherStations[index - 1]!.requiredWords : 0;
+          const availableEntries = entries
+            .slice(start, station.requiredWords)
+            .filter((entry) => !entry.excludedAt);
+          const pending = availableEntries.findIndex((entry) => !entry.introduced);
+          const offset = Math.max(0, pending < 0 ? availableEntries.length - 6 : pending);
+          return [
+            station.station,
+            availableEntries.slice(offset, offset + 6).map((entry) => ({
+              sourceText: entry.sourceText,
+              translationText: entry.translationText,
+              exampleText: entry.exampleText,
+              introduced: entry.introduced,
+              learningItemId: entry.learningItemId,
+            })),
+          ];
+        }),
+      ),
       words: entries
         .filter((entry) => entry.introduced)
         .slice(0, 12)

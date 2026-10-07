@@ -241,6 +241,7 @@ const courseService = new CourseService(
         callGuard: realtimeCallGuard,
       }
     : undefined,
+  new PostgresPrivateLessonJournal(pool),
 );
 const privateLessonService = new PrivateLessonService({
   wordPacks: new WordPackRepository(pool),
