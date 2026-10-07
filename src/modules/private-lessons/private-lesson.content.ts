@@ -78,6 +78,7 @@ export function privateLessonBriefInput(plan: PrivateLessonPlan) {
       meaning: target.translationText,
     })),
     previousLesson: plan.continuity,
+    wordPack: plan.wordPack ?? null,
     roadmap: plan.roadmap
       ? {
           communicationObjective: plan.roadmap.communicationObjective,

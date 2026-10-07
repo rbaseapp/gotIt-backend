@@ -26,6 +26,8 @@ import { CoreAuthClient } from '../../src/shared/core/core-auth.client.js';
 import { createLogger } from '../../src/shared/logger/logger.js';
 import { createTestDatabase } from '../helpers/postgres.js';
 import { WordPackRepository } from '../../src/modules/word-packs/word-packs.repository.js';
+import { PostgresPrivateLessonJournal } from '../../src/modules/private-lessons/private-lesson.repository.js';
+import type { PrivateLessonPlan } from '../../src/modules/private-lessons/private-lesson.prompt.js';
 
 test(
   'library and issued practice exercise lifecycle on product-only PostgreSQL',
@@ -622,6 +624,63 @@ test(
         assert.equal(complete.body.pack.progress.known, 50);
         assert.equal(complete.body.pack.progress.completed, 50);
         assert.equal(complete.body.pack.progress.mastered, 0);
+        assert.equal(complete.body.pack.progress.introduced, 50);
+        assert.equal(
+          complete.body.pack.teacherStations.find(
+            (step: { station: string }) => step.station === 'review',
+          ).available,
+          true,
+        );
+        const lessonUnit = await new WordPackRepository(db.runtimePool).lessonUnit(
+          { applicationId, applicationUserId: users[1]! },
+          second.id,
+        );
+        assert.equal(lessonUnit.total, 50);
+        assert.equal(
+          lessonUnit.teacherStations.find((step) => step.station === 'review')?.available,
+          true,
+        );
+        assert.ok(lessonUnit.words.length > 0 && lessonUnit.words.every((word) => word.introduced));
+        const lessonScope = { applicationId, applicationUserId: users[1]! };
+        const journal = new PostgresPrivateLessonJournal(db.runtimePool);
+        const plan: PrivateLessonPlan = {
+          id: randomUUID(),
+          durationSeconds: 600,
+          targetLanguageCode: 'en',
+          supportLanguageCode: 'he',
+          lessonMode: 'absolute_beginner',
+          level: 'A1',
+          topic: lessonUnit.title,
+          grammarFocus: null,
+          focusAreas: ['speaking', 'vocabulary'],
+          customFocus: null,
+          correctionMode: 'recast',
+          vocabularyMode: 'none',
+          teacherVoice: 'female',
+          speechRate: 'normal',
+          interests: [],
+          targets: [],
+          continuity: null,
+          wordPack: { ...lessonUnit, station: 'review' },
+        };
+        await journal.create(lessonScope, plan);
+        await journal.claim(lessonScope, plan.id, 600);
+        const stored = await journal.list(lessonScope, 50, undefined, second.id);
+        assert.equal(stored.length, 1);
+        assert.equal(stored[0]?.wordPack?.station, 'review');
+        assert.equal(stored[0]?.wordPack?.packId, second.id);
+        assert.equal((await journal.list(lessonScope, 50, undefined, twelfth.id)).length, 0);
+        assert.equal(
+          (
+            await journal.list(
+              { applicationId, applicationUserId: users[0]! },
+              50,
+              undefined,
+              second.id,
+            )
+          ).length,
+          0,
+        );
         const other = await englishCall('get', `/word-packs/${twelfth.id}`).expect(200);
         assert.equal(other.body.pack.progress.known, 0);
         await englishCall('put', `/word-packs/${second.id}/known`, {
@@ -1466,7 +1525,7 @@ test(
             client.release();
           }
           const inspection = await inspectProduction(db.runtimePool.options.connectionString);
-          assert.equal(inspection.productTableCount, 50);
+          assert.equal(inspection.productTableCount, 52);
           assert.deepEqual(inspection.v1, {
             learningRevision: true,
             captureReceipts: true,

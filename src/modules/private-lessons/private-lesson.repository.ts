@@ -37,7 +37,12 @@ export type PrivateLessonReportFailureCode =
 export interface PrivateLessonJournal {
   create(scope: ProfileScope, plan: PrivateLessonPlan): Promise<void>;
   get(scope: ProfileScope, id: string): Promise<StoredPrivateLesson | null>;
-  list(scope: ProfileScope, limit: number, courseId?: string): Promise<StoredPrivateLesson[]>;
+  list(
+    scope: ProfileScope,
+    limit: number,
+    courseId?: string,
+    packId?: string,
+  ): Promise<StoredPrivateLesson[]>;
   claim(scope: ProfileScope, id: string, duration: number): Promise<StoredPrivateLesson | null>;
   complete(
     scope: ProfileScope,
@@ -92,8 +97,8 @@ export class PostgresPrivateLessonJournal implements PrivateLessonJournal {
       `INSERT INTO product_gotit.private_lesson_sessions
        (id,application_id,application_user_id,target_language_code,support_language_code,level,topic,
         grammar_focus,focus_areas,custom_focus,correction_mode,vocabulary_mode,lesson_mode,teaching_language,continuity,teacher_voice,speech_rate,
-        planned_duration_seconds,target_words,roadmap_id,milestone_id,course_context)
-       VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10,$11,$12,$13,$14,$15::jsonb,$16,$17,$18,$19::jsonb,$20,$21,$22::jsonb)`,
+        planned_duration_seconds,target_words,roadmap_id,milestone_id,course_context,word_pack_context)
+       VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10,$11,$12,$13,$14,$15::jsonb,$16,$17,$18,$19::jsonb,$20,$21,$22::jsonb,$23::jsonb)`,
       [
         plan.id,
         scope.applicationId,
@@ -117,6 +122,7 @@ export class PostgresPrivateLessonJournal implements PrivateLessonJournal {
         plan.roadmap?.roadmapId ?? null,
         plan.roadmap?.milestoneId ?? null,
         plan.course ? JSON.stringify(plan.course) : null,
+        plan.wordPack ? JSON.stringify(plan.wordPack) : null,
       ],
     );
   }
@@ -131,14 +137,15 @@ export class PostgresPrivateLessonJournal implements PrivateLessonJournal {
     return row ? storedLesson(row) : null;
   }
 
-  async list(scope: ProfileScope, limit: number, courseId?: string) {
+  async list(scope: ProfileScope, limit: number, courseId?: string, packId?: string) {
     const rows = (
       await this.pool.query(
         `${selectFields} WHERE s.application_id=$1 AND s.application_user_id=$2 AND s.deleted_at IS NULL
            AND s.status<>'active'
            AND ($4::uuid IS NULL OR s.course_context->>'courseId'=$4::text)
+           AND ($5::uuid IS NULL OR s.word_pack_context->>'packId'=$5::text)
          ORDER BY s.started_at DESC,s.id DESC LIMIT $3`,
-        [scope.applicationId, scope.applicationUserId, limit, courseId ?? null],
+        [scope.applicationId, scope.applicationUserId, limit, courseId ?? null, packId ?? null],
       )
     ).rows;
     return rows.map(storedLesson);
@@ -196,7 +203,7 @@ export class PostgresPrivateLessonJournal implements PrivateLessonJournal {
 }
 
 const selectFields = `SELECT s.id,s.target_language_code,s.support_language_code,s.level,s.topic,s.grammar_focus,
- s.focus_areas,s.custom_focus,s.correction_mode,s.vocabulary_mode,s.lesson_mode,s.teaching_language,s.continuity,s.roadmap_id,s.milestone_id,s.course_context,
+ s.focus_areas,s.custom_focus,s.correction_mode,s.vocabulary_mode,s.lesson_mode,s.teaching_language,s.continuity,s.roadmap_id,s.milestone_id,s.course_context,s.word_pack_context,
  s.teacher_voice,s.speech_rate,s.planned_duration_seconds,s.target_words,s.status,s.started_at,s.ended_at,
  s.actual_duration_seconds,s.report,r.goal_title,m.milestone_key,m.communication_objective,m.grammar_topics,
  m.success_criteria,m.evidence_lesson_count
@@ -212,6 +219,7 @@ function storedLesson(row: Record<string, unknown>): StoredPrivateLesson {
     row.report && typeof row.report === 'object' ? (row.report as Record<string, unknown>) : null;
   return {
     course: (row.course_context as PrivateLessonPlan['course']) ?? null,
+    wordPack: (row.word_pack_context as PrivateLessonPlan['wordPack']) ?? null,
     id: String(row.id),
     durationSeconds: Number(row.planned_duration_seconds),
     targetLanguageCode: String(row.target_language_code),

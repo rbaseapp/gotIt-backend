@@ -243,6 +243,7 @@ const courseService = new CourseService(
     : undefined,
 );
 const privateLessonService = new PrivateLessonService({
+  wordPacks: new WordPackRepository(pool),
   courses: courseService,
   lessonContentGenerator: privateLessonContentGenerator,
   apiKey: env.OPENAI_REALTIME_API_KEY ?? env.OPENAI_API_KEY,

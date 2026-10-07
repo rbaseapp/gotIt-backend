@@ -44,6 +44,7 @@ import type { PrivateLessonProficiencyStore } from './private-lesson.proficiency
 import type { PrivateLessonGoalKind } from './private-lesson.curriculum.js';
 import type { CourseService } from '../courses/course.service.js';
 import type { CourseGenerator } from '../courses/course.provider.js';
+import type { WordPackRepository } from '../word-packs/word-packs.repository.js';
 import {
   privateLessonBriefInput,
   privateLessonBriefInstruction,
@@ -82,6 +83,7 @@ export interface PrivateLessonVocabularySource {
 }
 
 export type PrivateLessonServiceOptions = {
+  wordPacks?: Pick<WordPackRepository, 'lessonUnit'>;
   courses?: CourseService;
   lessonContentGenerator?: Pick<CourseGenerator, 'generate'>;
   apiKey?: string;
@@ -118,6 +120,12 @@ export class PrivateLessonService {
     return Boolean(this.options.apiKey);
   }
 
+  async getUnit(scope: ProfileScope, id: string) {
+    if (!this.options.wordPacks)
+      throw new AppError(503, 'PRIVATE_LESSON_UNITS_UNAVAILABLE', 'Lesson units are unavailable');
+    return this.options.wordPacks.lessonUnit(scope, id);
+  }
+
   async savePreferences(scope: ProfileScope, input: PrivateLessonPreferencesInput) {
     if (!this.options.roadmaps)
       throw new AppError(
@@ -141,6 +149,28 @@ export class PrivateLessonService {
 
     if (input.courseId && !this.options.courses)
       throw new AppError(503, 'COURSE_AI_UNAVAILABLE', 'Courses are unavailable');
+    const wordPack = input.packId ? await this.getUnit(scope, input.packId) : null;
+    if (wordPack) {
+      wordPack.station = input.station ?? 'supported';
+      const station = wordPack.teacherStations.find((step) => step.station === wordPack.station);
+      if (!station?.available)
+        throw new AppError(
+          409,
+          'PRIVATE_LESSON_STATION_LOCKED',
+          'Complete the preceding words first',
+        );
+      input = {
+        ...input,
+        targetLanguageCode: wordPack.targetLanguageCode,
+        supportLanguageCode: wordPack.supportLanguageCode,
+        requestedLevel: wordPack.level,
+        requestedDurationMinutes: station.durationMinutes,
+        lessonMode: wordPack.level === 'A1' ? 'absolute_beginner' : 'standard',
+        teachingLanguage: 'support',
+        topic: wordPack.title,
+        vocabularyMode: 'none',
+      };
+    }
     const courseContext = input.courseId
       ? await this.options.courses!.lessonContext(scope, input.courseId)
       : null;
@@ -200,12 +230,13 @@ export class PrivateLessonService {
           lesson.status === 'completed' &&
           lesson.report &&
           (!input.courseId || lesson.course?.courseId === input.courseId) &&
+          (!input.packId || lesson.wordPack?.packId === input.packId) &&
           (Boolean(input.courseId) || lesson.lessonMode === requestedLessonMode) &&
           new Intl.Locale(lesson.targetLanguageCode).language === targetBaseLanguage,
       ) ?? null;
     const activeRoadmap =
       loadedRoadmap ??
-      (this.options.roadmaps && !input.courseId && targetBaseLanguage === 'en'
+      (this.options.roadmaps && !input.courseId && !input.packId && targetBaseLanguage === 'en'
         ? await this.options.roadmaps.create(
             scope,
             input.targetLanguageCode,
@@ -238,6 +269,23 @@ export class PrivateLessonService {
       if (!this.options.courses)
         throw new AppError(503, 'COURSE_AI_UNAVAILABLE', 'Courses are unavailable');
       plan = await this.options.courses.prepareLesson(scope, plan, input.courseId, courseContext!);
+    }
+    if (wordPack) {
+      plan = {
+        ...plan,
+        wordPack,
+        roadmap: null,
+        grammarFocus: null,
+        customFocus: null,
+        focusAreas: ['speaking', 'vocabulary'],
+        targets: wordPack.words
+          .filter((word) => word.learningItemId)
+          .map((word) => ({
+            learningItemId: word.learningItemId!,
+            sourceText: word.sourceText,
+            translationText: word.translationText,
+          })),
+      };
     }
     const childCourse = plan.course?.preferences.ageGroup === 'child';
     if (childCourse)
@@ -356,7 +404,8 @@ export class PrivateLessonService {
       });
       const secret = clientSecretSchema.parse(await readProviderJson(response, controller.signal));
 
-      if (!input.courseId) await this.options.roadmaps?.savePreferences(scope, input, plan);
+      if (!input.courseId && !input.packId)
+        await this.options.roadmaps?.savePreferences(scope, input, plan);
       await this.options.journal?.create(scope, plan);
       if (ticketId) await this.options.realtimeCallGuard!.issue(ticketId, secret.value);
       return {
@@ -471,9 +520,11 @@ export class PrivateLessonService {
     }
   }
 
-  async listSessions(scope: ProfileScope, limit: number, courseId?: string) {
+  async listSessions(scope: ProfileScope, limit: number, courseId?: string, packId?: string) {
     return {
-      lessons: (await this.requireJournal().list(scope, limit, courseId)).map(publicStoredLesson),
+      lessons: (await this.requireJournal().list(scope, limit, courseId, packId)).map(
+        publicStoredLesson,
+      ),
     };
   }
 
@@ -687,8 +738,10 @@ export class PrivateLessonService {
 }
 
 function publicStoredLesson(lesson: StoredPrivateLesson) {
+  // Keep the unit and station available to the learning map and lesson history.
   return {
     course: lesson.course ?? null,
+    wordPack: lesson.wordPack ?? null,
     id: lesson.id,
     targetLanguageCode: lesson.targetLanguageCode,
     supportLanguageCode: lesson.supportLanguageCode,
@@ -720,6 +773,7 @@ function publicPlan(plan: PrivateLessonPlan) {
   const wrapUpLeadSeconds = Math.min(5, Math.max(3, Math.floor(plan.durationSeconds * 0.02)));
   return {
     course: plan.course ?? null,
+    wordPack: plan.wordPack ?? null,
     id: plan.id,
     durationSeconds: plan.durationSeconds,
     wrapUpAfterSeconds: Math.max(0, plan.durationSeconds - wrapUpLeadSeconds),

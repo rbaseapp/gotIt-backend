@@ -133,6 +133,7 @@ export async function verifyRuntimeSchema(client, { strictRole = true } = {}) {
       'started_at',
       'deleted_at',
       'course_context',
+      'word_pack_context',
     ],
     learning_documents: [
       'application_id',
