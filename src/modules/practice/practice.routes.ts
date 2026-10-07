@@ -13,11 +13,20 @@ export function createPracticeRoutes(service: PracticeService, requirePlay: Requ
   const router = Router();
   router.get('/sessions', async (req, res) => {
     const page = parseInput(
-      pageSchema.extend({ sourceLanguageCode: languageSchema.optional() }),
+      pageSchema.extend({
+        sourceLanguageCode: languageSchema.optional(),
+        packId: uuidSchema.optional(),
+      }),
       req.query,
     );
     res.json({
-      ...(await service.sessions(req.gotitAuth!, page.limit, page.cursor, page.sourceLanguageCode)),
+      ...(await service.sessions(
+        req.gotitAuth!,
+        page.limit,
+        page.cursor,
+        page.sourceLanguageCode,
+        page.packId,
+      )),
       requestId: req.id,
     });
   });

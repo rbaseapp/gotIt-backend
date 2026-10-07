@@ -24,6 +24,7 @@ export function createPrivateLessonRoutes(
         request.gotitAuth!,
         parseInput(uuidSchema, request.params.id),
       ),
+      requestId: request.id,
     }),
   );
 

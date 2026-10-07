@@ -235,7 +235,12 @@ export function createRoutes(dependencies: AppDependencies) {
   if (dependencies.wordPackService)
     router.use(
       '/api/v1/word-packs',
-      createWordPackRoutes(dependencies.wordPackService, requireVocabularyWrite),
+      createWordPackRoutes(
+        dependencies.wordPackService,
+        requireVocabularyWrite,
+        dependencies.wordPackStudyService,
+        requirePractice,
+      ),
     );
   if (dependencies.practiceService) {
     router.use(

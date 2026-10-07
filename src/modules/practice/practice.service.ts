@@ -731,7 +731,13 @@ export class PracticeService {
         : null,
     };
   }
-  async sessions(scope: ProfileScope, limit: number, cursor?: string, languageCode?: string) {
+  async sessions(
+    scope: ProfileScope,
+    limit: number,
+    cursor?: string,
+    languageCode?: string,
+    packId?: string,
+  ) {
     return withTransaction(
       this.pool,
       async (tx) => {
@@ -740,10 +746,11 @@ export class PracticeService {
             await tx.query(
               `SELECT count(*)::integer AS count FROM product_gotit.practice_sessions session
                WHERE session.application_id=$1 AND session.application_user_id=$2
+                 AND ($4::uuid IS NULL OR (session.selection->'scope'->>'type'='pack' AND session.selection->'scope'->>'id'=$4::uuid::text))
                  AND ($3::text IS NULL OR EXISTS(SELECT 1 FROM product_gotit.learning_items item
                    WHERE item.application_id=$1 AND item.application_user_id=$2
                      AND item.id=(session.selection->'itemIds'->>0)::uuid AND item.source_language_code=$3))`,
-              [...scopeValues(scope), languageCode ?? null],
+              [...scopeValues(scope), languageCode ?? null, packId ?? null],
             )
           ).rows[0]?.count ?? 0,
         );
@@ -751,6 +758,7 @@ export class PracticeService {
           await tx.query(
             `SELECT session.* FROM product_gotit.practice_sessions session
              WHERE session.application_id=$1 AND session.application_user_id=$2
+               AND ($6::uuid IS NULL OR (session.selection->'scope'->>'type'='pack' AND session.selection->'scope'->>'id'=$6::uuid::text))
                AND ($5::text IS NULL OR EXISTS(SELECT 1 FROM product_gotit.learning_items item
                  WHERE item.application_id=$1 AND item.application_user_id=$2
                    AND item.id=(session.selection->'itemIds'->>0)::uuid AND item.source_language_code=$5))
@@ -759,7 +767,13 @@ export class PracticeService {
                  WHERE cursor.application_id=$1 AND cursor.application_user_id=$2 AND cursor.id=$3
                ))
              ORDER BY session.started_at DESC,session.id DESC LIMIT $4`,
-            [...scopeValues(scope), cursor ?? null, limit + 1, languageCode ?? null],
+            [
+              ...scopeValues(scope),
+              cursor ?? null,
+              limit + 1,
+              languageCode ?? null,
+              packId ?? null,
+            ],
           )
         ).rows;
         return {
