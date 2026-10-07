@@ -8,6 +8,7 @@ import type { AddInput, KnownInput, RemovalInput } from './word-packs.validation
 
 import { wordPackJourney } from './word-pack-journey.js';
 import { unitLearnedPredicate } from './unit-learning.js';
+import { currentWordStage, type LessonUnit } from './teacher-stations.js';
 
 type Row = Record<string, any>;
 
@@ -48,6 +49,10 @@ export class WordPackRepository {
         mastered: Number(row.mastered_count),
         known: Number(row.known_count),
         completed: Number(row.completed_count),
+        unitCompleted:
+          Number(row.word_count) > 0 &&
+          Number(row.completed_count) === Number(row.word_count) &&
+          Number(row.prepared_meetings) === 3,
         due: Number(row.due_count),
       },
     };
@@ -73,7 +78,24 @@ export class WordPackRepository {
               AND li.learning_status IN ('learning','reviewing','mastered')))::integer introduced_count,
           count(DISTINCT e.id) FILTER(WHERE known.entry_id IS NOT NULL OR
             (up.status='active' AND link.excluded_at IS NULL AND li.learning_status='mastered'))::integer completed_count,
-          count(DISTINCT li.id) FILTER(WHERE up.status='active' AND link.excluded_at IS NULL AND li.next_review_at<=now())::integer due_count
+          count(DISTINCT li.id) FILTER(WHERE up.status='active' AND link.excluded_at IS NULL AND li.next_review_at<=now())::integer due_count,
+          (SELECT count(*) FROM (
+            SELECT DISTINCT ON (s.word_pack_context->>'station') s.id
+            FROM product_gotit.private_lesson_sessions s
+            JOIN product_gotit.learning_documents d ON d.application_id=s.application_id
+              AND d.application_user_id=s.application_user_id AND d.id=s.id AND d.kind='homework'
+            WHERE s.application_id=$1 AND s.application_user_id=$2 AND s.deleted_at IS NULL
+              AND s.word_pack_context->>'packId'=p.id::text AND s.status='completed'
+              AND s.report->'assessment'->'lessonPerformance'->>'evidenceQuality'<>'insufficient'
+              AND s.word_pack_context->>'station' IN ('supported','midpoint','review')
+            ORDER BY s.word_pack_context->>'station',s.started_at,s.id
+          ) checkpoint
+          JOIN product_gotit.learning_documents d ON d.application_id=$1 AND d.application_user_id=$2
+            AND d.id=checkpoint.id AND d.kind='homework'
+          WHERE jsonb_array_length(d.document->'content'->'tasks') > 0
+            AND jsonb_array_length(d.document->'progress')=jsonb_array_length(d.document->'content'->'tasks')
+            AND NOT EXISTS (SELECT 1 FROM jsonb_array_elements(d.document->'progress') task WHERE task->>'done' IS DISTINCT FROM 'true')
+          )::integer prepared_meetings
         FROM product_gotit.word_packs p
         JOIN product_gotit.word_tracks tr ON tr.id=p.track_id AND tr.is_active
         JOIN product_gotit.word_topics tp ON tp.id=tr.topic_id AND tp.is_active
@@ -119,6 +141,8 @@ export class WordPackRepository {
               link.learning_item_id AS "learningItemId",link.excluded_at AS "excludedAt",
               li.learning_status AS "learningStatus",li.user_status AS "userStatus",
               (link.excluded_at IS NULL AND li.user_status='active' AND ${unitLearnedPredicate('li', 'e.pack_id')}) IS TRUE AS "learned",
+              (known.entry_id IS NOT NULL OR (up.status='active' AND link.excluded_at IS NULL
+                AND li.user_status='active' AND li.learning_status IN ('learning','reviewing','mastered'))) AS "introduced",
               (known.entry_id IS NOT NULL) AS "known"
             FROM product_gotit.word_pack_entries e
             LEFT JOIN product_gotit.learning_item_pack_entries link
@@ -127,6 +151,8 @@ export class WordPackRepository {
               ON known.application_id=$1 AND known.application_user_id=$2 AND known.pack_id=e.pack_id AND known.entry_id=e.id
             LEFT JOIN product_gotit.learning_items li
               ON li.application_id=$1 AND li.application_user_id=$2 AND li.id=link.learning_item_id AND li.deleted_at IS NULL
+            LEFT JOIN product_gotit.user_word_packs up
+              ON up.application_id=$1 AND up.application_user_id=$2 AND up.pack_id=e.pack_id
             WHERE e.pack_id=$3 ORDER BY e.sort_order,e.id`,
             [...scopeValues(scope), id],
           )
@@ -182,6 +208,70 @@ export class WordPackRepository {
       },
       true,
     );
+  }
+
+  async lessonUnit(scope: ProfileScope, id: string): Promise<LessonUnit> {
+    const { pack, entries } = await this.detail(scope, id);
+    if (!pack.teacherStations.length) throw missingPack();
+    const stage = currentWordStage(pack.wordCount, pack.progress.introduced);
+    const stageEntries = entries.slice(stage.start, stage.end).filter((entry) => !entry.excludedAt);
+    const pending = stageEntries.findIndex((entry) => !entry.introduced);
+    const stageWords = stageEntries
+      .slice(
+        Math.max(0, pending < 0 ? stageEntries.length - 6 : pending),
+        Math.max(0, pending < 0 ? stageEntries.length - 6 : pending) + 6,
+      )
+      .map((entry) => ({
+        sourceText: entry.sourceText,
+        translationText: entry.translationText,
+        exampleText: entry.exampleText,
+        introduced: entry.introduced,
+        learningItemId: entry.learningItemId,
+      }));
+    return {
+      packId: pack.id,
+      title: pack.title,
+      moduleNumber: pack.moduleNumber,
+      targetLanguageCode: pack.track.sourceLanguageCode,
+      supportLanguageCode: pack.track.translationLanguageCode,
+      level: pack.track.cefrFrom,
+      station: 'supported',
+      introduced: pack.progress.introduced,
+      completed: pack.progress.completed,
+      total: pack.wordCount,
+      teacherStations: pack.teacherStations,
+      stageWords,
+      stageWordsByStation: Object.fromEntries(
+        pack.teacherStations.map((station, index) => {
+          const start = index ? pack.teacherStations[index - 1]!.requiredWords : 0;
+          const availableEntries = entries
+            .slice(start, station.requiredWords)
+            .filter((entry) => !entry.excludedAt);
+          const pending = availableEntries.findIndex((entry) => !entry.introduced);
+          const offset = Math.max(0, pending < 0 ? availableEntries.length - 6 : pending);
+          return [
+            station.station,
+            availableEntries.slice(offset, offset + 6).map((entry) => ({
+              sourceText: entry.sourceText,
+              translationText: entry.translationText,
+              exampleText: entry.exampleText,
+              introduced: entry.introduced,
+              learningItemId: entry.learningItemId,
+            })),
+          ];
+        }),
+      ),
+      words: entries
+        .filter((entry) => entry.introduced)
+        .slice(0, 12)
+        .map((entry) => ({
+          sourceText: entry.sourceText,
+          translationText: entry.translationText,
+          exampleText: entry.exampleText,
+          introduced: entry.introduced,
+          learningItemId: entry.excludedAt ? null : entry.learningItemId,
+        })),
+    };
   }
 
   async setKnown(scope: ProfileScope, id: string, input: KnownInput) {

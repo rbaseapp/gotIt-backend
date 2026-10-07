@@ -51,6 +51,8 @@ import { PostgresPrivateLessonRoadmapStore } from '../src/modules/private-lesson
 import { taskLevelForPlan } from '../src/modules/private-lessons/private-lesson.assessment.js';
 import type { AddonAccessContract } from '../src/modules/addons/addon-access.js';
 import type { MinuteWallet } from '../src/modules/private-lessons/minute-wallet.js';
+import { teacherStations, type LessonUnit } from '../src/modules/word-packs/teacher-stations.js';
+import { unitLesson, unitHistoryFixture } from './helpers/unit-path-fixtures.js';
 
 test('lesson history accepts a scoped course filter and rejects invalid IDs', () => {
   const courseId = '10000000-0000-4000-8000-000000000001';
@@ -2112,4 +2114,99 @@ test('mixed RTL language pairs keep lesson examples in the selected target langu
     assert.match(prompt, /TEACHING_LANGUAGE is SUPPORT_LANGUAGE/u);
     assert.doesNotMatch(prompt, /Speak in TARGET_LANGUAGE from the very first spoken word/u);
   }
+});
+
+test('unit summary meetings enforce availability and use the server unit scope', async () => {
+  const packId = '30000000-0000-4000-8000-000000000001';
+  for (const introduced of [49, 50]) {
+    const history = unitHistoryFixture([unitLesson('supported'), unitLesson('midpoint')]);
+    history.seed(identity);
+    let calls = 0;
+    let prompt = '';
+    const unit: LessonUnit = {
+      packId,
+      title: 'Building Your First Sentences',
+      moduleNumber: 1,
+      targetLanguageCode: 'en',
+      supportLanguageCode: 'he',
+      level: 'A1',
+      station: 'supported',
+      introduced,
+      completed: introduced,
+      total: 50,
+      teacherStations: teacherStations(50, introduced),
+      words: [
+        {
+          sourceText: 'water',
+          translationText: 'מים',
+          exampleText: null,
+          introduced: true,
+          learningItemId: null,
+        },
+      ],
+    };
+    const service = new PrivateLessonService({
+      apiKey: 'fixture',
+      model: 'fixture',
+      voice: 'marin',
+      transcriptionModel: 'fixture',
+      profiles,
+      vocabulary,
+      mapWordPacks: {
+        lessonUnit: async (scope, requestedId) => {
+          assert.deepEqual(scope, identity);
+          assert.equal(requestedId, packId);
+          return structuredClone(unit);
+        },
+      },
+      wordPacks: {
+        context: async (_scope, _packId, station) => ({
+          context: { ...structuredClone(unit), station },
+          targets: [],
+        }),
+      },
+      journal: history.journal,
+      courses: history.courses,
+      fetchImpl: async (_url, init) => {
+        calls++;
+        prompt = JSON.parse(String(init?.body)).session.instructions;
+        return Response.json({ value: 'fixture-secret' });
+      },
+    });
+    const input = privateLessonInputSchema.parse({
+      packId,
+      station: 'review',
+      interactionMode: 'guided',
+      targetLanguageCode: 'es',
+      supportLanguageCode: 'fr',
+      requestedDurationMinutes: 1,
+    });
+    if (introduced < 50) {
+      await assert.rejects(service.createSession(identity, input), {
+        code: 'PRIVATE_LESSON_STATION_LOCKED',
+      });
+      assert.equal(calls, 0);
+    } else {
+      const result = await service.createSession(identity, input);
+      assert.equal(calls, 1);
+      assert.equal(result.lesson.durationSeconds, 600);
+      assert.equal(result.lesson.targetLanguageCode, 'en');
+      assert.equal(result.lesson.supportLanguageCode, 'he');
+      assert.equal(result.lesson.wordPack?.station, 'review');
+      assert.equal(result.lesson.wordPack?.packId, packId);
+      assert.ok(prompt.includes('water'));
+      assert.ok(prompt.includes('Building Your First Sentences'));
+      assert.equal(result.lesson.roadmap, null);
+    }
+  }
+  assert.equal(
+    privateLessonInputSchema.safeParse({ targetLanguageCode: 'en', station: 'review' }).success,
+    false,
+  );
+  assert.equal(
+    privateLessonInputSchema.safeParse({ targetLanguageCode: 'en', packId, courseId: packId })
+      .success,
+    false,
+  );
+  assert.deepEqual(privateLessonListSchema.parse({ limit: '50', packId }), { limit: 50, packId });
 });

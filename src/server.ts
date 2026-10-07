@@ -266,9 +266,11 @@ const courseService = new CourseService(
       }
     : undefined,
   new PostgresCourseWordSource(pool),
+  new PostgresPrivateLessonJournal(pool),
 );
 const privateLessonService = new PrivateLessonService({
   wordPacks: new PostgresPrivateLessonWordPackSource(pool),
+  mapWordPacks: new WordPackRepository(pool),
   activities: privateLessonContentGenerator
     ? new LessonActivityService(
         new PostgresLessonActivityStore(pool),

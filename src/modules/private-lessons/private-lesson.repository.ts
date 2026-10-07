@@ -35,6 +35,7 @@ export type PrivateLessonReportFailureCode =
   | 'generation_failed';
 
 export interface PrivateLessonJournal {
+  unitHistory?(scope: ProfileScope, packId: string): Promise<StoredPrivateLesson[]>;
   create(scope: ProfileScope, plan: PrivateLessonPlan): Promise<void>;
   get(scope: ProfileScope, id: string): Promise<StoredPrivateLesson | null>;
   list(
@@ -92,6 +93,21 @@ export class PostgresPrivateLessonVocabularySource {
 
 export class PostgresPrivateLessonJournal implements PrivateLessonJournal {
   constructor(private readonly pool: Pool) {}
+
+  async unitHistory(scope: ProfileScope, packId: string) {
+    // Three canonical checkpoints, independent of history pagination and repeated calls.
+    const rows = (
+      await this.pool.query(
+        `${selectFields}
+      WHERE s.application_id=$1 AND s.application_user_id=$2 AND s.deleted_at IS NULL
+        AND s.word_pack_context->>'packId'=$3 AND s.status='completed'
+        AND s.report->'assessment'->'lessonPerformance'->>'evidenceQuality'<>'insufficient'
+      ORDER BY s.started_at ASC,s.id ASC`,
+        [scope.applicationId, scope.applicationUserId, packId],
+      )
+    ).rows;
+    return rows.map(storedLesson);
+  }
 
   async create(scope: ProfileScope, plan: PrivateLessonPlan) {
     await this.pool.query(

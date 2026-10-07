@@ -43,8 +43,10 @@ import { setupPayload } from './private-lesson.roadmap.js';
 import type { PrivateLessonProficiencyStore } from './private-lesson.proficiency.js';
 import type { PrivateLessonGoalKind } from './private-lesson.curriculum.js';
 import type { CourseService } from '../courses/course.service.js';
+import { buildUnitLearningPath, completedUnitMeeting } from '../word-packs/unit-learning-path.js';
 import type { CourseGenerator } from '../courses/course.provider.js';
 import { LessonActivityService, type LessonActivityCommand } from './private-lesson.activity.js';
+import type { WordPackRepository } from '../word-packs/word-packs.repository.js';
 import type { PrivateLessonWordPackSource } from './private-lesson.word-pack.js';
 import {
   privateLessonBriefInput,
@@ -85,6 +87,7 @@ export interface PrivateLessonVocabularySource {
 
 export type PrivateLessonServiceOptions = {
   wordPacks?: PrivateLessonWordPackSource;
+  mapWordPacks?: Pick<WordPackRepository, 'lessonUnit'>;
   activities?: LessonActivityService;
   courses?: CourseService;
   lessonContentGenerator?: Pick<CourseGenerator, 'generate'>;
@@ -207,6 +210,44 @@ export class PrivateLessonService {
     }
   }
 
+  async getLearningMap(scope: ProfileScope, id: string) {
+    if (!this.options.mapWordPacks)
+      throw new AppError(503, 'PRIVATE_LESSON_UNIT_UNAVAILABLE', 'Unit maps are unavailable');
+    const unit = await this.options.mapWordPacks.lessonUnit(scope, id);
+    const lessons = this.options.journal?.unitHistory
+      ? await this.options.journal.unitHistory(scope, id)
+      : ((await this.options.journal?.list(scope, 1000, undefined, id)) ?? []);
+    const assignments = await Promise.all(
+      lessons.filter(completedUnitMeeting).map(
+        (lesson) =>
+          this.options.courses?.homework(scope, lesson.id).catch((error: unknown) => {
+            if (error instanceof AppError && error.statusCode === 404) return null;
+            throw error;
+          }) ?? null,
+      ),
+    );
+    return buildUnitLearningPath(
+      unit,
+      lessons,
+      assignments.filter((item) => item !== null),
+    );
+  }
+
+  async getPreparedUnit(scope: ProfileScope, id: string) {
+    if (!this.options.mapWordPacks)
+      throw new AppError(503, 'PRIVATE_LESSON_UNIT_UNAVAILABLE', 'Unit maps are unavailable');
+    const unit = await this.options.mapWordPacks.lessonUnit(scope, id);
+    const path = await this.getLearningMap(scope, id);
+    return {
+      ...unit,
+      teacherStations: path.stations,
+      station:
+        path.nextAction.station ??
+        path.stations.find((step) => step.available)?.station ??
+        unit.station,
+    };
+  }
+
   async savePreferences(scope: ProfileScope, input: PrivateLessonPreferencesInput) {
     if (!this.options.roadmaps)
       throw new AppError(
@@ -228,11 +269,43 @@ export class PrivateLessonService {
         'Private voice lessons are unavailable',
       );
 
+    const path =
+      input.packId && this.options.mapWordPacks
+        ? await this.getLearningMap(scope, input.packId)
+        : null;
+    if (path) {
+      const station =
+        input.station ??
+        path.stations.find((step) => step.available && !step.meetingCompleted)?.station ??
+        'supported';
+      if (!path.stations.find((step) => step.station === station)?.available)
+        throw new AppError(
+          409,
+          'PRIVATE_LESSON_STATION_LOCKED',
+          'Complete the current unit stage before this meeting',
+        );
+      input = { ...input, station };
+    }
     if (input.packId && !this.options.wordPacks)
       throw new AppError(503, 'PRIVATE_LESSON_UNIT_UNAVAILABLE', 'Unit lessons are unavailable');
     const unit = input.packId
       ? await this.options.wordPacks!.context(scope, input.packId, input.station ?? 'supported')
       : null;
+    if (unit && path) {
+      unit.context.teacherStations = path.stations;
+      const mapUnit = await this.options.mapWordPacks!.lessonUnit(scope, input.packId!);
+      const words =
+        mapUnit.stageWordsByStation?.[input.station!]?.filter((word) => word.introduced) ??
+        mapUnit.words;
+      unit.context.words = words;
+      unit.targets = words
+        .filter((word) => word.learningItemId)
+        .map((word) => ({
+          learningItemId: word.learningItemId!,
+          sourceText: word.sourceText,
+          translationText: word.translationText,
+        }));
+    }
     if (unit) {
       const station = unit.context.teacherStations?.find(
         (step) => step.station === (input.station ?? 'supported'),
