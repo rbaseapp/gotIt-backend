@@ -1,7 +1,12 @@
 import { Router, type RequestHandler } from 'express';
 import { parseInput, uuidSchema } from '../capture/capture.validation.js';
 import type { WordPackRepository } from './word-packs.repository.js';
-import { addSchema, knownSchema, removalSchema } from './word-packs.validation.js';
+import {
+  addSchema,
+  catalogQuerySchema,
+  knownSchema,
+  removalSchema,
+} from './word-packs.validation.js';
 import type { WordPackStudyService } from './word-pack-study.service.js';
 import { z } from 'zod';
 
@@ -28,7 +33,10 @@ export function createWordPackRoutes(
     }
   }
   router.get('/', async (req, res) =>
-    res.json({ ...(await service.list(req.gotitAuth!)), requestId: req.id }),
+    res.json({
+      ...(await service.list(req.gotitAuth!, parseInput(catalogQuerySchema, req.query))),
+      requestId: req.id,
+    }),
   );
   router.get('/:id', async (req, res) =>
     res.json({

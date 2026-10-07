@@ -4,7 +4,7 @@ import { AppError } from '../../shared/errors/app-error.js';
 import { scopeValues } from '../library/library.repository.js';
 import { PROFILE_DEFAULTS } from '../profile/profile.constants.js';
 import type { ProfileScope } from '../profile/profile.types.js';
-import type { AddInput, KnownInput, RemovalInput } from './word-packs.validation.js';
+import type { AddInput, CatalogQuery, KnownInput, RemovalInput } from './word-packs.validation.js';
 
 import { wordPackJourney } from './word-pack-journey.js';
 import { unitLearnedPredicate } from './unit-learning.js';
@@ -58,7 +58,12 @@ export class WordPackRepository {
     };
   }
 
-  private async packRows(tx: DatabaseTransaction, scope: ProfileScope, id?: string) {
+  private async packRows(
+    tx: DatabaseTransaction,
+    scope: ProfileScope,
+    id?: string,
+    query: CatalogQuery = {},
+  ) {
     return (
       await tx.query(
         `SELECT p.id,p.slug,p.title,p.description,p.module_number,p.version,p.sort_order,
@@ -109,21 +114,28 @@ export class WordPackRepository {
           ON known.application_id=$1 AND known.application_user_id=$2
           AND known.pack_id=p.id AND known.entry_id=e.id
         WHERE p.is_active AND ($3::uuid IS NULL OR p.id=$3)
-          AND (profile.default_source_language IS NULL OR
-            split_part(lower(profile.default_source_language),'-',1)=split_part(lower(tr.source_language_code),'-',1))
-          AND (profile.default_translation_language IS NULL OR
-            split_part(lower(profile.default_translation_language),'-',1)=split_part(lower(tr.translation_language_code),'-',1))
+          AND (COALESCE($4::text,profile.default_source_language) IS NULL OR
+            split_part(lower(COALESCE($4::text,profile.default_source_language)),'-',1)=split_part(lower(tr.source_language_code),'-',1))
+          AND (COALESCE($5::text,profile.default_translation_language) IS NULL OR
+            split_part(lower(COALESCE($5::text,profile.default_translation_language)),'-',1)=split_part(lower(tr.translation_language_code),'-',1))
         GROUP BY p.id,tr.id,tp.id,up.status,up.installed_version
         ORDER BY tp.sort_order,tr.sort_order,p.sort_order,p.id`,
-        [...scopeValues(scope), id ?? null],
+        [
+          ...scopeValues(scope),
+          id ?? null,
+          query.sourceLanguageCode ?? null,
+          query.translationLanguageCode ?? null,
+        ],
       )
     ).rows;
   }
 
-  async list(scope: ProfileScope) {
+  async list(scope: ProfileScope, query: CatalogQuery = {}) {
     return withTransaction(
       this.pool,
-      async (tx) => ({ packs: (await this.packRows(tx, scope)).map((row) => this.dto(row)) }),
+      async (tx) => ({
+        packs: (await this.packRows(tx, scope, undefined, query)).map((row) => this.dto(row)),
+      }),
       true,
     );
   }

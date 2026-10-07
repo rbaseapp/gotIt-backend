@@ -8,6 +8,7 @@ import { readFileSync } from 'node:fs';
 import { sessionSchema } from '../src/modules/practice/practice.validation.js';
 import {
   addSchema,
+  catalogQuerySchema,
   knownSchema,
   removalSchema,
 } from '../src/modules/word-packs/word-packs.validation.js';
@@ -29,6 +30,20 @@ test('curriculum order is restricted to unit-owned smart practice', () => {
     { sessionType: 'smart_review', scope: { type: 'track', id }, curriculumOrder: true },
   ])
     assert.equal(sessionSchema.safeParse(input).success, false);
+});
+
+test('catalog accepts explicit BCP-47 languages and preserves the no-query contract', () => {
+  assert.deepEqual(catalogQuerySchema.parse({}), {});
+  assert.deepEqual(
+    catalogQuerySchema.parse({ sourceLanguageCode: 'en-us', translationLanguageCode: 'he-il' }),
+    {
+      sourceLanguageCode: 'en-US',
+      translationLanguageCode: 'he-IL',
+    },
+  );
+  assert.equal(catalogQuerySchema.safeParse({ sourceLanguageCode: 'bad language' }).success, false);
+  assert.equal(catalogQuerySchema.safeParse({ sourceLanguageCode: ['en', 'fr'] }).success, false);
+  assert.equal(catalogQuerySchema.safeParse({ applicationUserId: id }).success, false);
 });
 
 test('replacement English catalog matches the supplied 60 units without repeated words', () => {
