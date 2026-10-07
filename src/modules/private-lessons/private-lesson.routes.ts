@@ -17,6 +17,26 @@ export function createPrivateLessonRoutes(
 ) {
   const router = Router();
 
+  // Read-only progression is available without purchasing or starting a teacher call.
+  router.get('/units/:id/map', async (request, response) =>
+    response.json({
+      path: await service.getLearningMap(
+        request.gotitAuth!,
+        parseInput(uuidSchema, request.params.id),
+      ),
+    }),
+  );
+
+  router.get('/units/:id', requireLessonAccess, async (request, response) => {
+    response.json({
+      unit: await service.getPreparedUnit(
+        request.gotitAuth!,
+        parseInput(uuidSchema, request.params.id),
+      ),
+      requestId: request.id,
+    });
+  });
+
   router.get('/setup', requireLessonAccess, async (request, response) => {
     const input = parseInput(privateLessonSetupSchema, request.query);
     response.json({
@@ -59,7 +79,12 @@ export function createPrivateLessonRoutes(
   router.get('/', requireLessonAccess, async (request, response) => {
     const input = parseInput(privateLessonListSchema, request.query);
     response.json({
-      ...(await service.listSessions(request.gotitAuth!, input.limit, input.courseId)),
+      ...(await service.listSessions(
+        request.gotitAuth!,
+        input.limit,
+        input.courseId,
+        input.packId,
+      )),
       requestId: request.id,
     });
   });

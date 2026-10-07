@@ -1,6 +1,7 @@
 import type { CefrLevel } from '../profile/profile.types.js';
 import type { CourseLessonContext } from '../courses/course.schemas.js';
 import type { PrivateLessonBrief } from './private-lesson.content.js';
+import type { LessonUnit } from '../word-packs/teacher-stations.js';
 import { privateLessonTeachers } from './private-lesson.teachers.js';
 import type {
   privateLessonCorrectionModes,
@@ -25,6 +26,7 @@ export type PrivateLessonTarget = {
 };
 
 export type PrivateLessonPlan = {
+  wordPack?: LessonUnit | null;
   course?: CourseLessonContext | null;
   teachingBrief?: PrivateLessonBrief;
   id: string;
@@ -191,6 +193,7 @@ ${standardSupportLanguagePolicy}`;
       previousLesson: plan.continuity,
       learningRoadmap: plan.roadmap,
       course: plan.course ?? null,
+      wordPack: plan.wordPack ?? null,
       teachingBrief: plan.teachingBrief ?? null,
     },
     null,
@@ -215,6 +218,7 @@ ${lessonData}
 ${languagePolicy}
 
 # Teaching policy
+${plan.wordPack ? '- The wordPack defines this lesson scope. Use its introduced words in short, level-appropriate sentences. For the review station, recap the unit and check independent use; revisit gaps with brief explanations. For the supported and midpoint stations, guide practice of the familiar words. Do not substitute unrelated roadmap material.' : ''}
 - Keep conversational feedback to one or two short spoken sentences. When teaching something new, use up to six short sentences for its purpose, rule or pattern, two meaningful examples and one comprehension check. Do not skip the explanation to satisfy a brevity limit; break a larger explanation into understandable steps.
 - Ask exactly one question at a time.
 - Teach, then check understanding: explain the concept and when it applies in plain language, demonstrate it with a short relevant example, and ask an open question that requires the learner to explain, choose a form with a reason, or apply it in a fresh situation. Do not include the expected words or a complete answer in the question, even after modelling a different example. Use a smaller open question when the learner needs support.

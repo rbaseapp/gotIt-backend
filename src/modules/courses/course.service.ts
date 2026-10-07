@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { AppError } from '../../shared/errors/app-error.js';
 import type { ProfileScope, ProfileServiceContract } from '../profile/profile.types.js';
 import type { PrivateLessonPlan } from '../private-lessons/private-lesson.prompt.js';
+import type { PrivateLessonJournal } from '../private-lessons/private-lesson.repository.js';
 import type {
   PrivateLessonReport,
   PrivateLessonTurn,
@@ -24,6 +25,7 @@ import {
   intakeReplySchema,
   intakeQuestionsSchema,
   homeworkContentSchema,
+  unitHomeworkContentSchema,
   homeworkTaskSchema,
   homeworkJudgmentSchema,
   type CourseDocument,
@@ -113,6 +115,7 @@ export class CourseService {
       fetchImpl?: typeof fetch;
       callGuard?: RealtimeCallGuard;
     },
+    private readonly lessonJournal?: Pick<PrivateLessonJournal, 'get'>,
   ) {}
   get available() {
     return Boolean(this.generator);
@@ -212,7 +215,25 @@ export class CourseService {
   async homework(scope: ProfileScope, id: string) {
     const document = await this.store.get(scope, id);
     if (document?.kind !== 'homework') throw courseNotFound();
+    await this.requireCompletedMeeting(scope, document);
     return document;
+  }
+
+  private async requireCompletedMeeting(scope: ProfileScope, homework: HomeworkDocument) {
+    if (!this.lessonJournal) return;
+    const lesson = await this.lessonJournal.get(scope, homework.lessonId);
+    if (
+      !lesson ||
+      lesson.status !== 'completed' ||
+      !lesson.report ||
+      (homework.wordPack &&
+        lesson.report.assessment.lessonPerformance.evidenceQuality === 'insufficient')
+    )
+      throw new AppError(
+        409,
+        'HOMEWORK_MEETING_REQUIRED',
+        'Complete the teacher meeting before its practice',
+      );
   }
   async start(scope: ProfileScope, input: z.infer<typeof intakeStartSchema>) {
     const fingerprint = commandFingerprint(['start', input]);
@@ -863,9 +884,16 @@ export class CourseService {
             turns.some((turn) => turn.role === 'tutor' && turn.text.includes(item.sourceText)),
         ) ||
         Object.values(report.assessment.skills).some((skill) => skill.evidence.length > 0));
-    if (!learned) return;
+    if (
+      !learned ||
+      (lesson.wordPack && report.assessment.lessonPerformance.evidenceQuality === 'insufficient')
+    )
+      return;
     if (!(await this.store.get(scope, lesson.id))) {
       const homework: HomeworkDocument = {
+        ...(lesson.wordPack
+          ? { wordPack: { packId: lesson.wordPack.packId, station: lesson.wordPack.station } }
+          : {}),
         kind: 'homework',
         id: lesson.id,
         revision: 0,
@@ -927,8 +955,9 @@ export class CourseService {
   }
   async prepareHomework(scope: ProfileScope, id: string, input: Command) {
     const current = await this.current(scope, id, input, 'prepareHomework');
-    if (current.replay) return publicHomework(asHomework(current.replay));
     const homework = asHomework(current.document);
+    await this.requireCompletedMeeting(scope, homework);
+    if (current.replay) return publicHomework(asHomework(current.replay));
     if (homework.content && !homeworkNeedsRefresh(homework)) return publicHomework(homework);
     const reportEvidence = homeworkReportEvidenceSchema.safeParse(homework.source.report);
     const grammarPoints = reportEvidence.success ? (reportEvidence.data.grammarPoints ?? []) : [];
@@ -953,13 +982,16 @@ export class CourseService {
       grammarPoints,
       corrections,
     };
-    const groundedContentSchema = homeworkContentSchema.extend({
+    const shortPractice = Boolean(homework.wordPack);
+    const groundedContentSchema = (
+      shortPractice ? unitHomeworkContentSchema : homeworkContentSchema
+    ).extend({
       tasks: z
         .array(
           homeworkTaskSchema.extend({ sourceQuote: z.enum(sourceQuotes as [string, ...string[]]) }),
         )
-        .min(12)
-        .max(MAX_HOMEWORK_TASKS),
+        .min(shortPractice ? 3 : 12)
+        .max(shortPractice ? 6 : MAX_HOMEWORK_TASKS),
     });
     let content: z.infer<typeof homeworkContentSchema> | null = null;
     let feedback = '';
@@ -969,7 +1001,9 @@ export class CourseService {
         scope,
         groundedContentSchema,
         'lesson_homework',
-        homeworkInstruction,
+        shortPractice
+          ? `Create a short follow-up practice of 3-6 distinct tasks taking 2-5 minutes (estimatedMinutes 2-5). ${homeworkInstruction.slice(homeworkInstruction.indexOf('Ground every task')).replace('at least four independent production tasks', 'at least one production task').replace('use 12 short oral-friendly tasks', 'use 3 short oral-friendly tasks')}`
+          : homeworkInstruction,
         {
           targetLanguageCode: homework.targetLanguageCode,
           supportLanguageCode: homework.supportLanguageCode,
@@ -980,14 +1014,21 @@ export class CourseService {
           priorDraft,
         },
       );
-      feedback = homeworkStructureIssue(candidate, sourceQuotes) ?? '';
+      feedback = homeworkStructureIssue(candidate, sourceQuotes, shortPractice ? 1 : 4) ?? '';
       priorDraft = candidate;
       if (feedback) continue;
       const review = await this.ai().generate(
         scope,
         homeworkReviewSchema,
         'lesson_homework_review',
-        homeworkReviewInstruction,
+        shortPractice
+          ? homeworkReviewInstruction
+              .replace('10-20 minutes', '2-5 minutes')
+              .replace(
+                'at least four independent production tasks',
+                'at least one independent production task',
+              )
+          : homeworkReviewInstruction,
         {
           targetLanguageCode: homework.targetLanguageCode,
           supportLanguageCode: homework.supportLanguageCode,
@@ -1031,8 +1072,68 @@ export class CourseService {
     input: z.infer<typeof homeworkActionSchema>,
   ) {
     const current = await this.current(scope, id, input, 'homeworkAction', input);
-    if (current.replay) return publicHomework(asHomework(current.replay));
     const homework = asHomework(current.document);
+    await this.requireCompletedMeeting(scope, homework);
+    if (current.replay) return publicHomework(asHomework(current.replay));
+    if (input.review) {
+      const task = homework.content?.tasks[input.taskIndex];
+      if (
+        !task ||
+        !homework.progress[input.taskIndex]?.done ||
+        !['answer', 'hint'].includes(input.action)
+      )
+        throw courseConflict();
+      if (input.action === 'answer' && !input.answer.trim())
+        throw new AppError(400, 'VALIDATION_ERROR', 'Enter an answer');
+      if (
+        input.action === 'answer' &&
+        task.kind === 'choice' &&
+        !task.choices.some((choice) => normalizeAnswer(choice) === normalizeAnswer(input.answer))
+      )
+        throw new AppError(400, 'VALIDATION_ERROR', 'Select one of the available choices');
+      const exact =
+        task.kind === 'choice'
+          ? normalizeAnswer(task.expectedAnswer) === normalizeAnswer(input.answer)
+          : task.acceptedAnswers.some(
+              (answer) => normalizeAnswer(answer) === normalizeAnswer(input.answer),
+            );
+      const judgment =
+        input.action === 'hint'
+          ? { result: 'retry' as const, feedback: task.hint }
+          : exact
+            ? { result: 'correct' as const, feedback: task.explanation }
+            : task.kind === 'choice'
+              ? { result: 'retry' as const, feedback: task.hint }
+              : await this.ai().generate(
+                  scope,
+                  homeworkJudgmentSchema,
+                  'homework_feedback',
+                  'Evaluate only the stated objective. Accept equivalent grammatical answers. Ignore punctuation. Explain briefly in supportLanguageCode. Do not change the original practice progress.',
+                  {
+                    task,
+                    answer: input.answer,
+                    targetLanguageCode: homework.targetLanguageCode,
+                    supportLanguageCode: homework.supportLanguageCode,
+                  },
+                );
+      homework.review = {
+        taskIndex: input.taskIndex,
+        ...judgment,
+        hint: input.action === 'hint' ? task.hint : null,
+      };
+      return publicHomework(
+        asHomework(
+          await this.store.save(
+            scope,
+            homework,
+            input.revision,
+            input.eventId,
+            current.fingerprint,
+          ),
+        ),
+      );
+    }
+    delete homework.review;
     const index = homework.progress.findIndex((p) => !p.done);
     if (!homework.content || index !== input.taskIndex) throw courseConflict();
     const task = homework.content.tasks[index]!;
@@ -1278,6 +1379,8 @@ export function publicCourse(course: CourseDocument) {
 }
 export function homeworkSummary(homework: HomeworkDocument) {
   return {
+    packId: homework.wordPack?.packId ?? null,
+    station: homework.wordPack?.station ?? null,
     id: homework.id,
     lessonId: homework.lessonId,
     courseId: homework.course?.courseId ?? null,
@@ -1287,7 +1390,9 @@ export function homeworkSummary(homework: HomeworkDocument) {
     createdAt: homework.createdAt,
     status: !homework.content
       ? ('pending' as const)
-      : homework.progress.every((p) => p.done)
+      : homework.content.tasks.length > 0 &&
+          homework.progress.length === homework.content.tasks.length &&
+          homework.progress.every((p) => p.done)
         ? ('completed' as const)
         : ('ready' as const),
     taskCount: homework.content?.tasks.length ?? 0,
@@ -1298,6 +1403,7 @@ export function publicHomework(homework: HomeworkDocument) {
   return {
     ...homeworkSummary(homework),
     revision: homework.revision,
+    review: homework.review ?? null,
     needsRefresh: homeworkNeedsRefresh(homework),
     supportLanguageCode: homework.supportLanguageCode,
     oralFirst:
@@ -1345,6 +1451,7 @@ function normalizeAnswer(value: string) {
 function homeworkStructureIssue(
   content: z.infer<typeof homeworkContentSchema>,
   sourceQuotes: string[],
+  minimumProduction = 4,
 ): string | null {
   const prompts = new Set<string>();
   let productionTasks = 0;
@@ -1387,8 +1494,8 @@ function homeworkStructureIssue(
     if (task.kind === 'order' && task.tokens.length < 2)
       return `${label}: supply the words to order.`;
   }
-  if (productionTasks < 4)
-    return 'Include at least four tasks where the learner produces an answer independently.';
+  if (productionTasks < minimumProduction)
+    return `Include at least ${minimumProduction} tasks where the learner produces an answer independently.`;
   return null;
 }
 function learningExcerpts(
