@@ -1,5 +1,13 @@
 import { z } from 'zod';
-import { uuidSchema } from '../capture/capture.validation.js';
+import { languageSchema, uuidSchema } from '../capture/capture.validation.js';
+
+export const catalogQuerySchema = z
+  .object({
+    sourceLanguageCode: languageSchema.optional(),
+    translationLanguageCode: languageSchema.optional(),
+  })
+  .strict();
+export type CatalogQuery = z.output<typeof catalogQuerySchema>;
 
 export const addSchema = z
   .object({
