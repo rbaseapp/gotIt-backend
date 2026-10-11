@@ -2521,6 +2521,122 @@ test(
           assert.equal(denied.body.error.code, 'INSUFFICIENT_DISTRACTORS');
         },
       );
+      await t.test(
+        'DEV word cards include owned context, current evidence, tags and complete server filtering',
+        async () => {
+          const capture = (
+            user: number,
+            sourceText: string,
+            translation: string,
+            sourceType: string,
+          ) =>
+            call(
+              'post',
+              '/captures',
+              {
+                item: {
+                  sourceText,
+                  sourceLanguageCode: 'en',
+                  translationLanguageCode: 'he',
+                  itemType: 'word',
+                  partOfSpeech: 'noun',
+                },
+                translation: { text: translation },
+                context: {
+                  selectedText: sourceText,
+                  sourceType,
+                  sentenceText: `A special sentence about ${sourceText}.`,
+                  pageUrl: 'https://example.test/context',
+                },
+                senseDecision: { mode: 'auto' },
+              },
+              randomUUID(),
+              user,
+            );
+          const own = (
+            await capture(0, 'mywords-card-owned', 'unique translation', 'chrome_extension').expect(
+              201,
+            )
+          ).body.capture.learningItemId;
+          await capture(
+            1,
+            'mywords-card-foreign',
+            'foreign translation',
+            'chrome_extension',
+          ).expect(201);
+          const tag = (await call('post', '/tags', { name: 'mywords category' }).expect(201)).body
+            .tag;
+          await call('put', `/learning-items/${own}/tags`, { tagIds: [tag.id] }).expect(200);
+          const cards = await call(
+            'get',
+            '/learning-items?view=cards&search=mywords-card-&partsOfSpeech=noun,n&origins=chrome_extension&learningStatuses=new,learning&limit=1&page=1',
+          ).expect(200);
+          assert.equal(cards.body.totalCount, 1);
+          assert.equal(cards.body.items[0].id, own);
+          assert.equal(cards.body.items[0].partOfSpeech, 'noun');
+          assert.equal(cards.body.items[0].source.pageUrl, 'https://example.test/context');
+          assert.deepEqual(cards.body.items[0].tags, [{ id: tag.id, name: 'mywords category' }]);
+          assert.deepEqual(cards.body.items[0].answers, { correct: 0, total: 0 });
+          assert.equal(cards.body.summary.tags[tag.id], 1);
+          const unfiltered = await call(
+            'get',
+            '/learning-items?view=cards&sourceLanguageCode=en&limit=1',
+          ).expect(200);
+          assert.equal(unfiltered.body.summary.total, unfiltered.body.totalCount);
+          assert.equal(cards.body.summary.total > cards.body.totalCount, true);
+          assert.equal(cards.body.items[0].program, null);
+          for (const search of [
+            'unique translation',
+            'special sentence about mywords-card-owned',
+          ]) {
+            const result = await call(
+              'get',
+              `/learning-items?view=cards&search=${encodeURIComponent(search)}`,
+            ).expect(200);
+            assert.deepEqual(
+              result.body.items.map((item: { id: string }) => item.id),
+              [own],
+            );
+          }
+          assert.equal(
+            (await call('get', '/learning-items?view=cards&search=%25_').expect(200)).body.items
+              .length,
+            1,
+          );
+          assert.equal(
+            (
+              await call(
+                'get',
+                '/learning-items?view=cards&search=mywords-card-&origins=web_manual',
+              ).expect(200)
+            ).body.items.length,
+            0,
+          );
+          assert.equal(
+            (
+              await call(
+                'get',
+                '/learning-items?view=cards&search=mywords-card-&partsOfSpeech=verb',
+              ).expect(200)
+            ).body.items.length,
+            0,
+          );
+          const legacy = await call('get', '/learning-items?search=mywords-card-owned').expect(200);
+          assert.equal('source' in legacy.body.items[0], false);
+          assert.equal(
+            (await call('get', '/learning-items?view=cards&search=foreign').expect(200)).body.items
+              .length,
+            0,
+          );
+          for (const query of [
+            'origins=unknown',
+            'partsOfSpeech=DROP%20TABLE',
+            'learningStatuses=forged',
+            'view=admin',
+          ])
+            await call('get', `/learning-items?${query}`).expect(400);
+        },
+      );
     } finally {
       await db.dispose();
     }

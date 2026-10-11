@@ -15,6 +15,57 @@ export const listSchema = z
     translationLanguageCode: languageSchema.optional(),
     userStatus: z.enum(['active', 'paused', 'archived', 'deleted', 'all']).default('all'),
     learningStatus: z.enum(['new', 'learning', 'reviewing', 'mastered']).optional(),
+    view: z.literal('cards').optional(),
+    learningStatuses: z
+      .string()
+      .max(100)
+      .transform((v) => v.split(','))
+      .pipe(
+        z
+          .array(z.enum(['new', 'learning', 'reviewing', 'mastered']))
+          .min(1)
+          .max(4),
+      )
+      .optional(),
+    origins: z
+      .string()
+      .max(100)
+      .transform((v) => v.split(','))
+      .pipe(
+        z
+          .array(z.enum(['chrome_extension', 'web_manual', 'program']))
+          .min(1)
+          .max(3),
+      )
+      .optional(),
+    partsOfSpeech: z
+      .string()
+      .max(500)
+      .transform((v) => v.split(','))
+      .pipe(
+        z
+          .array(
+            z.enum([
+              'noun',
+              'n',
+              'verb',
+              'v',
+              'adjective',
+              'adj',
+              'adverb',
+              'adv',
+              'pronoun',
+              'preposition',
+              'conjunction',
+              'interjection',
+              'determiner',
+              'other',
+            ]),
+          )
+          .min(1)
+          .max(14),
+      )
+      .optional(),
     difficult: z.enum(['true', 'false']).optional(),
     highPriority: z.enum(['true', 'false']).optional(),
     due: z.enum(['true', 'false']).optional(),
