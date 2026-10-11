@@ -2,6 +2,7 @@ import type { Pool } from 'pg';
 import { withTransaction } from '../../shared/database/transaction.js';
 import type { ProfileScope, ProfileServiceContract } from '../profile/profile.types.js';
 import { scopeValues } from '../library/library.repository.js';
+import { DAILY_TASK_REWARDS, dailyTaskKey, type DailyTask } from './daily-task-rewards.js';
 import {
   DEFAULT_LEARNING_POLICY,
   LEARNED_REVIEW_STAGE,
@@ -53,9 +54,26 @@ export class DashboardService {
             )
           ).rows[0]?.xp ?? 0,
         );
+        const practiceXp = Number(
+          (
+            await tx.query(
+              `SELECT COALESCE(sum(xp_amount),0)::integer xp FROM product_gotit.xp_events
+           WHERE application_id=$1 AND application_user_id=$2 AND (created_at AT TIME ZONE $4)::date=$3::date AND source_type<>'daily_task'`,
+              [...scopeValues(scope), today, profile.timezone],
+            )
+          ).rows[0]!.xp,
+        );
         const xp = Number(row?.total_xp ?? 0),
           level = levelForXp(xp),
-          dailyXpRemaining = Math.max(0, this.policy.dailyXpCap - todayXp);
+          dailyXpRemaining = Math.max(0, this.policy.dailyXpCap - practiceXp);
+        const dailyTasks = await tx.query(
+          `SELECT idempotency_key FROM product_gotit.xp_events WHERE application_id=$1 AND application_user_id=$2
+           AND idempotency_key=ANY($3::text[])`,
+          [
+            ...scopeValues(scope),
+            Object.keys(DAILY_TASK_REWARDS).map((task) => dailyTaskKey(today, task as DailyTask)),
+          ],
+        );
         return {
           totalXp: xp,
           level,
@@ -70,6 +88,17 @@ export class DashboardService {
             : 0,
           longestStreakDays: row?.longest_streak_days ?? 0,
           lastActivityDate: row?.activity_day ?? null,
+          dailyTaskRewards: Object.fromEntries(
+            Object.entries(DAILY_TASK_REWARDS).map(([task, xp]) => [
+              task,
+              {
+                xp,
+                completed: dailyTasks.rows.some(
+                  (event) => event.idempotency_key === dailyTaskKey(today, task as DailyTask),
+                ),
+              },
+            ]),
+          ),
         };
       },
       true,

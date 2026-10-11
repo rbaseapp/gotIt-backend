@@ -1442,6 +1442,64 @@ test(
             exerciseId: exercises.body.exercises[0].id,
             answerText: item.source_text,
           }).expect(201);
+          await call('patch', `/practice/sessions/${quiz.body.session.id}`, {
+            status: 'completed',
+          }).expect(200);
+          const taskBonuses = async () =>
+            Number(
+              (
+                await db.runtimePool.query(
+                  "SELECT COALESCE(sum(xp_amount),0)::integer xp FROM product_gotit.xp_events WHERE application_id=$1 AND application_user_id=$2 AND source_type='daily_task' AND reason_code='reading'",
+                  [applicationId, users[0]],
+                )
+              ).rows[0].xp,
+            );
+          assert.equal(
+            await taskBonuses(),
+            0,
+            'a partially answered article does not earn a completion bonus',
+          );
+          const fullQuiz = (
+            await call('post', '/practice/sessions', {
+              sessionType: 'article_quiz',
+              readingId: id,
+            }).expect(201)
+          ).body.session;
+          const fullExercises = (
+            await call('post', `/practice/sessions/${fullQuiz.id}/exercises`, {
+              count: fullQuiz.itemCount,
+            }).expect(201)
+          ).body.exercises;
+          for (const exercise of fullExercises) {
+            const answer = (
+              await db.runtimePool.query(
+                'SELECT source_text FROM product_gotit.learning_items WHERE id=$1',
+                [exercise.learningItemId],
+              )
+            ).rows[0].source_text;
+            await call('post', '/practice/attempts', {
+              exerciseId: exercise.id,
+              answerText: answer,
+            }).expect(201);
+          }
+          const closed = (
+            await call('patch', `/practice/sessions/${fullQuiz.id}`, {
+              status: 'completed',
+            }).expect(200)
+          ).body.session;
+          assert.equal(await taskBonuses(), 50);
+          const replayedClose = (
+            await call('patch', `/practice/sessions/${fullQuiz.id}`, {
+              status: 'completed',
+            }).expect(200)
+          ).body.session;
+          assert.equal(replayedClose.xpEarned, closed.xpEarned);
+          assert.equal(await taskBonuses(), 50, 'replaying completion does not award twice');
+          const dashboard = (await call('get', '/dashboard').expect(200)).body;
+          assert.deepEqual(dashboard.gamification.dailyTaskRewards.reading, {
+            xp: 50,
+            completed: true,
+          });
           await call('delete', `/reading/${id}`).expect(200);
           await call('get', `/reading/${id}`).expect(404);
           readingClock += 20 * 60000;
@@ -1523,7 +1581,7 @@ test(
           assert.equal(dashboard.body.gamification.dailyXpCap, 200);
           assert.equal(
             dashboard.body.gamification.dailyXpRemaining,
-            200 - dashboard.body.gamification.todayXp,
+            200 - (dashboard.body.gamification.todayXp - 50),
           );
           assert.equal(dashboard.body.gamification.dailyXpCapReached, false);
           assert.equal(

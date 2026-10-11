@@ -32,6 +32,7 @@ import {
 import { scoreAnswer, type AnswerSpec } from './practice.scoring.js';
 import { practiceLanguagePredicate } from './practice.language.js';
 import { unitLearnedPredicate } from '../word-packs/unit-learning.js';
+import { awardDailyTask } from '../dashboard/daily-task-rewards.js';
 import type {
   SessionInput,
   SessionScope,
@@ -889,6 +890,22 @@ export class PracticeService {
             now,
           );
       }
+      let taskReward = 0;
+      if (
+        status === 'completed' &&
+        row.session_type === 'article_quiz' &&
+        row.selection.readingId
+      ) {
+        const answered = (
+          await tx.query(
+            `SELECT count(DISTINCT learning_item_id)::integer AS count FROM product_gotit.practice_attempts
+           WHERE application_id=$1 AND application_user_id=$2 AND practice_session_id=$3 AND result<>'skipped'`,
+            [...scopeValues(scope), id],
+          )
+        ).rows[0]!.count;
+        if (row.item_count > 0 && answered >= row.item_count)
+          taskReward = await awardDailyTask(tx, scope, 'reading', id, profile.timezone, now);
+      }
       const duration = Math.max(
         0,
         Math.min(
@@ -899,7 +916,7 @@ export class PracticeService {
       const updated = (
         await tx.query(
           `UPDATE product_gotit.practice_sessions SET status=$4,ended_at=$5,duration_seconds=$6,xp_earned=xp_earned+$7,updated_at=now() WHERE application_id=$1 AND application_user_id=$2 AND id=$3 RETURNING *`,
-          [...scopeValues(scope), id, status, now, duration, reward],
+          [...scopeValues(scope), id, status, now, duration, reward + taskReward],
         )
       ).rows[0]!;
       if (status === 'completed') {
@@ -1716,7 +1733,16 @@ export class PracticeService {
             [...scopeValues(scope), day, goalXp],
           );
       }
-      const dailyXpRemaining = Math.max(0, this.policy.dailyXpCap - todayXp);
+      const practiceXp = Number(
+        (
+          await tx.query(
+            `SELECT COALESCE(sum(xp_amount),0)::integer xp FROM product_gotit.xp_events
+         WHERE application_id=$1 AND application_user_id=$2 AND (created_at AT TIME ZONE $4)::date=$3::date AND source_type<>'daily_task'`,
+            [...scopeValues(scope), day, profile.timezone],
+          )
+        ).rows[0]!.xp,
+      );
+      const dailyXpRemaining = Math.max(0, this.policy.dailyXpCap - practiceXp);
       await tx.query(
         'UPDATE product_gotit.practice_sessions SET attempt_count=$4,correct_count=correct_count+$5,xp_earned=xp_earned+$6,updated_at=now() WHERE application_id=$1 AND application_user_id=$2 AND id=$3',
         [
@@ -1796,7 +1822,7 @@ export class PracticeService {
     if (amount <= 0) return 0;
     const daily = (
       await tx.query(
-        'SELECT COALESCE(sum(xp_amount),0)::integer xp FROM product_gotit.xp_events WHERE application_id=$1 AND application_user_id=$2 AND (created_at AT TIME ZONE $4)::date=$3::date',
+        "SELECT COALESCE(sum(xp_amount),0)::integer xp FROM product_gotit.xp_events WHERE application_id=$1 AND application_user_id=$2 AND (created_at AT TIME ZONE $4)::date=$3::date AND source_type<>'daily_task'",
         [...scopeValues(scope), day, timezone],
       )
     ).rows[0]!.xp;

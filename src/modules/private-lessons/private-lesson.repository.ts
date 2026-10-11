@@ -2,6 +2,8 @@ import type { Pool } from 'pg';
 import { AppError } from '../../shared/errors/app-error.js';
 import type { ProfileScope } from '../profile/profile.types.js';
 import type { PrivateLessonPlan } from './private-lesson.prompt.js';
+import { withTransaction } from '../../shared/database/transaction.js';
+import { awardDailyTask } from '../dashboard/daily-task-rewards.js';
 import {
   lowConfidenceAssessment,
   privateLessonReportSchema,
@@ -197,18 +199,42 @@ export class PostgresPrivateLessonJournal implements PrivateLessonJournal {
   }
 
   async complete(scope: ProfileScope, id: string, report: PrivateLessonReport) {
-    const updated = (
-      await this.pool.query(
-        `WITH finished AS (UPDATE product_gotit.private_lesson_sessions SET status='completed',report=$4::jsonb,
+    await withTransaction(this.pool, async (tx) => {
+      await tx.lock(['practice-user', scope.applicationId, scope.applicationUserId]);
+      const updated = (
+        await tx.query(
+          `WITH finished AS (UPDATE product_gotit.private_lesson_sessions SET status='completed',report=$4::jsonb,
          report_generated_at=now(),report_error_code=NULL,updated_at=now()
-         WHERE application_id=$1 AND application_user_id=$2 AND id=$3 AND deleted_at IS NULL
-         RETURNING id), purged AS (DELETE FROM product_gotit.private_lesson_activities a USING finished
+         WHERE application_id=$1 AND application_user_id=$2 AND id=$3 AND deleted_at IS NULL AND status<>'completed'
+         RETURNING id,course_context,word_pack_context,actual_duration_seconds), purged AS (DELETE FROM product_gotit.private_lesson_activities a USING finished
            WHERE a.application_id=$1 AND a.application_user_id=$2 AND a.lesson_id=finished.id RETURNING a.lesson_id)
-         SELECT id FROM finished`,
-        [scope.applicationId, scope.applicationUserId, id, JSON.stringify(report)],
-      )
-    ).rows[0];
-    if (!updated) throw notFound();
+         SELECT * FROM finished`,
+          [scope.applicationId, scope.applicationUserId, id, JSON.stringify(report)],
+        )
+      ).rows[0];
+      if (
+        updated &&
+        updated.actual_duration_seconds > 0 &&
+        report.assessment.lessonPerformance.evidenceQuality !== 'insufficient'
+      ) {
+        const profile = (
+          await tx.query(
+            'SELECT timezone FROM product_gotit.user_profiles WHERE application_id=$1 AND application_user_id=$2',
+            [scope.applicationId, scope.applicationUserId],
+          )
+        ).rows[0];
+        const now = (await tx.query('SELECT clock_timestamp() AS timestamp')).rows[0]!
+          .timestamp as Date;
+        await awardDailyTask(
+          tx,
+          scope,
+          updated.course_context || updated.word_pack_context ? 'lesson' : 'conversation',
+          id,
+          profile?.timezone ?? 'UTC',
+          now,
+        );
+      }
+    });
     const lesson = await this.get(scope, id);
     if (!lesson) throw notFound();
     return lesson;
