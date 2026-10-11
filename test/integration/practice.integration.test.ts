@@ -2399,6 +2399,70 @@ test(
           );
         },
       );
+      await t.test(
+        'single-question manual recall keeps distractors from its selected session pool',
+        async () => {
+          const ids: string[] = [];
+          for (const sourceText of ['drag-one', 'drag-two', 'drag-outside']) {
+            const capture = await call('post', '/captures', {
+              item: {
+                sourceText,
+                sourceLanguageCode: 'en',
+                translationLanguageCode: 'he',
+                itemType: 'word',
+              },
+              translation: { text: sourceText + ' meaning' },
+              context: { selectedText: sourceText },
+              senseDecision: { mode: 'auto' },
+            }).expect(201);
+            ids.push(capture.body.capture.learningItemId);
+          }
+          const session = (
+            await call('post', '/practice/sessions', {
+              sessionType: 'recall',
+              learningItemIds: ids.slice(0, 2),
+            }).expect(201)
+          ).body.session;
+          const issued = (
+            await call('post', `/practice/sessions/${session.id}/exercises`, {
+              count: 1,
+              learningItemIds: [ids[0]],
+              exerciseType: 'recall',
+              kind: 'multiple_choice',
+              direction: 'translation_to_source',
+            }).expect(201)
+          ).body.exercises;
+          assert.equal(issued.length, 1);
+          assert.equal(issued[0].learningItemId, ids[0]);
+          assert.deepEqual(
+            new Set(issued[0].prompt.choices.map((choice: { text: string }) => choice.text)),
+            new Set(['drag-one', 'drag-two']),
+          );
+          const choice = issued[0].prompt.choices.find(
+            (choice: { text: string }) => choice.text === 'drag-one',
+          );
+          const receipt = (
+            await call('post', '/practice/attempts', {
+              exerciseId: issued[0].id,
+              choiceId: choice.id,
+            }).expect(201)
+          ).body;
+          assert.equal(receipt.attempt.result, 'correct');
+          const single = (
+            await call('post', '/practice/sessions', {
+              sessionType: 'recall',
+              learningItemIds: [ids[0]],
+            }).expect(201)
+          ).body.session;
+          const denied = await call('post', `/practice/sessions/${single.id}/exercises`, {
+            count: 1,
+            learningItemIds: [ids[0]],
+            kind: 'multiple_choice',
+            direction: 'translation_to_source',
+          }).expect(409);
+          assert.equal(denied.body.error.code, 'INSUFFICIENT_DISTRACTORS');
+        },
+      );
     } finally {
       await db.dispose();
     }

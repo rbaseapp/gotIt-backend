@@ -1001,7 +1001,9 @@ export class PracticeService {
       }
       const startIndex = preferUnseen ? 0 : issuedCount;
       const choiceRows =
-        session.session_type === 'smart_review'
+        session.session_type === 'smart_review' ||
+        ((input.exerciseType ?? session.session_type) === 'recall' &&
+          input.kind === 'multiple_choice')
           ? [
               ...rows,
               ...(
@@ -1024,7 +1026,13 @@ export class PracticeService {
                          AND target.source_language_code=li.source_language_code
                          AND target.translation_language_code=li.translation_language_code)
                    ORDER BY li.created_at,id LIMIT 50`,
-                  [...scopeValues(scope), ids, session.selection.scope ? sessionIds : null],
+                  [
+                    ...scopeValues(scope),
+                    ids,
+                    session.session_type !== 'smart_review' || session.selection.scope
+                      ? sessionIds
+                      : null,
+                  ],
                 )
               ).rows,
             ]
