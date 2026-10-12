@@ -162,6 +162,12 @@ test('mascot uses the canonical raster and actual language, with separate langua
   assert.ok(calls().lastPrompt.includes('"targetLanguage":"es"'));
   assert.match(calls().lastPrompt, /flag/u);
   const arabic = await service.artwork(scope, { kind: 'mascot', languageCode: 'ar' }, true);
+  assert.ok(calls().lastPrompt.includes('"flagCountryCode":"PS"'));
   assert.notEqual(spanish.image!.fingerprint, arabic.image!.fingerprint);
-  assert.equal(calls().generated, 2);
+  await service.artwork(scope, { kind: 'mascot', languageCode: 'en' }, true);
+  assert.ok(calls().lastPrompt.includes('"flagCountryCode":"GB"'));
+  assert.ok(!calls().lastPrompt.includes('Palestinian'));
+  await service.artwork(scope, { kind: 'mascot', languageCode: 'en-US' }, true);
+  assert.ok(calls().lastPrompt.includes('"flagCountryCode":"US"'));
+  assert.equal(calls().generated, 4);
 });
