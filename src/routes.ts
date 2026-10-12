@@ -256,7 +256,14 @@ export function createRoutes(dependencies: AppDependencies) {
     );
   }
   if (dependencies.courseService) {
-    router.use('/api/v1/courses', createCourseRoutes(dependencies.courseService, requireCourse));
+    router.use(
+      '/api/v1/courses',
+      createCourseRoutes(
+        dependencies.courseService,
+        requireCourse,
+        dependencies.programArtworkService,
+      ),
+    );
   }
   if (dependencies.dashboardService) {
     router.use('/api/v1/dashboard', createDashboardRoutes(dependencies.dashboardService));

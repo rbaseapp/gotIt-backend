@@ -41,6 +41,7 @@ import {
   PostgresLessonActivityStore,
 } from './modules/private-lessons/private-lesson.activity.js';
 import { CourseService } from './modules/courses/course.service.js';
+import { ProgramArtworkService } from './modules/courses/program-artwork.service.js';
 import { PostgresCourseWordSource } from './modules/courses/course.words.js';
 import { PostgresLearningDocumentStore } from './modules/courses/course.repository.js';
 import { OpenAiCourseGenerator } from './modules/courses/course.provider.js';
@@ -338,6 +339,13 @@ const app = createApp({
   speechService,
   privateLessonService,
   courseService,
+  programArtworkService: new ProgramArtworkService(
+    pool,
+    courseService,
+    env.OPENAI_API_KEY,
+    env.OPENAI_IMAGE_MODEL,
+    aiDailyQuota,
+  ),
   addonAccess,
   minuteWallet,
   realtimeCallGuard,

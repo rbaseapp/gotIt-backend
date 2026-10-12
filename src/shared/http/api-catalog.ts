@@ -63,6 +63,8 @@ export const API_ROUTES = [
   ['POST', '/private-lessons/voice-sample'],
   ['POST', '/private-lessons/:id/activity'],
   ['GET', '/courses'],
+  ['POST', '/courses/artwork/lookup'],
+  ['POST', '/courses/artwork/generate'],
   ['POST', '/courses/intake'],
   ['POST', '/courses/transcribe'],
   ['GET', '/courses/:id'],
