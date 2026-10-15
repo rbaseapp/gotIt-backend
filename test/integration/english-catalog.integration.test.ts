@@ -11,9 +11,23 @@ test(
   async () => {
     const db = await createTestDatabase();
     try {
-      // Remove the guided-lesson migration before exercising the catalog migration.
-      await db.migrate('down');
-      await db.migrate('down');
+      // Later additive migrations must be undone before rehearsing this historical
+      // catalog migration. This is only the disposable database created above.
+      let removedCatalog = false;
+      for (let step = 0; step < 100; step++) {
+        const latest = (
+          await db.adminPool.query(
+            'SELECT name FROM gotit_migrations.pgmigrations ORDER BY run_on DESC, id DESC LIMIT 1',
+          )
+        ).rows[0]?.name as string | undefined;
+        assert.ok(latest, 'Expected the installed catalog migration');
+        await db.migrate('down');
+        if (latest.includes('1790800011000_english-unique-catalog')) {
+          removedCatalog = true;
+          break;
+        }
+      }
+      assert.equal(removedCatalog, true);
       const applicationId = randomUUID();
       const userId = randomUUID();
       await db.adminPool.query(

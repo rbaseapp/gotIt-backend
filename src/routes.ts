@@ -1,4 +1,9 @@
 import { Router, text as expressText } from 'express';
+import {
+  createProductAdminRouter,
+  createLearnerSupportRouter,
+} from './modules/admin/admin.routes.js';
+import { adminRuntimeContext } from './modules/admin/admin.context.js';
 import { createCaptureRoutes, createLearningItemRoutes } from './modules/capture/capture.routes.js';
 import { createProfileRoutes } from './modules/profile/profile.routes.js';
 import { createLibraryRoutes, createTagRoutes } from './modules/library/library.routes.js';
@@ -132,6 +137,14 @@ export function createRoutes(dependencies: AppDependencies) {
   }
 
   router.use('/api/v1', ...authenticate);
+  if (dependencies.adminService) {
+    router.use('/api/v1', async (req, _res, next) => {
+      const context = await dependencies.adminService!.runtime(req.gotitAuth!, String(req.id));
+      adminRuntimeContext.run(context, next);
+    });
+    router.use('/api/v1/admin', createProductAdminRouter(dependencies.adminService));
+    router.use('/api/v1/support', createLearnerSupportRouter(dependencies.adminService));
+  }
   const requireVocabularyWrite = createRequireEntitlementMiddleware(
     dependencies.coreAuthClient,
     'vocabulary.write',

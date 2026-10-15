@@ -18,8 +18,10 @@ import type { AddonAccessContract } from '../../modules/addons/addon-access.js';
 import type { MinuteWallet } from '../../modules/private-lessons/minute-wallet.js';
 import type { PostgresRealtimeCallGuard } from '../../modules/private-lessons/realtime-call-guard.js';
 import type { NotificationService } from '../../modules/notifications/notification.service.js';
+import type { ProductAdminService } from '../../modules/admin/admin.service.js';
 
 export type AppDependencies = {
+  adminService?: ProductAdminService;
   logger: Logger;
   checkDatabase: () => Promise<void>;
   coreAuthClient: CoreAuthClient;
