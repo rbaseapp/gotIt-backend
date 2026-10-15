@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import test from 'node:test';
@@ -405,6 +407,39 @@ test(
               }),
             { code: 'CONFLICT' },
           );
+        },
+      );
+      await t.test(
+        'concurrent prompt publishers choose one revision without a row-lock deadlock',
+        { timeout: 5000 },
+        async () => {
+          const drafts = await Promise.all(
+            [1, 2].map((index) =>
+              service.save(actor, 'prompts', null, {
+                ...command(),
+                expectedRevision: null,
+                document: {
+                  key: 'image-brief',
+                  title: `Concurrent draft ${index}`,
+                  content: { instructions: `Brief guidance ${index}` },
+                },
+              }),
+            ),
+          );
+          const outcomes = await Promise.allSettled(
+            drafts.map((draft) =>
+              service.publish(actor, 'prompts', String(draft.data.id), {
+                ...command(),
+                expectedRevision: Number(draft.data.revision),
+                expectedActiveId: null,
+              }),
+            ),
+          );
+          assert.equal(outcomes.filter((result) => result.status === 'fulfilled').length, 1);
+          const rejected = outcomes.find((result) => result.status === 'rejected');
+          assert.equal(rejected?.status === 'rejected' && rejected.reason.code, 'CONFLICT');
+          const active = (await service.runtime(actor, actor.requestId)).prompts['image-brief'];
+          assert.ok(active && drafts.some((draft) => draft.data.id === active.id));
         },
       );
       let programId: string,
@@ -817,6 +852,66 @@ test(
                 `SELECT to_regclass('product_gotit.admin_documents') AS table_name`,
               )
             ).rows[0].table_name,
+          );
+        },
+      );
+      await t.test(
+        'Core additive migration rolls back and reapplies only on the disposable database',
+        async () => {
+          const run = promisify(execFile);
+          const migrateCore = async (direction: 'up' | 'down') =>
+            run(
+              process.execPath,
+              [
+                resolve(corePath, 'node_modules/node-pg-migrate/bin/node-pg-migrate.js'),
+                direction,
+                '--migrations-dir',
+                resolve(corePath, 'migrations'),
+                '--database-url-var',
+                'GOTIT_TEST_CORE_ADMIN_URL',
+              ],
+              {
+                cwd: corePath,
+                env: {
+                  ...process.env,
+                  GOTIT_TEST_CORE_ADMIN_URL: database.adminPool.options.connectionString!,
+                },
+                timeout: 30000,
+                maxBuffer: 2 * 1024 * 1024,
+              },
+            );
+          await migrateCore('down');
+          assert.equal(
+            (
+              await database.adminPool.query(
+                `SELECT to_regclass('core.admin_mfa_credentials') AS table_name`,
+              )
+            ).rows[0].table_name,
+            null,
+          );
+          assert.equal(
+            (
+              await database.adminPool.query(
+                `SELECT count(*)::int AS n FROM information_schema.columns WHERE table_schema='core' AND table_name='application_users' AND column_name='admin_revision'`,
+              )
+            ).rows[0].n,
+            0,
+          );
+          await migrateCore('up');
+          assert.ok(
+            (
+              await database.adminPool.query(
+                `SELECT to_regclass('core.admin_mfa_credentials') AS table_name`,
+              )
+            ).rows[0].table_name,
+          );
+          assert.ok(
+            (
+              await database.adminPool.query(
+                `SELECT id FROM core.application_users WHERE application_id=$1 AND id=$2`,
+                [appId, userId],
+              )
+            ).rowCount,
           );
         },
       );
