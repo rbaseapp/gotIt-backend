@@ -119,7 +119,9 @@ export function nextSmartLearningExercise(
 }
 
 export class PracticeService {
-  readonly version: string;
+  get version() {
+    return policyVersion(this.policy);
+  }
   constructor(
     readonly pool: Pool,
     private readonly profiles: ProfileServiceContract,
@@ -129,9 +131,7 @@ export class PracticeService {
       kind: 'listening' | 'pronunciation',
     ) => boolean = () => false,
     private readonly imageProvider?: StudyImageProvider,
-  ) {
-    this.version = policyVersion(policy);
-  }
+  ) {}
   availableSkills(profile: GotItProfile, language: string): Skill[] {
     return (
       profile.learningPreferences?.enabledSkills ?? [
@@ -846,6 +846,12 @@ export class PracticeService {
       const session = await this.session(tx, scope, id);
       if (session.status !== 'active')
         throw new AppError(409, 'SESSION_CLOSED', 'Session is closed');
+      if (session.algorithm_version !== this.version)
+        throw new AppError(
+          409,
+          'EXERCISE_STALE',
+          'Learning policy changed; start a new practice session',
+        );
       const open = await tx.query(
         `SELECT count(*)::integer count FROM product_gotit.practice_exercises WHERE application_id=$1 AND application_user_id=$2 AND practice_session_id=$3 AND consumed_at IS NULL AND expires_at>now()`,
         [...scopeValues(scope), id],
@@ -1285,6 +1291,12 @@ export class PracticeService {
       const session = await this.session(tx, scope, initial.practice_session_id);
       if (session.status !== 'active')
         throw new AppError(409, 'SESSION_CLOSED', 'Session is closed');
+      if (session.algorithm_version !== this.version)
+        throw new AppError(
+          409,
+          'EXERCISE_STALE',
+          'Learning policy changed; start a new practice session',
+        );
       const exercise = (
         await tx.query(
           'SELECT * FROM product_gotit.practice_exercises WHERE application_id=$1 AND application_user_id=$2 AND id=$3 FOR UPDATE',

@@ -1329,6 +1329,7 @@ export function publicCourse(course: CourseDocument) {
   );
   return {
     ...course,
+    adminAssignment: undefined,
     intakeQuestions: undefined,
     intakeClosing: undefined,
     reportedAvailability:

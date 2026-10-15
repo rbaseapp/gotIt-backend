@@ -38,13 +38,15 @@ const billingStatusSchema = z.object({
     .nullable(),
 });
 const minuteGrantsSchema = z.object({
-  grants: z.array(z.object({
-    sourceKind: z.enum(['subscription', 'purchase']),
-    sourceId: z.string().min(1),
-    startsAt: z.string().datetime({ offset: true }),
-    endsAt: z.string().datetime({ offset: true }),
-    secondsTotal: z.number().int().positive(),
-  })),
+  grants: z.array(
+    z.object({
+      sourceKind: z.enum(['subscription', 'purchase']),
+      sourceId: z.string().min(1),
+      startsAt: z.string().datetime({ offset: true }),
+      endsAt: z.string().datetime({ offset: true }),
+      secondsTotal: z.number().int().positive(),
+    }),
+  ),
 });
 export type CoreMinuteGrants = z.infer<typeof minuteGrantsSchema>;
 
@@ -60,6 +62,77 @@ export type CoreAuthenticatedIdentity = {
 type FetchLike = typeof fetch;
 
 export class CoreAuthClient {
+  async adminRequest(
+    accessToken: string,
+    path: string,
+    requestId?: string,
+    stepUp?: string,
+  ): Promise<unknown> {
+    const fetchImpl = this.options.fetchImpl ?? fetch;
+    let response: Response;
+    try {
+      response = await fetchImpl(new URL(`/api/v1/admin/${path}`, this.options.baseUrl), {
+        method: 'GET',
+        redirect: 'error',
+        headers: {
+          authorization: `Bearer ${accessToken}`,
+          'x-application-key': this.options.applicationKey,
+          ...(requestId ? { 'x-request-id': requestId } : {}),
+          ...(stepUp ? { 'x-admin-step-up': stepUp } : {}),
+        },
+        signal: AbortSignal.timeout(this.options.timeoutMs),
+      });
+    } catch {
+      throw new AppError(
+        503,
+        'CORE_ADMIN_UNAVAILABLE',
+        'Administrator authorization is unavailable',
+      );
+    }
+    if (response.status === 401 || response.status === 403)
+      throw new AppError(response.status, 'ADMIN_REQUIRED', 'Administrator access denied');
+    if (response.status === 404)
+      throw new AppError(404, 'NOT_FOUND', 'User not found in this application');
+    if (!response.ok)
+      throw new AppError(
+        503,
+        'CORE_ADMIN_UNAVAILABLE',
+        'Administrator authorization is unavailable',
+      );
+    return response.json();
+  }
+  async getAdminAccess(accessToken: string, requestId?: string, stepUp?: string) {
+    const parsed = z
+      .object({
+        applicationId: z.uuid(),
+        applicationUserId: z.uuid(),
+        mfaEnrolled: z.boolean(),
+        mfaVerified: z.boolean(),
+        permissions: z.array(
+          z.enum([
+            'users.write',
+            'billing.write',
+            'content.write',
+            'learning.write',
+            'support.write',
+          ]),
+        ),
+      })
+      .safeParse(await this.adminRequest(accessToken, 'access', requestId, stepUp));
+    if (!parsed.success)
+      throw new AppError(
+        503,
+        'CORE_ADMIN_INVALID_RESPONSE',
+        'Administrator authorization is unavailable',
+      );
+    return parsed.data;
+  }
+  async getAdminUser(accessToken: string, id: string, requestId?: string) {
+    z.uuid().parse(id);
+    return z
+      .object({ data: z.object({ id: z.uuid(), status: z.enum(['active', 'disabled']) }) })
+      .parse(await this.adminRequest(accessToken, `users/${id}`, requestId)).data;
+  }
   constructor(
     private readonly options: {
       baseUrl: string;
@@ -177,8 +250,12 @@ export class CoreAuthClient {
     let response: Response;
     try {
       response = await (this.options.fetchImpl ?? fetch)(
-        new URL('/api/v1/billing/minute-grants', this.options.baseUrl), {
-          headers: { authorization: `Bearer ${accessToken}`, 'x-application-key': this.options.applicationKey },
+        new URL('/api/v1/billing/minute-grants', this.options.baseUrl),
+        {
+          headers: {
+            authorization: `Bearer ${accessToken}`,
+            'x-application-key': this.options.applicationKey,
+          },
           signal: AbortSignal.timeout(this.options.timeoutMs),
         },
       );
@@ -191,7 +268,11 @@ export class CoreAuthClient {
       throw new AppError(503, 'CORE_BILLING_UNAVAILABLE', 'Billing service is unavailable');
     const parsed = minuteGrantsSchema.safeParse(await response.json().catch(() => undefined));
     if (!parsed.success)
-      throw new AppError(503, 'CORE_BILLING_INVALID_RESPONSE', 'Billing service returned an invalid response');
+      throw new AppError(
+        503,
+        'CORE_BILLING_INVALID_RESPONSE',
+        'Billing service returned an invalid response',
+      );
     return parsed.data;
   }
 }

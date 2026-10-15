@@ -91,6 +91,7 @@ export type CourseEvidence = {
   recordedAt: string;
 };
 export type CourseDocument = {
+  adminAssignment?: { templateId: string; templateVersion: number; actorId: string };
   kind: 'course';
   id: string;
   revision: number;

@@ -48,6 +48,7 @@ export function createEnrichment(
   },
   additionalProviders: EnrichmentProvider[] = [],
   dailyQuota?: Pick<AiDailyQuota, 'consume'>,
+  openAiFetch: typeof fetch = fetch,
 ) {
   if (!settings.ENRICHMENT_PROFILES_JSON) {
     if (settings.OPENAI_TRANSLATION_MODEL && !settings.OPENAI_API_KEY)
@@ -58,7 +59,7 @@ export function createEnrichment(
     settings.GOOGLE_TRANSLATION_API || settings.GOOGLE_TRANSLATE_API_KEY,
   );
   if (settings.OPENAI_API_KEY)
-    providers.push(new OpenAIProvider(settings.OPENAI_API_KEY, fetch, dailyQuota));
+    providers.push(new OpenAIProvider(settings.OPENAI_API_KEY, openAiFetch, dailyQuota));
   if (googleTranslationEnabled) {
     if (!settings.GOOGLE_TRANSLATE_API_KEY)
       throw new Error('Configured Google translation requires credentials');

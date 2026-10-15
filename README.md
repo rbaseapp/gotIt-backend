@@ -2,8 +2,46 @@
 
 Independent Node 24 / TypeScript / Express product service. Core validates Bearer
 tokens; GotIt owns learning behavior and persists in `product_gotit` using trusted
-`application_id` / `application_user_id`. Core source and historical migrations
-remain unchanged.
+`application_id` / `application_user_id`. Core remains a separate identity/billing
+authority; historical migrations remain immutable.
+
+## Operational administration
+
+GotIt Admin 0.2 adds authenticated `/api/v1/admin/access`, prompt/policy/program
+drafts and activation, real learner-course assignment and editing, support,
+measured AI usage, reading credits and audit APIs. Core independently verifies
+the active verified admin, explicit action permission and five-minute MFA
+step-up. Product runtime still has no general Core database access.
+
+Apply `1792100000000_admin-operations.js` with `GOTIT_MIGRATION_DATABASE_URL`
+before deploying this runtime. Startup does not migrate. The new seven product
+tables need the same scoped runtime DML grants as existing product tables. Core's
+matching admin API/migration must be deployed first. The quota constraint now
+allows authentic usage above four when an explicit current-month credit grant
+exists; down refuses to erase that history. Prefer retaining additive schema
+and deploying previous application code over automatic production down.
+
+Prompt/policy activation is request-scoped. Published bodies and prior learning
+evidence remain unchanged; stale policy exercises/sessions reject scoring.
+Course template assignments are independent snapshots. Learner-specific edits
+create reviewed drafts and preserve completed unit content. Administrative
+assignment IDs combine learner UUID and course UUID, preserving existing
+per-owner course identity. Private assignment metadata is filtered from learner
+course DTOs.
+
+Authenticated learner support routes `/api/v1/support/tickets` and `/:id`, plus
+POST create and `/:id/reply`, expose only the current learner's messages and
+omit internal staff notes. No external email is sent. Usage instrumentation
+stores trusted provider counts and revision IDs, never provider bodies; history
+before this release and realtime stream totals can remain unmeasured.
+
+See the [Admin contracts and rollout](https://github.com/rbaseapp/gotit-admin/blob/codex/admin-console-operations/docs/OPERATIONS.md).
+Local integration uses disposable Docker PostgreSQL only:
+`node --import tsx --test test/integration/admin-operations.integration.test.ts`.
+An isolated full-service browser preview is available via
+`node --import tsx test/fixtures/admin-console-preview.ts`; configure
+`CORE_PLATFORM_PATH` and `ADMIN_CONSOLE_PATH` for alternate checkouts. Its dummy
+credentials and loopback OTP helper are never mounted by the production server.
 
 ## Routes and implemented flows
 

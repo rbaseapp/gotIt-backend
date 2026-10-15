@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto';
 import type { EnrichmentInput, EnrichmentProvider, ModelProfile } from '../enrichment.types.js';
 import type { AiDailyQuota } from '../../../shared/middleware/ai-daily-quota.js';
 import { readProviderJson } from './http.js';
+import { adminRuntimeContext } from '../../admin/admin.context.js';
 
 const responseSchema = z
   .object({
@@ -164,6 +165,7 @@ export class OpenAIProvider implements EnrichmentProvider {
     const cacheKey = createHash('sha256')
       .update(
         JSON.stringify({
+          promptRevision: adminRuntimeContext.getStore()?.prompts.translation?.id ?? null,
           model: profile.model,
           input: {
             sourceText: input.sourceText,

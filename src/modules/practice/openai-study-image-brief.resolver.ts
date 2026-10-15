@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { adminRuntimeContext } from '../admin/admin.context.js';
 import type { ProfileScope } from '../profile/profile.types.js';
 import type { AiDailyQuota } from '../../shared/middleware/ai-daily-quota.js';
 import { z } from 'zod';
@@ -123,7 +124,14 @@ export class OpenAiStudyImageBriefResolver implements StudyImageBriefResolver {
       context: raw.context ? bounded(raw.context, 500) : null,
     };
     if (!input.sourceText || !input.translationText) return null;
-    const key = createHash('sha256').update(JSON.stringify(input)).digest('hex');
+    const key = createHash('sha256')
+      .update(
+        JSON.stringify({
+          input,
+          promptRevision: adminRuntimeContext.getStore()?.prompts['image-brief']?.id ?? null,
+        }),
+      )
+      .digest('hex');
     const cached = this.cache.get(key);
     if (cached && cached.expiresAt > Date.now()) return cached.value;
     if (cached) this.cache.delete(key);
