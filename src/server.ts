@@ -1,4 +1,7 @@
 import { ProfileRepository } from './modules/profile/profile.repository.js';
+import { ProductAdminService } from './modules/admin/admin.service.js';
+import { runtimeLearningPolicy } from './modules/admin/admin.context.js';
+import { adminAiFetch } from './modules/admin/admin.ai-fetch.js';
 import { ProfileService } from './modules/profile/profile.service.js';
 import { NotificationRepository } from './modules/notifications/notification.repository.js';
 import { NotificationService } from './modules/notifications/notification.service.js';
@@ -148,9 +151,10 @@ const notificationService = new NotificationService(
   ),
   env.NOTIFICATION_VAPID_PUBLIC_KEY,
 );
-const enrichment = createEnrichment(env, [], aiDailyQuota);
-const learningPolicy = policySchema.parse(
-  env.LEARNING_POLICY_JSON ? JSON.parse(env.LEARNING_POLICY_JSON) : {},
+const providerFetch = (operation: string) => adminAiFetch(pool, operation, logger);
+const enrichment = createEnrichment(env, [], aiDailyQuota, providerFetch('translation'));
+const learningPolicy = runtimeLearningPolicy(
+  policySchema.parse(env.LEARNING_POLICY_JSON ? JSON.parse(env.LEARNING_POLICY_JSON) : {}),
 );
 const captureService = new CaptureService(
   new CaptureRepository(pool),
@@ -165,7 +169,7 @@ const studyImageProviders = [
         new OpenAiStudyImageProvider(
           env.OPENAI_API_KEY,
           env.OPENAI_IMAGE_MODEL ?? 'gpt-image-2.5-flare',
-          fetch,
+          providerFetch('image-generation'),
           aiDailyQuota,
         ),
       ]
@@ -176,7 +180,7 @@ const studyImageBriefResolver =
     ? new OpenAiStudyImageBriefResolver(
         env.OPENAI_API_KEY,
         env.OPENAI_TRANSLATION_MODEL,
-        fetch,
+        providerFetch('image-brief'),
         aiDailyQuota,
       )
     : undefined;
@@ -192,7 +196,7 @@ const wordPackStudyService = new WordPackStudyService(
     ? new OpenAiWordPackExampleProvider(
         env.OPENAI_API_KEY,
         env.OPENAI_TRANSLATION_MODEL,
-        fetch,
+        providerFetch('word-pack-examples'),
         aiDailyQuota,
       )
     : undefined,
@@ -242,7 +246,7 @@ const privateLessonContentGenerator = privateLessonContentApiKey
       privateLessonContentApiKey,
       env.OPENAI_PRIVATE_LESSON_MODEL,
       env.OPENAI_REALTIME_TRANSCRIPTION_MODEL,
-      fetch,
+      providerFetch('courses'),
       aiDailyQuota,
     )
   : undefined;
@@ -256,6 +260,7 @@ const courseService = new CourseService(
         model: env.OPENAI_REALTIME_MODEL,
         transcriptionModel: env.OPENAI_REALTIME_TRANSCRIPTION_MODEL,
         callGuard: realtimeCallGuard,
+        fetchImpl: providerFetch('courses'),
       }
     : undefined,
   new PostgresPrivateLessonJournal(pool),
@@ -270,7 +275,7 @@ const privateLessonService = new PrivateLessonService({
   transcriptionModel: env.OPENAI_REALTIME_TRANSCRIPTION_MODEL,
   profiles: profileService,
   vocabulary: new PostgresPrivateLessonVocabularySource(pool),
-  fetchImpl: fetch,
+  fetchImpl: providerFetch('lesson-live'),
   journal: new PostgresPrivateLessonJournal(pool),
   roadmaps: new PostgresPrivateLessonRoadmapStore(pool),
   proficiency: new PostgresPrivateLessonProficiencyStore(pool),
@@ -278,7 +283,7 @@ const privateLessonService = new PrivateLessonService({
     ? new OpenAiPrivateLessonSummaryGenerator(
         privateLessonContentApiKey,
         env.OPENAI_PRIVATE_LESSON_MODEL,
-        fetch,
+        providerFetch('lesson-summary'),
       )
     : undefined,
   lessonAccess: env.ENFORCE_ADDON_ENTITLEMENTS ? addonAccess : undefined,
@@ -288,10 +293,17 @@ const privateLessonService = new PrivateLessonService({
 });
 const readingGenerator =
   env.OPENAI_API_KEY && env.AI_READING_MODEL
-    ? new OpenAiReadingGenerator(env.OPENAI_API_KEY, env.AI_READING_MODEL, fetch)
+    ? new OpenAiReadingGenerator(env.OPENAI_API_KEY, env.AI_READING_MODEL, providerFetch('reading'))
     : undefined;
 
 const app = createApp({
+  adminService: new ProductAdminService(
+    pool,
+    coreAuthClient,
+    profileService,
+    learningPolicy,
+    privateLessonContentGenerator,
+  ),
   logger,
   coreAuthClient,
   profileService,

@@ -1,3 +1,4 @@
+import { isDeepStrictEqual } from 'node:util';
 import { AppError } from '../../shared/errors/app-error.js';
 import type { CourseDocument, CoursePlan, CoursePreferences } from './course.schemas.js';
 
@@ -226,7 +227,13 @@ export function validateCoursePlan(
     const previous = prior.versions.find((version) => version.version === prior.activeVersion)!;
     const touched = new Set(prior.evidence.map((e) => e.unitKey));
     for (const unit of previous.plan.units.filter((unit) => touched.has(unit.key))) {
-      if (JSON.stringify(plan.units.find((next) => next.key === unit.key)) !== JSON.stringify(unit))
+      // PostgreSQL jsonb can reorder object keys without changing curriculum content.
+      if (
+        !isDeepStrictEqual(
+          plan.units.find((next) => next.key === unit.key),
+          unit,
+        )
+      )
         throw invalidPlan();
     }
     const oldOrder = previous.plan.units
@@ -275,5 +282,5 @@ export function evidenceMatchesActiveUnit(
   const original = course.versions
     .find((version) => version.version === evidenceVersion)
     ?.plan.units.find((unit) => unit.key === unitKey);
-  return Boolean(active && original && JSON.stringify(active) === JSON.stringify(original));
+  return Boolean(active && original && isDeepStrictEqual(active, original));
 }

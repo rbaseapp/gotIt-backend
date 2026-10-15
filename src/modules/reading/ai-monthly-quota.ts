@@ -32,11 +32,22 @@ export interface AiMonthlyQuotaContract {
 
 export class AiMonthlyQuota implements AiMonthlyQuotaContract {
   constructor(private readonly pool: Pool) {}
+  private async withCredits(scope: ProfileScope, policy: AiQuotaPolicy): Promise<AiQuotaPolicy> {
+    if (policy.period === 'trial') return policy;
+    const row = (
+      await this.pool.query(
+        `SELECT COALESCE(sum(amount),0)::int AS credits FROM product_gotit.admin_quota_grants WHERE application_id=$1 AND application_user_id=$2 AND ends_at>now() AND created_at>=date_trunc('month',now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC'`,
+        [scope.applicationId, scope.applicationUserId],
+      )
+    ).rows[0];
+    return { ...policy, limit: policy.limit + (row?.credits ?? 0) };
+  }
 
   async status(
     scope: ProfileScope,
     policy: AiQuotaPolicy = PAID_QUOTA_POLICY,
   ): Promise<AiMonthlyQuotaStatus> {
+    policy = await this.withCredits(scope, policy);
     const result = await this.pool.query<{ generation_count: number }>(
       `SELECT generation_count FROM product_gotit.ai_monthly_usage
        WHERE application_id=$1 AND application_user_id=$2
@@ -51,6 +62,8 @@ export class AiMonthlyQuota implements AiMonthlyQuotaContract {
     scope: ProfileScope,
     policy: AiQuotaPolicy = PAID_QUOTA_POLICY,
   ): Promise<AiMonthlyQuotaStatus> {
+    const basePolicy = policy;
+    policy = await this.withCredits(scope, policy);
     const result = await this.pool.query<{ generation_count: number }>(
       `INSERT INTO product_gotit.ai_monthly_usage(
          application_id,application_user_id,usage_month,generation_count)
@@ -64,7 +77,7 @@ export class AiMonthlyQuota implements AiMonthlyQuotaContract {
       [scope.applicationId, scope.applicationUserId, policy.period, policy.limit],
     );
     if (!result.rows[0]) {
-      const status = await this.status(scope, policy);
+      const status = await this.status(scope, basePolicy);
       throw new AppError(
         429,
         'AI_MONTHLY_LIMIT_REACHED',

@@ -30,13 +30,14 @@ test('AI monthly quota reports the fourth successful reservation as exhausted', 
   assert.equal(status.limit, 4);
   assert.equal(status.used, 4);
   assert.equal(status.remaining, 0);
-  assert.match(queries[0]!, /generation_count<\$4/u);
+  assert.match(queries.find((query) => query.includes('INSERT INTO'))!, /generation_count<\$4/u);
 });
 
 test('AI monthly quota rejects a fifth generation with reset guidance', async () => {
   let calls = 0;
   const quota = new AiMonthlyQuota({
-    async query() {
+    async query(text: string) {
+      if (text.includes('admin_quota_grants')) return { rows: [{ credits: 0 }] };
       calls++;
       return calls === 1 ? { rows: [] } : { rows: [{ generation_count: 4 }] };
     },

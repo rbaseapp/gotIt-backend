@@ -7,6 +7,7 @@ export function createLogger(level: string, destination?: DestinationStream): Lo
       redact: {
         paths: [
           'req.headers.authorization',
+          'req.headers["x-admin-step-up"]',
           'req.headers.cookie',
           'req.headers["idempotency-key"]',
           'res.headers["set-cookie"]',

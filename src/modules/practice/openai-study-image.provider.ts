@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { adminRuntimeContext } from '../admin/admin.context.js';
 import type { ProfileScope } from '../profile/profile.types.js';
 import type { AiDailyQuota } from '../../shared/middleware/ai-daily-quota.js';
 import { z } from 'zod';
@@ -54,7 +55,14 @@ export class OpenAiStudyImageProvider implements StudyImageProvider {
       visual: raw.visual ?? literalStudyImageBrief(raw),
     };
     if (!input.sourceText || !input.translationText) return null;
-    const key = createHash('sha256').update(JSON.stringify(input)).digest('hex');
+    const key = createHash('sha256')
+      .update(
+        JSON.stringify({
+          input,
+          promptRevision: adminRuntimeContext.getStore()?.prompts['image-generation']?.id ?? null,
+        }),
+      )
+      .digest('hex');
     const existing = this.pending.get(key);
     if (existing) return existing;
     const generation = this.generateOnce(input, raw.scope).finally(() => this.pending.delete(key));
