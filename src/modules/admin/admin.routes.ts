@@ -31,6 +31,9 @@ export function createProductAdminRouter(service: ProductAdminService) {
     next();
   });
   router.get('/access', async (req, res) => res.json(await service.access(actor(req))));
+  router.post('/prompts/preview', async (req, res) =>
+    res.json(await service.previewPrompt(actor(req), req.body)),
+  );
   for (const resource of [
     'prompts',
     'policies',
@@ -138,10 +141,19 @@ export function createProductAdminRouter(service: ProductAdminService) {
   router.post('/usage/credits', async (req, res) =>
     res.status(201).json(await service.grantQuota(actor(req), quotaGrantSchema.parse(req.body))),
   );
-  const validationErrors: ErrorRequestHandler = (error, _req, _res, next) =>
+  const validationErrors: ErrorRequestHandler = (error, req, _res, next) =>
     next(
       error instanceof z.ZodError
-        ? new AppError(400, 'VALIDATION_ERROR', 'Request validation failed')
+        ? req.path.startsWith('/prompts')
+          ? new AppError(
+              400,
+              'PROMPT_CONFIG_INVALID',
+              `בדקו את הגדרות הפרומפט: ${error.issues
+                .slice(0, 5)
+                .map((issue) => `${issue.path.join('.') || 'content'}: ${issue.message}`)
+                .join('; ')}`.slice(0, 1000),
+            )
+          : new AppError(400, 'VALIDATION_ERROR', 'Request validation failed')
         : error,
     );
   router.use(validationErrors);

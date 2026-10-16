@@ -303,6 +303,10 @@ const app = createApp({
     profileService,
     learningPolicy,
     privateLessonContentGenerator,
+    {
+      model: env.OPENAI_REALTIME_MODEL,
+      transcriptionModel: env.OPENAI_REALTIME_TRANSCRIPTION_MODEL,
+    },
   ),
   logger,
   coreAuthClient,

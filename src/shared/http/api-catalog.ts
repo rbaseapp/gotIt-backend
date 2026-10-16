@@ -1,5 +1,6 @@
 export const API_ROUTES = [
   ['GET', '/admin/access'],
+  ['POST', '/admin/prompts/preview'],
   ...[
     'prompts',
     'policies',

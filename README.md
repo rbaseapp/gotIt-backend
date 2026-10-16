@@ -431,3 +431,8 @@ together, followed by a new deployment. OpenAI reading generation uses the same
 key with `AI_READING_MODEL=gpt-6-luna`. Web/extension origins, Google Speech API
 enablement and live verification, production administrator access, calibrated
 level estimation and retention policy still require deployment-specific verification.
+
+
+## Modular prompt and Realtime administration
+
+Prompt revisions support append/replace, ordered modules and live-lesson section/stage overrides. The authenticated `POST /api/v1/admin/prompts/preview` composes a synthetic browser/provider contract without provider calls or learner data. Session overrides and lesson defaults resolve from the same application-scoped active revision used by live calls. Existing prompt-document tables are sufficient; no new migration is needed. Compatible with legacy `{instructions}` revisions.

@@ -1,5 +1,7 @@
+import { adminRuntimeContext } from '../admin/admin.context.js';
+import { buildRealtimeLessonContract } from './private-lesson.realtime.js';
 import { createHash, randomUUID } from 'node:crypto';
-import { childCourseTeacherVoice, privateLessonTeachers } from './private-lesson.teachers.js';
+import { childCourseTeacherVoice } from './private-lesson.teachers.js';
 import { z } from 'zod';
 import { AppError } from '../../shared/errors/app-error.js';
 import type { AddonAccessContract } from '../addons/addon-access.js';
@@ -17,11 +19,7 @@ import type {
   ProfileScope,
   ProfileServiceContract,
 } from '../profile/profile.types.js';
-import {
-  buildPrivateLessonPrompt,
-  describeLessonLanguage,
-  type PrivateLessonPlan,
-} from './private-lesson.prompt.js';
+import { type PrivateLessonPlan } from './private-lesson.prompt.js';
 import {
   privateLessonNotFound,
   type PrivateLessonJournal,
@@ -66,14 +64,6 @@ type QueueItem = {
   sourceLanguageCode: string;
   primaryTranslation: string;
 };
-
-const speedByRate = {
-  very_slow: 0.7,
-  slow: 0.85,
-  normal: 1,
-  fast: 1.2,
-  very_fast: 1.4,
-} as const;
 
 export interface PrivateLessonVocabularySource {
   learned(
@@ -175,6 +165,8 @@ export class PrivateLessonService {
   }
 
   async createSession(scope: ProfileScope, input: PrivateLessonInput, accessToken?: string) {
+    const runtimePrompt = adminRuntimeContext.getStore()?.prompts['lesson-live'];
+    input = { ...runtimePrompt?.realtime?.lessonDefaults, ...input };
     if (!this.options.apiKey)
       throw new AppError(
         503,
@@ -388,23 +380,7 @@ export class PrivateLessonService {
           );
       }
       timeout = setTimeout(() => controller.abort(), this.requestTimeoutMs);
-      const instructions = buildPrivateLessonPrompt(plan);
-      // Realtime response instructions replace (rather than append to) session
-      // instructions. Preserve the full teaching policy and approved lesson data.
-      const responseEvent = (directive: string) => ({
-        type: 'response.create' as const,
-        response: { instructions: `${instructions}\n\n# Current turn directive\n${directive}` },
-      });
-      const targetLanguage = describeLessonLanguage(plan.targetLanguageCode);
-      const supportLanguage = plan.supportLanguageCode
-        ? describeLessonLanguage(plan.supportLanguageCode)
-        : null;
-      const transcriptionLanguage = new Intl.Locale(targetLanguage.code).language;
-      const absoluteBeginner = plan.lessonMode === 'absolute_beginner';
-      const supportTeaching = plan.teachingLanguage === 'support';
-      const bilingualCourse = supportTeaching || Boolean(plan.course);
-      const teacher = privateLessonTeachers[plan.teacherVoice];
-      const voice = teacher.voice;
+      const contract = buildRealtimeLessonContract(plan, this.options, runtimePrompt);
       const response = await this.fetchImpl('https://api.openai.com/v1/realtime/client_secrets', {
         method: 'POST',
         headers: {
@@ -412,36 +388,7 @@ export class PrivateLessonService {
           'content-type': 'application/json',
           'openai-safety-identifier': safetyIdentifier(scope),
         },
-        body: JSON.stringify({
-          session: {
-            type: 'realtime',
-            model: this.options.model,
-            output_modalities: ['audio'],
-            instructions,
-            audio: {
-              input: {
-                noise_reduction: { type: 'far_field' },
-                transcription: {
-                  model: this.options.transcriptionModel,
-                  ...(bilingualCourse ? {} : { language: transcriptionLanguage }),
-                  prompt:
-                    bilingualCourse && supportLanguage
-                      ? `The learner may speak ${targetLanguage.englishName} or ${supportLanguage!.englishName}. Transcribe each utterance in the language actually spoken without translating it.`
-                      : `The learner is speaking only ${targetLanguage.englishName}. Transcribe the audio as ${targetLanguage.englishName}; do not interpret it as another language.`,
-                },
-                turn_detection: {
-                  type: 'server_vad',
-                  threshold: 0.7,
-                  prefix_padding_ms: 400,
-                  silence_duration_ms: 700,
-                  create_response: true,
-                  interrupt_response: true,
-                },
-              },
-              output: { voice, speed: speedByRate[plan.speechRate] },
-            },
-          },
-        }),
+        body: JSON.stringify({ session: contract.session }),
         signal: controller.signal,
       });
       const secret = clientSecretSchema.parse(await readProviderJson(response, controller.signal));
@@ -458,40 +405,14 @@ export class PrivateLessonService {
             secret.expires_at === undefined
               ? null
               : new Date(secret.expires_at * 1000).toISOString(),
-          model: this.options.model,
+          model: contract.session.model,
           connectionUrl: ticketId
             ? REALTIME_CONNECT_PATH
             : 'https://api.openai.com/v1/realtime/calls',
-          openingEvent: responseEvent(
-            childCourse
-              ? `Begin a child-friendly lesson now. Introduce yourself as ${teacher.name}. Follow the language policy and today's approved course objective. Give one short concrete model, explain it simply, then ask one short spoken understanding question about a fresh situation without giving its answer. Wait for the child's answer before the next step. Use imitation only when the objective or a sound requires it.`
-              : absoluteBeginner
-                ? `Begin with one short greeting in ${targetLanguage.promptName}, then give its meaning in ${supportLanguage!.promptName}. Introduce yourself as ${teacher.name} and explain today's objective in ${supportLanguage!.promptName}. Follow the approved objective when course is present. Explain the situation, meaning and useful parts of the first target phrase, give a short ${targetLanguage.promptName} example, then ask one open understanding question in ${supportLanguage!.promptName} about a different case. Do not say the answer in the question. Keep every practice word and sentence in ${targetLanguage.promptName}; explain meanings separately in ${supportLanguage!.promptName}. Use teachingBrief when supplied. Invite imitation only when it is the explicit lesson objective or a specific sound needs practice; do not mistake it for understanding.`
-                : supportTeaching
-                  ? `Begin with a short greeting in ${targetLanguage.promptName}, introduce yourself as ${teacher.name}, and explain today's objective in ${supportLanguage!.promptName}. Explain the concept and when and why to use it in ${supportLanguage!.promptName}, show contrasting examples in ${targetLanguage.promptName}, then ask one open understanding question in ${supportLanguage!.promptName} about a fresh case without saying the answer. Keep every practice word and sentence in ${targetLanguage.promptName}; explain meanings separately. Use teachingBrief when supplied. Follow the approved course objective when present.`
-                  : `Begin the lesson now. Speak only in ${targetLanguage.promptName}. The very first spoken word must be in this language. Greet briefly and introduce yourself as ${teacher.name}. State today's objective from the approved course, roadmap or grammar focus. Explain the concept and when to use it, show a clear example, then ask one open understanding question about a fresh case without saying the answer. For an independent unit check, elicit the task without giving its answer. If no structured objective is configured, follow the conversational opening policy. Use teachingBrief when supplied. Invite imitation only when it is the explicit lesson objective. Do not use any other language.`,
-          ),
-          continuationEvent: responseEvent(
-            childCourse
-              ? `Continue the child's current lesson under the configured language policy. Keep the approved objective. If the child has not answered, offer one different concrete example and a smaller spoken question; never claim the child answered or count silence as an attempt. After the first wrong answer, kindly explain the specific point and ask one fresh check. After the second unsuccessful attempt at the same task, reassure the child, give the answer briefly, and move to a different activity without another check of that task or claiming mastery. End with one small next step.`
-              : `Continue the current lesson after a pause or the learner's request to continue. ${supportTeaching ? `Use ${supportLanguage!.promptName} for explanation and understanding checks and ${targetLanguage.promptName} for practice; keep target-language examples and answer options untranslated.` : `Speak only in ${targetLanguage.promptName}.`} Keep the current objective and conversation history. Do not restart or assume an unheard answer was correct. If the last task is unanswered or the learner is confused, offer a different example and a smaller open question without its answer; silence does not count as an attempt. After the first incorrect answer, explain the specific error and ask one fresh check of the same point. After a second unsuccessful attempt at the same task, briefly explain the answer, reassure the learner that it is okay, and move to a different task or the next planned activity. Count rephrased checks of the same task toward the two-attempt limit. Do not claim mastery from a copied answer or require success before moving on. End with one concrete prompt. Do not repeat a mastered sentence or ask the learner to choose what happens next.`,
-          ),
-          wrapUpEvent: responseEvent(
-            childCourse
-              ? `The child's lesson time is up. Follow the configured language policy. Say kindly that time is up, name one specific success, encourage the child, and invite them to continue next time. Finish your final sentence completely. Do not ask another question or introduce new material. Keep this short.`
-              : absoluteBeginner
-                ? `The lesson time is up. In ${supportLanguage!.promptName}, say this politely, praise one specific success, and invite the learner to continue next time. You may repeat one useful ${targetLanguage.promptName} phrase with its meaning. Finish your final sentence completely. Do not introduce new material or ask another question. Keep the closing under 25 seconds.`
-                : supportTeaching
-                  ? `The lesson time is up. In ${supportLanguage!.promptName}, say this politely, name one specific success, offer a brief encouraging word, and invite the learner to continue next time. If you repeat a practice example, say it in ${targetLanguage.promptName} and explain its meaning separately. Finish your final sentence completely. Do not introduce new material or ask another question. Keep the closing under 25 seconds.`
-                  : `The lesson time is up. Speak only in ${targetLanguage.promptName}. Politely say that time is up, mention one specific success, offer encouragement, and invite the learner to continue next time. Finish your final sentence completely. Do not ask another question or introduce new material. Do not use any other language. Keep the entire closing under 20 seconds.`,
-          ),
-          translationEvent: supportLanguage
-            ? responseEvent(
-                supportTeaching
-                  ? `In ${supportLanguage.promptName}, explain the meaning of every ${targetLanguage.promptName} phrase from the tutor's most recent turn. Repeat each original phrase in ${targetLanguage.promptName}; do not replace the practice material with translated sentences. Do not introduce new material or ask a new question. Continue with the configured teaching language.`
-                  : `For this response only, translate the tutor's entire most recent speaking turn into ${supportLanguage.promptName}. Translate every sentence from that turn, from beginning to end; do not translate only its final sentence. Give only the complete translation and at most one brief clarification. Do not advance the lesson or ask a new question. After this response, resume speaking only in ${targetLanguage.promptName}.`,
-              )
-            : null,
+          openingEvent: contract.events.opening,
+          continuationEvent: contract.events.continuation,
+          wrapUpEvent: contract.events.wrapUp,
+          translationEvent: contract.events.translation,
         },
       };
     } catch (error) {

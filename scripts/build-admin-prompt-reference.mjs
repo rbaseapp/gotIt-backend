@@ -15,6 +15,7 @@ const definitions = [
     'courses/course.service.ts',
     'courses/course.provider.ts',
     'admin/admin.service.ts',
+    'private-lessons/private-lesson.content.ts',
   ],
   [
     'lesson-summary',
@@ -25,6 +26,7 @@ const definitions = [
     'lesson-live',
     'התנהגות המורה, שפות, תיקונים וזרימת שיעור בזמן אמת.',
     'private-lessons/private-lesson.prompt.ts',
+    'private-lessons/private-lesson.directives.ts',
   ],
   ['image-generation', 'יצירת איור לפי המשמעות שנבחרה.', 'practice/openai-study-image.provider.ts'],
   [
@@ -62,12 +64,17 @@ for (const [key, description, ...files] of definitions) {
         add(`${file}: instructions`, node.initializer);
       if (
         ts.isVariableDeclaration(node) &&
-        ['instructions', 'planInstruction', 'prompt'].includes(node.name.getText(ast))
+        ['instructions', 'planInstruction', 'prompt', 'privateLessonBriefInstruction'].includes(
+          node.name.getText(ast),
+        )
       )
         add(`${file}: ${node.name.getText(ast)}`, node.initializer);
       if (ts.isFunctionDeclaration(node) && node.name?.text === 'instructions')
         add(`${file}: translation template`, node.body);
-      if (ts.isFunctionDeclaration(node) && node.name?.text === 'buildPrivateLessonPrompt') {
+      if (
+        ts.isFunctionDeclaration(node) &&
+        ['buildPrivateLessonPrompt', 'defaultLessonDirectives'].includes(node.name?.text)
+      ) {
         // Include conditional policy fragments as well as the final template.
         const fragment = (part) => {
           if (ts.isTemplateExpression(part) || ts.isNoSubstitutionTemplateLiteral(part))
