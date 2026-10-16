@@ -1,3 +1,4 @@
+import type { LessonUnit } from '../word-packs/teacher-stations.js';
 import type { CefrLevel } from '../profile/profile.types.js';
 import type { CourseLessonContext } from '../courses/course.schemas.js';
 import type { PrivateLessonBrief } from './private-lesson.content.js';
@@ -25,6 +26,9 @@ export type PrivateLessonTarget = {
 };
 
 export type PrivateLessonPlan = {
+  realtimeContract?: ReturnType<
+    typeof import('./private-lesson.realtime.js').buildRealtimeLessonContract
+  >;
   wordPack?: PrivateLessonWordPackContext | null;
   course?: CourseLessonContext | null;
   teachingBrief?: PrivateLessonBrief;
@@ -66,6 +70,8 @@ export type PrivateLessonPlan = {
 };
 
 export type PrivateLessonWordPackContext = {
+  material?: LessonUnit['material'];
+  materials?: LessonUnit['materials'];
   packId: string;
   title: string;
   moduleNumber: number;

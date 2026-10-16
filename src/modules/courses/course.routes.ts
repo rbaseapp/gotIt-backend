@@ -37,6 +37,17 @@ export function createCourseRoutes(
     });
   }
   router.get('/', async (req, res) => res.json(await service.list(req.gotitAuth!)));
+  router.post('/templates/:id/use', async (req, res) =>
+    res
+      .status(201)
+      .json({
+        course: await service.useTemplate(
+          req.gotitAuth!,
+          parseInput(uuidSchema, req.params.id),
+          parseInput(z.object({ eventId: z.uuid() }).strict(), req.body).eventId,
+        ),
+      }),
+  );
   router.post('/intake', async (req, res) =>
     res.status(201).json({
       course: await service.start(req.gotitAuth!, parseInput(intakeStartSchema, req.body)),

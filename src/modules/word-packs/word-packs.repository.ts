@@ -9,6 +9,8 @@ import type { AddInput, CatalogQuery, KnownInput, RemovalInput } from './word-pa
 import { wordPackJourney } from './word-pack-journey.js';
 import { unitLearnedPredicate } from './unit-learning.js';
 import { currentWordStage, type LessonUnit } from './teacher-stations.js';
+import { unitOverride } from '../admin/admin.unit-content.js';
+import { lookupText } from '../capture/capture.validation.js';
 
 type Row = Record<string, any>;
 
@@ -66,7 +68,7 @@ export class WordPackRepository {
   ) {
     return (
       await tx.query(
-        `SELECT p.id,p.slug,p.title,p.description,p.module_number,p.version,p.sort_order,
+        `SELECT p.id,p.slug,COALESCE((SELECT c.content->>'title' FROM product_gotit.admin_unit_content c WHERE c.application_id=$1 AND c.pack_id=p.id AND (c.application_user_id=$2 OR c.application_user_id IS NULL) ORDER BY c.application_user_id NULLS LAST LIMIT 1),p.title) AS title,p.description,p.module_number,p.version,p.sort_order,
           tr.id track_id,tr.slug track_slug,tr.title track_title,tr.level_code,tr.cefr_from,tr.cefr_to,
           tr.source_language_code,tr.translation_language_code,tr.sort_order track_sort_order,
           tp.id topic_id,tp.slug topic_slug,tp.title topic_title,tp.sort_order topic_sort_order,
@@ -148,7 +150,7 @@ export class WordPackRepository {
         if (!row) throw missingPack();
         const entries = (
           await tx.query(
-            `SELECT e.id,e.source_text AS "sourceText",e.translation_text AS "translationText",
+            `SELECT e.id,COALESCE(li.source_text,e.source_text) AS "sourceText",COALESCE((SELECT translation_text FROM product_gotit.item_translations t WHERE t.application_id=li.application_id AND t.application_user_id=li.application_user_id AND t.learning_item_id=li.id AND t.is_current AND t.is_primary LIMIT 1),e.translation_text) AS "translationText",
               e.item_type AS "itemType",e.part_of_speech AS "partOfSpeech",e.example_text AS "exampleText",
               link.learning_item_id AS "learningItemId",link.excluded_at AS "excludedAt",
               li.learning_status AS "learningStatus",li.user_status AS "userStatus",
@@ -169,6 +171,20 @@ export class WordPackRepository {
             [...scopeValues(scope), id],
           )
         ).rows;
+        const override = await unitOverride(tx, scope, id);
+        if (override) {
+          row.title = override.title;
+          for (const entry of entries) {
+            const edited = override.entries.find((item) => item.id === entry.id);
+            if (edited)
+              Object.assign(entry, {
+                ...(!entry.learningItemId
+                  ? { sourceText: edited.sourceText, translationText: edited.translationText }
+                  : {}),
+                exampleText: edited.exampleText,
+              });
+          }
+        }
         return { pack: this.dto(row), entries };
       },
       true,
@@ -224,6 +240,7 @@ export class WordPackRepository {
 
   async lessonUnit(scope: ProfileScope, id: string): Promise<LessonUnit> {
     const { pack, entries } = await this.detail(scope, id);
+    const materials = (await unitOverride(this.pool, scope, id))?.materials;
     if (!pack.teacherStations.length) throw missingPack();
     const stage = currentWordStage(pack.wordCount, pack.progress.introduced);
     const stageEntries = entries.slice(stage.start, stage.end).filter((entry) => !entry.excludedAt);
@@ -242,6 +259,7 @@ export class WordPackRepository {
       }));
     return {
       packId: pack.id,
+      ...(materials ? { materials } : {}),
       title: pack.title,
       moduleNumber: pack.moduleNumber,
       targetLanguageCode: pack.track.sourceLanguageCode,
@@ -399,6 +417,18 @@ export class WordPackRepository {
         )
       ).rows;
       const selected = new Set(input.entryIds);
+      const override = await unitOverride(tx, scope, id);
+      for (const entry of entries) {
+        const edited = override?.entries.find((item) => item.id === entry.id);
+        if (edited)
+          Object.assign(entry, {
+            source_text: edited.sourceText,
+            normalized_source_text: lookupText(edited.sourceText),
+            translation_text: edited.translationText,
+            normalized_translation_text: lookupText(edited.translationText),
+            example_text: edited.exampleText,
+          });
+      }
       if (entries.filter((entry) => selected.has(entry.id)).length !== selected.size)
         throw new AppError(400, 'VALIDATION_ERROR', 'A selected word is not part of this pack');
       await tx.query(
