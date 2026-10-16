@@ -11,6 +11,7 @@ import type {
 import { scopeValues, itemSnapshot, itemNotFound } from '../library/library.repository.js';
 import { fingerprint } from '../enrichment/selection-proof.js';
 import { lookupText } from '../capture/capture.validation.js';
+import { ConceptImagesService } from '../concepts/concept-images.service.js';
 import {
   DEFAULT_LEARNING_POLICY,
   policyVersion,
@@ -570,6 +571,25 @@ export class PracticeService {
         throw new AppError(409, 'ITEM_INCOMPLETE', 'Study item is unavailable or incomplete');
       return row;
     });
+    const conceptInput = {
+      scope,
+      sourceText: item.source_text,
+      translationText: item.translation_text,
+      sourceLanguageCode: item.source_language_code,
+      translationLanguageCode: item.translation_language_code,
+      context: null,
+    };
+    const concepts = new ConceptImagesService(this.pool, this.imageProvider);
+    const concept = await concepts.resolve(conceptInput);
+    if (concept) {
+      const image = await concepts.image(concept, conceptInput, true);
+      // An edit while the provider works must not return media for a stale item.
+      const current = await this.pool.query(
+        `SELECT id FROM product_gotit.learning_items WHERE application_id=$1 AND application_user_id=$2 AND id=$3 AND learning_revision=$4 AND deleted_at IS NULL`,
+        [...scopeValues(scope), itemId, item.learning_revision],
+      );
+      return { image: current.rowCount ? image : null };
+    }
     const cachedImage =
       item.study_image_revision === item.learning_revision
         ? studyImageDto(

@@ -20,11 +20,13 @@ import {
   learnerSectionSchema,
   learnerProfileSchema,
 } from './admin.learner.js';
-
 import { validatePromptContent, type PromptContent } from './admin.prompt-config.js';
 import { promptPreviewSchema, previewRealtimePrompt } from './admin.prompt-preview.js';
 import type { RealtimeDefaults } from '../private-lessons/private-lesson.realtime.js';
 import { ProgramAdmin } from './admin.programs.js';
+import { ConceptAdmin } from './admin.concepts.js';
+import { WordAdmin } from './admin.words.js';
+import type { StudyImageProvider } from '../practice/study-image.provider.js';
 import {
   contentSchemas,
   promptKeys,
@@ -66,6 +68,12 @@ function validateAdminPlan(...args: Parameters<typeof validateCoursePlan>) {
 const columns = `d.id,d.key,d.title,d.title AS name,d.version,d.revision,d.status,d.application_user_id AS "applicationUserId",d.created_at AS "createdAt",d.updated_at AS "updatedAt",d.content->'preferences'->>'targetLanguageCode' AS "languageCode",a.document_id AS "activeId"`;
 
 export class ProductAdminService {
+  get words() {
+    return new WordAdmin(this);
+  }
+  get concepts() {
+    return new ConceptAdmin(this, this.conceptImageProvider, this.conceptReplacementProviders);
+  }
   get programContent() {
     return new ProgramAdmin(this, this.realtimeDefaults);
   }
@@ -79,6 +87,10 @@ export class ProductAdminService {
       model: 'gpt-realtime-2.1',
       transcriptionModel: 'gpt-4o-mini-transcribe',
     },
+    private readonly conceptImageProvider?: StudyImageProvider,
+    private readonly conceptReplacementProviders: Partial<
+      Record<'stock' | 'ai', StudyImageProvider>
+    > = {},
   ) {}
   async previewPrompt(actor: AdminActor, value: unknown) {
     await this.access(actor);
@@ -121,6 +133,8 @@ export class ProductAdminService {
         'quotas',
         'audit',
         'learners',
+        'concepts',
+        'words',
       ],
     };
   }

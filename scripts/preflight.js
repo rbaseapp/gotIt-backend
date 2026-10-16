@@ -7,6 +7,24 @@ import { verifyBaseline } from './migrate.js';
 export async function verifyRuntimeSchema(client, { strictRole = true } = {}) {
   await verifyBaseline(client);
   const requirements = {
+    lexical_concepts: [
+      'application_id',
+      'id',
+      'key',
+      'revision',
+      'image_revision',
+      'visual_description',
+      'stock_search_query',
+    ],
+    concept_expressions: ['application_id', 'concept_id', 'language_code', 'normalized_text'],
+    concept_image_assets: [
+      'application_id',
+      'concept_id',
+      'image_revision',
+      'claim_id',
+      'claim_until',
+      'image_data',
+    ],
     admin_documents: ['application_id', 'resource', 'revision', 'content'],
     admin_unit_content: ['application_id', 'application_user_id', 'pack_id', 'revision', 'content'],
     admin_active_revisions: ['application_id', 'resource', 'document_id'],

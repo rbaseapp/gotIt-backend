@@ -9,6 +9,7 @@ export type StudyImageInput = {
   context: string | null;
   visual?: StudyImageVisualBrief;
   scope?: ProfileScope;
+  excludeSourceUrls?: string[];
 };
 
 export type StudyImageVisualBrief = {

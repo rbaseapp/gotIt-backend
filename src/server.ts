@@ -307,6 +307,11 @@ const app = createApp({
       model: env.OPENAI_REALTIME_MODEL,
       transcriptionModel: env.OPENAI_REALTIME_TRANSCRIPTION_MODEL,
     },
+    studyImageProvider,
+    {
+      stock: studyImageProviders.find((provider) => provider instanceof PixabayStudyImageProvider),
+      ai: studyImageProviders.find((provider) => provider instanceof OpenAiStudyImageProvider),
+    },
   ),
   logger,
   coreAuthClient,
