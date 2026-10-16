@@ -10,6 +10,9 @@ import { coursePlanSchema, type CourseDocument } from '../courses/course.schemas
 import { syllabusFor, validateCoursePlan } from '../courses/course.curriculum.js';
 import { promptReference } from './admin.prompt-reference.generated.js';
 import type { CourseGenerator } from '../courses/course.provider.js';
+import { validatePromptContent, type PromptContent } from './admin.prompt-config.js';
+import { promptPreviewSchema, previewRealtimePrompt } from './admin.prompt-preview.js';
+import type { RealtimeDefaults } from '../private-lessons/private-lesson.realtime.js';
 import {
   contentSchemas,
   promptKeys,
@@ -56,7 +59,15 @@ export class ProductAdminService {
     private readonly profiles: ProfileServiceContract,
     private readonly basePolicy: LearningPolicy,
     private readonly generator?: CourseGenerator,
+    private readonly realtimeDefaults: RealtimeDefaults = {
+      model: 'gpt-realtime-2.1',
+      transcriptionModel: 'gpt-4o-mini-transcribe',
+    },
   ) {}
+  async previewPrompt(actor: AdminActor, value: unknown) {
+    await this.access(actor);
+    return previewRealtimePrompt(promptPreviewSchema.parse(value), this.realtimeDefaults);
+  }
   profilesForLearner(scope: ProfileScope) {
     return this.profiles.getProfile(scope);
   }
@@ -119,11 +130,11 @@ export class ProductAdminService {
         [scope.applicationId],
       )
     ).rows;
-    const prompts: Record<string, { id: string; instructions: string }> = {};
+    const prompts: Record<string, PromptContent & { id: string }> = {};
     let policy: LearningPolicy | undefined;
     for (const row of rows) {
       if (row.resource === 'prompts')
-        prompts[row.key] = { id: row.id, ...contentSchemas.prompts.parse(row.content) };
+        prompts[row.key] = { id: row.id, ...validatePromptContent(row.key, row.content) };
       if (row.resource === 'policies' && row.key === 'learning-default')
         policy = policySchema.parse(row.content);
     }
@@ -199,6 +210,14 @@ export class ProductAdminService {
       if (resource === 'prompts') {
         const row = result.rows[0];
         row.promptReference = promptReference[row.key as keyof typeof promptReference];
+        row.activeContent = row.activeId
+          ? ((
+              await this.db.query(
+                `SELECT content FROM product_gotit.admin_documents WHERE application_id=$1 AND id=$2 AND resource='prompts'`,
+                [actor.applicationId, row.activeId],
+              )
+            ).rows[0]?.content ?? null)
+          : null;
         row.activeGuidance = row.activeId
           ? ((
               await this.db.query(
@@ -329,7 +348,10 @@ export class ProductAdminService {
     id: string | null,
     input: z.infer<typeof saveSchema>,
   ) {
-    const content = contentSchemas[resource].parse(input.document.content);
+    const content =
+      resource === 'prompts'
+        ? validatePromptContent(input.document.key, input.document.content)
+        : contentSchemas[resource].parse(input.document.content);
     if (
       resource === 'prompts' &&
       !promptKeys.includes(input.document.key as (typeof promptKeys)[number])
@@ -425,7 +447,10 @@ export class ProductAdminService {
             )
           ).rows[0]?.document_id ?? null;
         if (old !== input.expectedActiveId) throw changed();
-        const content = contentSchemas[resource].parse(row.content);
+        const content =
+          resource === 'prompts'
+            ? validatePromptContent(row.key, row.content)
+            : contentSchemas[resource].parse(row.content);
         if (resource === 'programs') {
           const program = contentSchemas.programs.parse(content);
           if (!program.plan)

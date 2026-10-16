@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { promptContentSchema } from './admin.prompt-config.js';
 import { policySchema } from '../learning/learning.policy.js';
 import { coursePlanSchema, coursePreferencesSchema } from '../courses/course.schemas.js';
 export const promptKeys = [
@@ -42,7 +43,7 @@ export const listSchema = z
   })
   .strict();
 export const contentSchemas = {
-  prompts: z.object({ instructions: z.string().trim().max(20000) }).strict(),
+  prompts: promptContentSchema,
   policies: policySchema,
   programs: z
     .object({ preferences: coursePreferencesSchema, plan: coursePlanSchema.nullable() })

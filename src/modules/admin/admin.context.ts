@@ -1,12 +1,13 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import type { LearningPolicy } from '../learning/learning.policy.js';
 import type { ProfileScope } from '../profile/profile.types.js';
+import type { PromptContent } from './admin.prompt-config.js';
 
 export const adminRuntimeContext = new AsyncLocalStorage<
   ProfileScope & {
     requestId: string;
     policy?: LearningPolicy;
-    prompts: Record<string, { id: string; instructions: string }>;
+    prompts: Record<string, PromptContent & { id: string }>;
   }
 >();
 // One immutable context per request. No mutable process-wide policy or user scope.

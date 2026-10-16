@@ -645,6 +645,109 @@ test(
           );
         },
       );
+      await t.test(
+        'Realtime prompt drafts preserve modular settings across activation, rollback and scoped preview',
+        async () => {
+          const items = await service.list(actor, 'prompts', query);
+          const first = items.data.find((row: { key: string }) => row.key === 'lesson-live');
+          assert.ok(first);
+          const content = {
+            instructions: 'ADMIN TUTOR {{targetLanguage}}',
+            mode: 'replace',
+            modules: [{ key: 'method', title: 'Method', enabled: true, text: 'ONE QUESTION' }],
+            realtime: {
+              session: { model: 'fixture-realtime', audio: { output: { speed: 0.8 } } },
+              stages: { opening: 'OPEN {{topic}}' },
+            },
+          };
+          const saved = await service.save(actor, 'prompts', first.id, {
+            ...command(),
+            expectedRevision: first.revision,
+            document: { key: 'lesson-live', title: 'Live tutor configuration', content },
+          });
+          assert.equal(
+            (await service.runtime(actor, actor.requestId)).prompts['lesson-live'],
+            undefined,
+          );
+          const input = { content, sample: { targetLanguageCode: 'en', topic: 'Travel' } };
+          const preview = await service.previewPrompt({ ...actor, stepUp: undefined }, input);
+          assert.equal(preview.providerRequest.body.session.model, 'fixture-realtime');
+          assert.match(preview.clientEvents.opening.response.instructions, /OPEN Travel/);
+          await assert.rejects(
+            () => service.previewPrompt({ ...actor, applicationId: otherApp }, input),
+            { code: 'APPLICATION_MISMATCH' },
+          );
+          const published = await service.publish(actor, 'prompts', String(saved.data.id), {
+            ...command(),
+            expectedRevision: Number(saved.data.revision),
+            expectedActiveId: null,
+          });
+          const active = await service.runtime(actor, actor.requestId);
+          assert.deepEqual(active.prompts['lesson-live']!.realtime, content.realtime);
+          const detail = await service.list(actor, 'prompts', query, String(published.data.id));
+          assert.deepEqual(detail.data.activeContent, content);
+          const changed = await service.save(actor, 'prompts', String(published.data.id), {
+            ...command(),
+            expectedRevision: Number(published.data.revision),
+            document: {
+              key: 'lesson-live',
+              title: 'Another draft',
+              content: { instructions: 'ANOTHER VERSION' },
+            },
+          });
+          assert.notEqual(changed.data.id, published.data.id);
+          const second = await service.publish(actor, 'prompts', String(changed.data.id), {
+            ...command(),
+            expectedRevision: Number(changed.data.revision),
+            expectedActiveId: String(published.data.id),
+          });
+          const prior = await service.list(actor, 'prompts', query, String(published.data.id));
+          await service.publish(actor, 'prompts', String(published.data.id), {
+            ...command(),
+            expectedRevision: prior.data.revision,
+            expectedActiveId: String(second.data.id),
+          });
+          assert.deepEqual(
+            (await service.runtime(actor, actor.requestId)).prompts['lesson-live']!.realtime,
+            content.realtime,
+          );
+          // A request already holding its snapshot retains that revision.
+          assert.equal(active.prompts['lesson-live']!.instructions, content.instructions);
+        },
+      );
+      await t.test(
+        'concurrent prompt publishers choose one revision without a row-lock deadlock',
+        { timeout: 5000 },
+        async () => {
+          const drafts = await Promise.all(
+            [1, 2].map((index) =>
+              service.save(actor, 'prompts', null, {
+                ...command(),
+                expectedRevision: null,
+                document: {
+                  key: 'image-brief',
+                  title: `Concurrent draft ${index}`,
+                  content: { instructions: `Brief guidance ${index}` },
+                },
+              }),
+            ),
+          );
+          const outcomes = await Promise.allSettled(
+            drafts.map((draft) =>
+              service.publish(actor, 'prompts', String(draft.data.id), {
+                ...command(),
+                expectedRevision: Number(draft.data.revision),
+                expectedActiveId: null,
+              }),
+            ),
+          );
+          assert.equal(outcomes.filter((result) => result.status === 'fulfilled').length, 1);
+          const rejected = outcomes.find((result) => result.status === 'rejected');
+          assert.equal(rejected?.status === 'rejected' && rejected.reason.code, 'CONFLICT');
+          const active = (await service.runtime(actor, actor.requestId)).prompts['image-brief'];
+          assert.ok(active && drafts.some((draft) => draft.data.id === active.id));
+        },
+      );
       let programId: string,
         assignmentId = '',
         courseId = '';
