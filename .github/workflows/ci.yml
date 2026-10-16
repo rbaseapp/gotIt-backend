@@ -31,14 +31,14 @@ jobs:
       - name: Require a pinned read-only Core baseline for integration
         env:
           CORE_REPOSITORY: ${{ vars.CORE_PLATFORM_REPOSITORY || 'rbaseapp/rbase-core-platforms' }}
-          CORE_REF: ${{ vars.CORE_PLATFORM_REF || '63b89e8a825152091cffb7668ff2871ab1cfc2b2' }}
+          CORE_REF: ${{ vars.CORE_PLATFORM_REF || '02243669c713b2266ecf50221ae8341d0018e6ae' }}
         run: |
           test -n "$CORE_REPOSITORY" || { echo 'Configure CORE_PLATFORM_REPOSITORY'; exit 1; }
           [[ "$CORE_REF" =~ ^[a-fA-F0-9]{40}$ ]] || { echo 'Configure CORE_PLATFORM_REF with the reviewed Core commit SHA'; exit 1; }
       - uses: actions/checkout@v7
         with:
           repository: ${{ vars.CORE_PLATFORM_REPOSITORY || 'rbaseapp/rbase-core-platforms' }}
-          ref: ${{ vars.CORE_PLATFORM_REF || '63b89e8a825152091cffb7668ff2871ab1cfc2b2' }}
+          ref: ${{ vars.CORE_PLATFORM_REF || '02243669c713b2266ecf50221ae8341d0018e6ae' }}
           token: ${{ secrets.CORE_PLATFORM_READ_TOKEN || github.token }}
           path: core-platform
           persist-credentials: false

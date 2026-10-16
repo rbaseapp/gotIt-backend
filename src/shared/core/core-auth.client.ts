@@ -115,6 +115,7 @@ export class CoreAuthClient {
             'content.write',
             'learning.write',
             'support.write',
+            'staff.write',
           ]),
         ),
       })

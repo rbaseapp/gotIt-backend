@@ -13,6 +13,16 @@ measured AI usage, reading credits and audit APIs. Core independently verifies
 the active verified admin, explicit action permission and five-minute MFA
 step-up. Product runtime still has no general Core database access.
 
+Admin 0.3 adds authenticated prepared-catalog list/detail at
+`/api/v1/admin/catalog-programs`, exposing the actual shared English-from-zero
+units without learner progress. Prompt details include source-derived fixed
+templates and active additional guidance separately from draft instructions.
+`npm run build` regenerates the read-only reference; its freshness is verified
+in fast tests. No provider call or learner data is used for previews. This upgrade
+needs no new Product migration; deploy Core's matching API before consumers and
+bootstrap `staff.write` only after Backend and Admin understand it. See the
+[ordered upgrade runbook](https://github.com/rbaseapp/gotit-admin/blob/codex/admin-console-operations/docs/OPERATIONS.md#upgrade-from-the-working-02-deployment).
+
 Apply `1792100000000_admin-operations.js` with `GOTIT_MIGRATION_DATABASE_URL`
 before deploying this runtime. Startup does not migrate. The new seven product
 tables need the same scoped runtime DML grants as existing product tables. Core's
