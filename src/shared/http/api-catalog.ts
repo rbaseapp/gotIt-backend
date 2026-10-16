@@ -5,6 +5,7 @@ export const API_ROUTES = [
     'policies',
     'programs',
     'assignments',
+    'catalog-programs',
     'support',
     'usage',
     'quotas',

@@ -295,6 +295,211 @@ test(
         },
       );
       const profiles = new ProfileService(new ProfileRepository(database.runtimePool));
+      await t.test(
+        'staff management needs its own permission, verified targets and MFA; role changes revoke sessions and replay once',
+        async () => {
+          const targetId = randomUUID();
+          await database.adminPool.query(
+            `INSERT INTO core.application_users(application_id,id,email,role,email_verified_at) VALUES($1,$2,'staff-target@example.test','user',now())`,
+            [appId, targetId],
+          );
+          const input = {
+            ...command(),
+            expectedRevision: 0,
+            role: 'admin' as const,
+            permissions: ['content.write'],
+          };
+          await assert.rejects(() => core.updateStaff(context, targetId, input), {
+            code: 'PERMISSION_REQUIRED',
+          });
+          await database.adminPool.query(
+            `INSERT INTO core.admin_staff_permissions(application_id,application_user_id,permission) VALUES($1,$2,'staff.write')`,
+            [appId, adminId],
+          );
+          await assert.rejects(
+            () => core.updateStaff({ ...context, adminStepUp: undefined }, targetId, input),
+            { code: 'ADMIN_MFA_REQUIRED' },
+          );
+          await assert.rejects(() => core.updateStaff(context, otherUser, input), {
+            code: 'CONFLICT',
+          });
+          await assert.rejects(() => core.updateStaff(context, adminId, input), {
+            code: 'SELF_CHANGE_FORBIDDEN',
+          });
+          await assert.rejects(
+            () => core.updateStaff(context, userId, { ...input, expectedRevision: 2 }),
+            { code: 'VERIFIED_USER_REQUIRED' },
+          );
+          await database.adminPool.query(
+            `INSERT INTO core.auth_sessions(application_id,application_user_id,refresh_token_hash,expires_at) VALUES($1,$2,'staff-session',now()+interval '1 day')`,
+            [appId, targetId],
+          );
+          const results = await Promise.all([
+            core.updateStaff(context, targetId, input),
+            core.updateStaff(context, targetId, input),
+          ]);
+          assert.deepEqual(results[0], results[1]);
+          assert.equal(results[0].data.role, 'admin');
+          assert.deepEqual(
+            (await core.access({ ...context, applicationUserId: targetId })).permissions,
+            ['content.write'],
+          );
+          assert.equal(
+            (
+              await database.adminPool.query(
+                `SELECT count(*)::int n FROM core.auth_sessions WHERE application_user_id=$1 AND revoked_at IS NULL`,
+                [targetId],
+              )
+            ).rows[0].n,
+            0,
+          );
+          assert.equal((await core.list(context, 'users', query, targetId)).data.planKey, 'admin');
+          await core.updateStaff(context, targetId, {
+            ...command(),
+            expectedRevision: 1,
+            role: 'user',
+            permissions: [],
+          });
+          await assert.rejects(() => core.access({ ...context, applicationUserId: targetId }), {
+            code: 'ADMIN_REQUIRED',
+          });
+          assert.equal(
+            (
+              await database.adminPool.query(
+                `SELECT count(*)::int n FROM core.admin_staff_permissions WHERE application_user_id=$1`,
+                [targetId],
+              )
+            ).rows[0].n,
+            0,
+          );
+          const audit = (
+            await database.adminPool.query(
+              `SELECT metadata FROM core.admin_audit_events WHERE target_id=$1 AND action='staff.update' ORDER BY created_at`,
+              [targetId],
+            )
+          ).rows;
+          assert.equal(audit.length, 2);
+          assert.equal(audit[0].metadata.role, 'admin');
+        },
+      );
+      await t.test(
+        'Free/Pro access overrides drive the actual billing status, preserve provider charges, expire and restore normal access',
+        async () => {
+          const targetId = randomUUID(),
+            freeId = randomUUID(),
+            paidId = randomUUID();
+          await database.adminPool.query(
+            `INSERT INTO core.application_users(application_id,id,email,email_verified_at) VALUES($1,$2,'plan-target@example.test',now())`,
+            [appId, targetId],
+          );
+          await database.adminPool.query(
+            `INSERT INTO core.billing_plans(application_id,id,key,name,kind,entitlements) VALUES($1,$2,'free','Free / Basic','free','["practice.basic"]')`,
+            [appId, freeId],
+          );
+          await database.adminPool.query(
+            `INSERT INTO core.billing_plans(application_id,id,key,name,kind,provider,provider_price_id,billing_interval,entitlements) VALUES($1,$2,'pro-switch-test','Pro','paid','paddle',$3,'month','["practice.basic","reading.ai"]')`,
+            [appId, paidId, `pri_${'e'.repeat(26)}`],
+          );
+          const { BillingService } = await import(
+            pathToFileURL(resolve(corePath, 'src/modules/billing/billing.service.ts')).href
+          );
+          const billing = new BillingService();
+          const learnerContext = { ...context, applicationUserId: targetId };
+          await database.adminPool.query(
+            `INSERT INTO core.billing_subscriptions(application_id,application_user_id,billing_plan_id,provider,provider_subscription_id,provider_customer_id,status,provider_occurred_at) VALUES($1,$2,$3,'paddle',$4,$5,'active',now())`,
+            [appId, targetId, paidId, `sub_${'c'.repeat(26)}`, `ctm_${'d'.repeat(26)}`],
+          );
+          assert.equal(
+            (await billing.getStatus(learnerContext, database.adminPool)).source,
+            'provider',
+          );
+          const input = {
+            ...command(),
+            expectedRevision: 0,
+            planId: freeId,
+            endsAt: new Date(Date.now() + 86400000).toISOString(),
+          };
+          const result = await core.setPlan(context, targetId, input);
+          assert.deepEqual(await core.setPlan(context, targetId, input), result);
+          let status = await billing.getStatus(learnerContext, database.adminPool);
+          assert.equal(status.tier, 'free');
+          assert.equal(status.source, 'admin_override');
+          assert.deepEqual(status.entitlements, ['practice.basic']);
+          assert.equal(status.subscription?.status, 'active');
+          assert.equal((await core.list(context, 'users', query, targetId)).data.planKey, 'free');
+          await assert.rejects(() => core.setPlan(context, targetId, { ...input, ...command() }), {
+            code: 'CONFLICT',
+          });
+          await core.setPlan(context, targetId, {
+            ...input,
+            ...command(),
+            expectedRevision: 1,
+            planId: paidId,
+          });
+          assert.equal((await billing.getStatus(learnerContext, database.adminPool)).tier, 'paid');
+          await database.adminPool.query(
+            `UPDATE core.admin_plan_overrides SET created_at=now()-interval '2 days',ends_at=now()-interval '1 second' WHERE application_id=$1 AND application_user_id=$2`,
+            [appId, targetId],
+          );
+          assert.equal(
+            (await billing.getStatus(learnerContext, database.adminPool)).source,
+            'provider',
+          );
+          await core.setPlan(context, targetId, {
+            ...input,
+            ...command(),
+            expectedRevision: 2,
+            planId: freeId,
+          });
+          await core.setPlan(context, targetId, {
+            ...command(),
+            expectedRevision: 3,
+            planId: null,
+            endsAt: null,
+          });
+          status = await billing.getStatus(learnerContext, database.adminPool);
+          assert.equal(status.source, 'provider');
+          assert.equal(
+            (
+              await database.adminPool.query(
+                `SELECT status FROM core.billing_subscriptions WHERE application_id=$1 AND application_user_id=$2`,
+                [appId, targetId],
+              )
+            ).rows[0].status,
+            'active',
+          );
+          await assert.rejects(
+            () =>
+              core.setPlan(context, targetId, {
+                ...input,
+                ...command(),
+                expectedRevision: 4,
+                endsAt: new Date(Date.now() + 91 * 86400000).toISOString(),
+              }),
+            { code: 'VALIDATION_ERROR' },
+          );
+          await assert.rejects(
+            () => core.setPlan(context, adminId, { ...input, ...command(), expectedRevision: 0 }),
+            { code: 'ADMIN_ACCESS_FIXED' },
+          );
+          await core.setPlan(context, targetId, {
+            ...command(),
+            expectedRevision: 4,
+            planId: paidId,
+            endsAt: null,
+          });
+          status = await billing.getStatus(learnerContext, database.adminPool);
+          assert.equal(status.source, 'admin_override');
+          assert.equal(status.overrideEndsAt, null);
+          assert.equal(status.tier, 'paid');
+          await core.setPlan(context, targetId, {
+            ...command(),
+            expectedRevision: 5,
+            planId: null,
+            endsAt: null,
+          });
+        },
+      );
       const actor: AdminActor = {
         applicationId: appId,
         applicationUserId: adminId,
@@ -330,6 +535,29 @@ test(
         generator,
       );
       await profiles.getProfile(actor);
+      await t.test(
+        'prepared catalog exposes the real English-from-zero units without learner progress',
+        async () => {
+          const response = await service.list(actor, 'catalog-programs', query);
+          const program = response.data.find((row: { slug: string }) =>
+            ['daily-english', 'english-learning-path-en-he'].includes(row.slug),
+          );
+          assert.ok(program);
+          const detail = await service.list(actor, 'catalog-programs', query, program.id);
+          assert.match(detail.data.title, /English from zero/);
+          assert.ok(detail.data.units.length > 0);
+          assert.equal(detail.data.units.length, detail.data.unitCount);
+          assert.equal(
+            detail.data.units.reduce((n: number, u: { wordCount: number }) => n + u.wordCount, 0),
+            detail.data.wordCount,
+          );
+          assert.ok(
+            detail.data.units.every(
+              (u: Record<string, unknown>) => !('applicationUserId' in u) && !('progress' in u),
+            ),
+          );
+        },
+      );
       await t.test('owner authorization compares trusted application and actor scope', async () => {
         await assert.rejects(
           () => service.list({ ...actor, applicationId: otherApp }, 'prompts', query),
@@ -347,6 +575,13 @@ test(
           const items = await service.list(actor, 'prompts', query);
           const first = items.data.find((row: { key: string }) => row.key === 'reading');
           assert.ok(first);
+          const initial = await service.list(actor, 'prompts', query, first.id);
+          assert.equal(initial.data.content.instructions, '');
+          assert.equal(initial.data.activeGuidance, '');
+          assert.match(
+            initial.data.promptReference.templates[0].text,
+            /Write a natural reading passage/,
+          );
           const draft = await service.save(actor, 'prompts', first.id, {
             ...command(),
             expectedRevision: 0,
@@ -376,6 +611,9 @@ test(
             },
           });
           assert.notEqual(next.data.id, first.id);
+          const preview = await service.list(actor, 'prompts', query, String(next.data.id));
+          assert.equal(preview.data.content.instructions, 'Use travel examples.');
+          assert.equal(preview.data.activeGuidance, 'Use concrete beginner examples.');
           assert.equal(next.data.version, 2);
           assert.equal(
             (await service.runtime(actor, actor.requestId)).prompts.reading!.id,
@@ -817,6 +1055,82 @@ test(
                 `SELECT to_regclass('product_gotit.admin_documents') AS table_name`,
               )
             ).rows[0].table_name,
+          );
+        },
+      );
+      await t.test(
+        'Core additive migration rolls back and reapplies only on the disposable database',
+        async () => {
+          const run = promisify(execFile);
+          const migrateCore = async (direction: 'up' | 'down') =>
+            run(
+              process.execPath,
+              [
+                resolve(corePath, 'node_modules/node-pg-migrate/bin/node-pg-migrate.js'),
+                direction,
+                '--migrations-dir',
+                resolve(corePath, 'migrations'),
+                '--database-url-var',
+                'GOTIT_TEST_CORE_ADMIN_URL',
+              ],
+              {
+                cwd: corePath,
+                env: {
+                  ...process.env,
+                  GOTIT_TEST_CORE_ADMIN_URL: database.adminPool.options.connectionString!,
+                },
+                timeout: 30000,
+                maxBuffer: 2 * 1024 * 1024,
+              },
+            );
+          await assert.rejects(
+            () => migrateCore('down'),
+            /Remove plan overrides and staff.write grants/,
+          );
+          await database.adminPool.query(
+            `DELETE FROM core.admin_staff_permissions WHERE permission='staff.write'`,
+          );
+          await migrateCore('down');
+          assert.equal(
+            (
+              await database.adminPool.query(
+                `SELECT to_regclass('core.admin_plan_overrides') AS name`,
+              )
+            ).rows[0].name,
+            null,
+          );
+          await migrateCore('down');
+          assert.equal(
+            (
+              await database.adminPool.query(
+                `SELECT to_regclass('core.admin_mfa_credentials') AS table_name`,
+              )
+            ).rows[0].table_name,
+            null,
+          );
+          assert.equal(
+            (
+              await database.adminPool.query(
+                `SELECT count(*)::int AS n FROM information_schema.columns WHERE table_schema='core' AND table_name='application_users' AND column_name='admin_revision'`,
+              )
+            ).rows[0].n,
+            0,
+          );
+          await migrateCore('up');
+          assert.ok(
+            (
+              await database.adminPool.query(
+                `SELECT to_regclass('core.admin_mfa_credentials') AS table_name`,
+              )
+            ).rows[0].table_name,
+          );
+          assert.ok(
+            (
+              await database.adminPool.query(
+                `SELECT id FROM core.application_users WHERE application_id=$1 AND id=$2`,
+                [appId, userId],
+              )
+            ).rowCount,
           );
         },
       );

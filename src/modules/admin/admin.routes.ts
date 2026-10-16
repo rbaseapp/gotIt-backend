@@ -36,6 +36,7 @@ export function createProductAdminRouter(service: ProductAdminService) {
     'policies',
     'programs',
     'assignments',
+    'catalog-programs',
     'support',
     'usage',
     'quotas',

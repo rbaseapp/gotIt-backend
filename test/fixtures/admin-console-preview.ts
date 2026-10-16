@@ -86,12 +86,23 @@ try {
     [
       applicationId,
       adminId,
-      ['users.write', 'billing.write', 'content.write', 'learning.write', 'support.write'],
+      [
+        'users.write',
+        'billing.write',
+        'content.write',
+        'learning.write',
+        'support.write',
+        'staff.write',
+      ],
     ],
   );
   await database.adminPool.query(
     `INSERT INTO core.billing_plans(application_id,key,name,kind,provider,provider_price_id,billing_interval,entitlements) VALUES($1,'fixture-plan','Fixture access plan','paid','paddle',$2,'month','["practice.play"]')`,
     [applicationId, `pri_${'f'.repeat(26)}`],
+  );
+  await database.adminPool.query(
+    `INSERT INTO core.billing_plans(application_id,key,name,kind,entitlements) VALUES($1,'free','Free / Basic','free','["practice.basic"]')`,
+    [applicationId],
   );
   const coreAdmin = new AdminService(database.adminPool);
   const { secret: fixtureSecret } = await coreAdmin.mfa.enroll({

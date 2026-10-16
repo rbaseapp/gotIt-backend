@@ -5,8 +5,9 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm ci
 
-COPY tsconfig.json ./
+COPY tsconfig.json .prettierrc.json ./
 COPY src ./src
+COPY scripts/build-admin-prompt-reference.mjs ./scripts/build-admin-prompt-reference.mjs
 
 RUN npm run build
 

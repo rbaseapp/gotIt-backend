@@ -9,7 +9,7 @@
   },
   "scripts": {
     "dev": "tsx watch src/server.ts",
-    "build": "tsc -p tsconfig.json",
+    "build": "node scripts/build-admin-prompt-reference.mjs && tsc -p tsconfig.json",
     "start": "node --enable-source-maps dist/src/server.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "format": "prettier --write src test scripts migrations .github package.json tsconfig.json render.yaml",

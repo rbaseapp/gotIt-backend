@@ -8,6 +8,7 @@ import type { ProfileScope, ProfileServiceContract } from '../profile/profile.ty
 import { policySchema, type LearningPolicy } from '../learning/learning.policy.js';
 import { coursePlanSchema, type CourseDocument } from '../courses/course.schemas.js';
 import { syllabusFor, validateCoursePlan } from '../courses/course.curriculum.js';
+import { promptReference } from './admin.prompt-reference.generated.js';
 import type { CourseGenerator } from '../courses/course.provider.js';
 import {
   contentSchemas,
@@ -84,6 +85,7 @@ export class ProductAdminService {
         'policies',
         'programs',
         'assignments',
+        'catalog-programs',
         'support',
         'usage',
         'quotas',
@@ -129,11 +131,12 @@ export class ProductAdminService {
   }
   async list(
     actor: AdminActor,
-    resource: DocumentResource | 'usage' | 'quotas' | 'audit' | 'assignments',
+    resource: DocumentResource | 'usage' | 'quotas' | 'audit' | 'assignments' | 'catalog-programs',
     query: z.infer<typeof listSchema>,
     id?: string,
   ) {
     await this.access(actor);
+    if (resource === 'catalog-programs') return this.catalog(query, id);
     if (resource === 'prompts' || resource === 'policies') await this.defaults(actor.applicationId);
     const documents = resource in contentSchemas;
     const source = documents
@@ -193,9 +196,60 @@ export class ProductAdminService {
     );
     if (id) {
       if (!result.rows[0]) throw notFound();
+      if (resource === 'prompts') {
+        const row = result.rows[0];
+        row.promptReference = promptReference[row.key as keyof typeof promptReference];
+        row.activeGuidance = row.activeId
+          ? ((
+              await this.db.query(
+                `SELECT content->>'instructions' AS instructions FROM product_gotit.admin_documents WHERE application_id=$1 AND id=$2 AND resource='prompts'`,
+                [actor.applicationId, row.activeId],
+              )
+            ).rows[0]?.instructions ?? '')
+          : '';
+      }
       return { data: result.rows[0] };
     }
     return { data: result.rows, total: count.rows[0].total };
+  }
+  private async catalog(query: z.infer<typeof listSchema>, id?: string) {
+    // The vocabulary catalog is shared product content, as in learner discovery.
+    // No learner membership, progress or identity joins are exposed here.
+    const values: unknown[] = [];
+    let filter = 'TRUE';
+    if (id) {
+      values.push(id);
+      filter = 'id=$1';
+    } else if (query.q) {
+      values.push(`%${query.q.replace(/[\\%_]/g, '\\$&')}%`);
+      filter = '(title ILIKE $1 OR slug ILIKE $1)';
+    }
+    const source = `SELECT t.id,t.slug,CASE WHEN t.slug IN ('daily-english','english-learning-path-en-he') THEN 'אנגלית מאפס / English from zero' ELSE t.title END AS title,t.description,
+      CASE WHEN t.is_active THEN 'active' ELSE 'inactive' END AS status,t.created_at AS "createdAt",
+      string_agg(DISTINCT tr.source_language_code,', ') AS "sourceLanguageCode",string_agg(DISTINCT tr.translation_language_code,', ') AS "translationLanguageCode",
+      count(DISTINCT p.id)::int AS "unitCount",count(e.id)::int AS "wordCount"
+      FROM product_gotit.word_topics t LEFT JOIN product_gotit.word_tracks tr ON tr.topic_id=t.id AND tr.is_active
+      LEFT JOIN product_gotit.word_packs p ON p.track_id=tr.id AND p.is_active LEFT JOIN product_gotit.word_pack_entries e ON e.pack_id=p.id GROUP BY t.id`;
+    if (!['id', 'title', 'status', 'createdAt'].includes(query.sort))
+      throw new AppError(400, 'VALIDATION_ERROR', 'Unsupported sort field');
+    const total = (
+      await this.db.query(`SELECT count(*)::int AS n FROM (${source}) r WHERE ${filter}`, values)
+    ).rows[0].n;
+    const rows = (
+      await this.db.query(
+        `SELECT * FROM (${source}) r WHERE ${filter} ORDER BY "${query.sort}" ${query.order},id ${query.order} LIMIT $${values.length + 1} OFFSET $${values.length + 2}`,
+        [...values, id ? 1 : query.perPage, id ? 0 : (query.page - 1) * query.perPage],
+      )
+    ).rows;
+    if (!id) return { data: rows, total };
+    if (!rows[0]) throw notFound();
+    rows[0].units = (
+      await this.db.query(
+        `SELECT p.id,p.title,p.module_number AS "moduleNumber",p.version,tr.title AS track,tr.level_code AS "levelCode",tr.cefr_from AS "cefrFrom",tr.cefr_to AS "cefrTo",count(e.id)::int AS "wordCount" FROM product_gotit.word_packs p JOIN product_gotit.word_tracks tr ON tr.id=p.track_id LEFT JOIN product_gotit.word_pack_entries e ON e.pack_id=p.id WHERE tr.topic_id=$1 AND tr.is_active AND p.is_active GROUP BY p.id,tr.id ORDER BY tr.sort_order,p.sort_order,p.module_number,p.id`,
+        [id],
+      )
+    ).rows;
+    return { data: rows[0] };
   }
   async command(
     actor: AdminActor,
