@@ -3,8 +3,15 @@ import { z } from 'zod';
 import { AppError } from '../../shared/errors/app-error.js';
 import { ProductAdminService, type AdminActor } from './admin.service.js';
 import {
+  unitIdSchema,
+  unitSaveSchema,
+  lessonPreviewSchema,
+  unitPreviewSchema,
+} from './admin.programs.js';
+import {
   listSchema,
   saveSchema,
+  assignmentSaveSchema,
   publishSchema,
   assignSchema,
   supportCreateSchema,
@@ -31,6 +38,57 @@ export function createProductAdminRouter(service: ProductAdminService) {
     next();
   });
   router.get('/access', async (req, res) => res.json(await service.access(actor(req))));
+  for (const resource of ['catalog-units', 'learner-units'] as const) {
+    router.get(`/${resource}`, async (req, res) =>
+      res.json(
+        await service.programContent.units(
+          actor(req),
+          listSchema.parse(req.query),
+          undefined,
+          resource === 'learner-units',
+        ),
+      ),
+    );
+    router.get(`/${resource}/:id`, async (req, res) =>
+      res.json(
+        await service.programContent.units(
+          actor(req),
+          listSchema.parse({}),
+          unitIdSchema.parse(req.params.id),
+          resource === 'learner-units',
+        ),
+      ),
+    );
+    router.patch(`/${resource}/:id`, async (req, res) =>
+      res.json(
+        await service.programContent.saveUnit(
+          actor(req),
+          unitIdSchema.parse(req.params.id),
+          unitSaveSchema.parse(req.body),
+        ),
+      ),
+    );
+  }
+  router.get('/lessons', async (req, res) =>
+    res.json(await service.programContent.lessons(actor(req), listSchema.parse(req.query))),
+  );
+  router.get('/lessons/:id', async (req, res) =>
+    res.json(
+      await service.programContent.lessons(
+        actor(req),
+        listSchema.parse({}),
+        z.uuid().parse(req.params.id),
+      ),
+    ),
+  );
+  router.post('/programs/preview', async (req, res) =>
+    res.json(await service.programContent.preview(actor(req), lessonPreviewSchema.parse(req.body))),
+  );
+  router.post('/units/preview', async (req, res) =>
+    res.json(
+      await service.programContent.previewUnit(actor(req), unitPreviewSchema.parse(req.body)),
+    ),
+  );
   router.post('/prompts/preview', async (req, res) =>
     res.json(await service.previewPrompt(actor(req), req.body)),
   );
@@ -111,7 +169,7 @@ export function createProductAdminRouter(service: ProductAdminService) {
       await service.updateAssignment(
         actor(req),
         assignmentId.parse(req.params.id),
-        saveSchema.parse(req.body),
+        assignmentSaveSchema.parse(req.body),
       ),
     ),
   );

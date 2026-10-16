@@ -8,6 +8,7 @@ export async function verifyRuntimeSchema(client, { strictRole = true } = {}) {
   await verifyBaseline(client);
   const requirements = {
     admin_documents: ['application_id', 'resource', 'revision', 'content'],
+    admin_unit_content: ['application_id', 'application_user_id', 'pack_id', 'revision', 'content'],
     admin_active_revisions: ['application_id', 'resource', 'document_id'],
     admin_audit_events: ['application_id', 'actor_id', 'action'],
     admin_command_receipts: [
@@ -136,6 +137,7 @@ export async function verifyRuntimeSchema(client, { strictRole = true } = {}) {
       'released_at',
     ],
     private_lesson_sessions: [
+      'realtime_contract',
       'id',
       'application_id',
       'application_user_id',

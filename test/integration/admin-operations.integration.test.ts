@@ -1128,8 +1128,24 @@ test(
       await t.test(
         'new product migration rolls back and reapplies on disposable data only',
         async () => {
+          // Rehearse this migration explicitly; newer additive migrations may follow it.
+          const migration = await import(
+            new URL('../../migrations/1792100000000_admin-operations.js', import.meta.url).href
+          );
+          const exactMigration = async (direction: 'up' | 'down') => {
+            const statements: string[] = [];
+            migration[direction]({ sql: (sql: string) => statements.push(sql) });
+            await database.adminPool.query('BEGIN');
+            try {
+              for (const sql of statements) await database.adminPool.query(sql);
+              await database.adminPool.query('COMMIT');
+            } catch (error) {
+              await database.adminPool.query('ROLLBACK');
+              throw error;
+            }
+          };
           await assert.rejects(
-            () => database.migrate('down'),
+            () => exactMigration('down'),
             'Rollback must not discard usage above the historical four-generation cap',
           );
           assert.ok(
@@ -1144,7 +1160,7 @@ test(
             `DELETE FROM product_gotit.ai_monthly_usage WHERE application_id=$1`,
             [appId],
           );
-          await database.migrate('down');
+          await exactMigration('down');
           assert.equal(
             (
               await database.adminPool.query(
@@ -1153,7 +1169,7 @@ test(
             ).rows[0].table_name,
             null,
           );
-          await database.migrate('up');
+          await exactMigration('up');
           assert.ok(
             (
               await database.adminPool.query(
