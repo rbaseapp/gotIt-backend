@@ -42,6 +42,7 @@ export const listSchema = z
     q: z.string().trim().max(200).optional(),
   })
   .strict();
+export const usageListSchema = listSchema.extend({ activity: z.literal('failed').optional() });
 export const contentSchemas = {
   prompts: promptContentSchema,
   policies: policySchema,

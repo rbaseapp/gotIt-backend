@@ -16,6 +16,7 @@ import { wordListSchema, wordSectionSchema } from './admin.words.js';
 import { stockSearchSchema, wordImageSchema } from './admin.word-images.js';
 import {
   listSchema,
+  usageListSchema,
   saveSchema,
   assignmentSaveSchema,
   publishSchema,
@@ -226,7 +227,13 @@ export function createProductAdminRouter(service: ProductAdminService) {
     'audit',
   ] as const) {
     router.get(`/${resource}`, async (req, res) =>
-      res.json(await service.list(actor(req), resource, listSchema.parse(req.query))),
+      res.json(
+        await service.list(
+          actor(req),
+          resource,
+          (resource === 'usage' ? usageListSchema : listSchema).parse(req.query),
+        ),
+      ),
     );
     router.get(`/${resource}/:id`, async (req, res) =>
       res.json(

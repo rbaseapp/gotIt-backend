@@ -37,6 +37,7 @@ import {
   publishSchema,
   assignSchema,
   listSchema,
+  usageListSchema,
   supportCreateSchema,
   supportUpdateSchema,
   quotaGrantSchema,
@@ -260,10 +261,12 @@ export class ProductAdminService {
   async list(
     actor: AdminActor,
     resource: DocumentResource | 'usage' | 'quotas' | 'audit' | 'assignments' | 'catalog-programs',
-    query: z.infer<typeof listSchema>,
+    query: z.infer<typeof usageListSchema>,
     id?: string,
   ) {
     await this.access(actor);
+    if (query.activity && (resource !== 'usage' || id))
+      throw new AppError(400, 'VALIDATION_ERROR', 'Unsupported activity filter');
     if (resource === 'catalog-programs') return this.catalog(query, id);
     if (resource === 'prompts' || resource === 'policies') await this.defaults(actor.applicationId);
     const documents = resource in contentSchemas;
@@ -294,6 +297,7 @@ export class ProductAdminService {
               : 'r.id::text';
       filter = `(r.id::text ILIKE $${values.length} OR ${search} ILIKE $${values.length}${['usage', 'quotas', 'assignments'].includes(resource) ? ` OR r."applicationUserId"::text ILIKE $${values.length}` : ''})`;
     }
+    if (query.activity === 'failed') filter = `(${filter}) AND r.status='failed'`;
     const sorts = documents
       ? ['id', 'key', 'title', 'name', 'version', 'status', 'createdAt', 'applicationUserId']
       : resource === 'assignments'
