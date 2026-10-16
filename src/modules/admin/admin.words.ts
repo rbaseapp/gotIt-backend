@@ -25,10 +25,8 @@ export const wordListSchema = listSchema
   .strict();
 export const wordSectionSchema = z.enum(['translations', 'examples', 'occurrences', 'tags']);
 const primary = `LEFT JOIN LATERAL(SELECT t.translation_text,t.normalized_text FROM product_gotit.item_translations t WHERE t.application_id=li.application_id AND t.application_user_id=li.application_user_id AND t.learning_item_id=li.id AND t.is_current AND t.is_primary LIMIT 1) tr ON true`;
-const concepts = `LEFT JOIN LATERAL(SELECT array_agg(candidate.id ORDER BY candidate.id) ids,array_agg(candidate.revision ORDER BY candidate.id) revisions FROM (SELECT c.id,c.revision FROM product_gotit.lexical_concepts c WHERE c.application_id=li.application_id AND c.status='active' AND c.automatic_identity IS NULL
-  AND EXISTS(SELECT 1 FROM product_gotit.concept_expressions e WHERE e.application_id=c.application_id AND e.concept_id=c.id AND e.language_code=li.source_language_code AND e.normalized_text=li.normalized_source_text)
-  AND EXISTS(SELECT 1 FROM product_gotit.concept_expressions e WHERE e.application_id=c.application_id AND e.concept_id=c.id AND e.language_code=li.translation_language_code AND e.normalized_text=tr.normalized_text) LIMIT 2) candidate) matches ON true LEFT JOIN product_gotit.lexical_concepts automatic ON automatic.application_id=li.application_id AND automatic.status='active' AND automatic.automatic_identity=product_gotit.word_image_identity(li.source_language_code,li.normalized_source_text,li.translation_language_code,tr.normalized_text)`;
-const fields = `li.id,li.source_text AS "sourceText",li.source_language_code AS "sourceLanguageCode",li.translation_language_code AS "translationLanguageCode",li.application_user_id AS "applicationUserId",tr.translation_text AS "primaryTranslation",li.part_of_speech AS "partOfSpeech",li.phonetic_text AS "phoneticText",li.item_type AS "itemType",li.user_status AS "userStatus",li.learning_status AS "learningStatus",li.learning_revision AS "learningRevision",li.overall_mastery_score AS "mastery",li.review_stage AS "reviewStage",li.next_review_at AS "nextReviewAt",li.created_at AS "createdAt",li.updated_at AS "updatedAt",li.deleted_at AS "deletedAt",CASE WHEN cardinality(matches.ids)=1 THEN matches.ids[1] ELSE automatic.id END AS "conceptId",CASE WHEN cardinality(matches.ids)=1 THEN matches.revisions[1] ELSE automatic.revision END AS "conceptRevision",COALESCE(cardinality(matches.ids)>1,false) AND automatic.id IS NULL AS "conceptAmbiguous"`;
+const concepts = `LEFT JOIN LATERAL product_gotit.resolve_image_concept(li.application_id,li.source_language_code,li.normalized_source_text,li.translation_language_code,tr.normalized_text) resolved ON true LEFT JOIN product_gotit.lexical_concepts concept ON concept.application_id=li.application_id AND concept.id=resolved.concept_id`;
+const fields = `li.id,li.source_text AS "sourceText",li.source_language_code AS "sourceLanguageCode",li.translation_language_code AS "translationLanguageCode",li.application_user_id AS "applicationUserId",tr.translation_text AS "primaryTranslation",li.part_of_speech AS "partOfSpeech",li.phonetic_text AS "phoneticText",li.item_type AS "itemType",li.user_status AS "userStatus",li.learning_status AS "learningStatus",li.learning_revision AS "learningRevision",li.overall_mastery_score AS "mastery",li.review_stage AS "reviewStage",li.next_review_at AS "nextReviewAt",li.created_at AS "createdAt",li.updated_at AS "updatedAt",li.deleted_at AS "deletedAt",concept.id AS "conceptId",concept.revision AS "conceptRevision",resolved.ambiguous AS "conceptAmbiguous"`;
 
 export class WordAdmin {
   constructor(private readonly owner: ProductAdminService) {}
@@ -53,8 +51,7 @@ export class WordAdmin {
       if (query.applicationUserId) add('li.application_user_id=?', query.applicationUserId);
       if (query.state === 'active') where.push('li.deleted_at IS NULL');
       if (query.state === 'deleted') where.push('li.deleted_at IS NOT NULL');
-      if (query.state === 'unlinked')
-        where.push('COALESCE(cardinality(matches.ids),0)<>1 AND automatic.id IS NULL');
+      if (query.state === 'unlinked') where.push('concept.id IS NULL');
     }
     const from = `FROM product_gotit.learning_items li ${primary} ${concepts} WHERE ${where.join(' AND ')}`;
     const countFrom = `FROM product_gotit.learning_items li ${primary} ${!id && query.state === 'unlinked' ? concepts : ''} WHERE ${where.join(' AND ')}`;

@@ -6,6 +6,12 @@ import { verifyBaseline } from './migrate.js';
 /** Read-only production gate. Results never include connections, identities or data. */
 export async function verifyRuntimeSchema(client, { strictRole = true } = {}) {
   await verifyBaseline(client);
+  const resolver = (
+    await client.query(
+      `SELECT to_regprocedure('product_gotit.resolve_image_concept(uuid,text,text,text,text)') IS NOT NULL present`,
+    )
+  ).rows[0];
+  if (!resolver?.present) throw new Error('GOTIT_IMAGE_CONCEPT_RESOLVER_REQUIRED');
   const requirements = {
     lexical_concepts: [
       'application_id',

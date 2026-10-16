@@ -16,6 +16,7 @@ test(
   async (t) => {
     const db = await createTestDatabase();
     try {
+      await db.migrate('down'); // Read-only translation resolver.
       await db.migrate('down');
       const app = randomUUID(),
         foreign = randomUUID(),
@@ -269,6 +270,7 @@ test(
             (await imageService.cached(linked, 'banana'))?.url,
             `data:image/png;base64,${Buffer.from('later-catalog-picture').toString('base64')}`,
           );
+          await db.migrate('down'); // Resolver rollback retains all meanings and media.
           await assert.rejects(db.migrate('down'));
         },
       );

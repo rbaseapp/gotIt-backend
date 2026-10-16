@@ -386,7 +386,8 @@ test(
       await t.test(
         'migration down/up on disposable data creates multilingual starter apple',
         async () => {
-          // The additive automatic-identity migration is now the latest migration.
+          // Remove the read-only resolver, then the empty automatic-identity layer.
+          await db.migrate('down');
           await db.migrate('down');
           await assert.rejects(
             db.migrate('down'),

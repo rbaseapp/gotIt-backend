@@ -3,7 +3,7 @@ import type { DatabaseTransaction } from '../../shared/database/transaction.js';
 import { lookupText } from '../capture/capture.validation.js';
 import { AppError } from '../../shared/errors/app-error.js';
 
-/** Exact recorded bilingual meaning. No transitive merging of homonyms. */
+/** Reviewed meanings (including a unique new-language link), then exact automatic pairs. */
 export async function ensureWordImageConcept(
   tx: DatabaseTransaction,
   applicationId: string,
@@ -18,14 +18,13 @@ export async function ensureWordImageConcept(
     ),
   );
   await tx.lock(['automatic-word-image', applicationId, identity]);
-  const reviewed = (
+  let concept = (
     await tx.query(
-      `SELECT c.* FROM product_gotit.lexical_concepts c WHERE c.application_id=$1 AND c.status='active' AND c.automatic_identity IS NULL
-    AND NOT EXISTS(SELECT 1 FROM jsonb_array_elements($2::jsonb) node WHERE NOT EXISTS(SELECT 1 FROM product_gotit.concept_expressions e WHERE e.application_id=c.application_id AND e.concept_id=c.id AND e.language_code=node->>0 AND e.normalized_text=node->>1)) LIMIT 2`,
-      [applicationId, identity],
+      `SELECT c.* FROM product_gotit.resolve_image_concept($1,$2,$3,$4,$5) resolved
+      JOIN product_gotit.lexical_concepts c ON c.application_id=$1 AND c.id=resolved.concept_id`,
+      [applicationId, forms[0]![0], forms[0]![1], forms[1]?.[0], forms[1]?.[1]],
     )
-  ).rows;
-  let concept = forms.length > 1 && reviewed.length === 1 ? reviewed[0] : undefined;
+  ).rows[0];
   if (!concept) {
     const title = `${word.source_text}${word.translation_text ? ' / ' + word.translation_text : ''}`;
     const query =

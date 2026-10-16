@@ -48,27 +48,11 @@ export class ConceptImagesService {
   ) {}
   async resolve(input: StudyImageInput): Promise<ResolvedConcept | null> {
     if (!input.scope) return null;
-    const rows = (
-      await this.db.query(
-        `SELECT c.* FROM product_gotit.lexical_concepts c
-      WHERE c.application_id=$1 AND c.status='active' AND c.automatic_identity IS NULL
-      AND EXISTS(SELECT 1 FROM product_gotit.concept_expressions e WHERE e.application_id=c.application_id AND e.concept_id=c.id AND e.language_code=$2 AND e.normalized_text=$3)
-      AND EXISTS(SELECT 1 FROM product_gotit.concept_expressions e WHERE e.application_id=c.application_id AND e.concept_id=c.id AND e.language_code=$4 AND e.normalized_text=$5)
-      LIMIT 2`,
-        [
-          input.scope.applicationId,
-          input.sourceLanguageCode,
-          lookupText(input.sourceText),
-          input.translationLanguageCode,
-          lookupText(input.translationText),
-        ],
-      )
-    ).rows;
-    if (rows.length === 1) return rows[0] as ResolvedConcept;
     return (
       ((
         await this.db.query(
-          `SELECT * FROM product_gotit.lexical_concepts WHERE application_id=$1 AND status='active' AND automatic_identity=product_gotit.word_image_identity($2,$3,$4,$5)`,
+          `SELECT c.* FROM product_gotit.resolve_image_concept($1,$2,$3,$4,$5) resolved
+      JOIN product_gotit.lexical_concepts c ON c.application_id=$1 AND c.id=resolved.concept_id`,
           [
             input.scope.applicationId,
             input.sourceLanguageCode,
