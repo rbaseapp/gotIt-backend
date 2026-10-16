@@ -13,6 +13,7 @@ import { learnerSettingsSchema } from './admin.learner.js';
 import { conceptSaveSchema } from '../concepts/concepts.schema.js';
 import { regenerateConceptSchema } from './admin.concept-regeneration.js';
 import { wordListSchema, wordSectionSchema } from './admin.words.js';
+import { stockSearchSchema, wordImageSchema } from './admin.word-images.js';
 import {
   listSchema,
   saveSchema,
@@ -49,6 +50,24 @@ export function createProductAdminRouter(service: ProductAdminService) {
   router.get('/words/:id', async (req, res) =>
     res.json(
       await service.words.list(actor(req), wordListSchema.parse({}), z.uuid().parse(req.params.id)),
+    ),
+  );
+  router.get('/words/:id/stock-images', async (req, res) =>
+    res.json(
+      await service.wordImages.search(
+        actor(req),
+        z.uuid().parse(req.params.id),
+        stockSearchSchema.parse(req.query),
+      ),
+    ),
+  );
+  router.post('/words/:id/image', async (req, res) =>
+    res.json(
+      await service.wordImages.replace(
+        actor(req),
+        z.uuid().parse(req.params.id),
+        wordImageSchema.parse(req.body),
+      ),
     ),
   );
   router.get('/word-images/:id', async (req, res) =>

@@ -10,6 +10,7 @@ export type StudyImageInput = {
   visual?: StudyImageVisualBrief;
   scope?: ProfileScope;
   excludeSourceUrls?: string[];
+  stockSelection?: string;
 };
 
 export type StudyImageVisualBrief = {
@@ -34,7 +35,21 @@ export type GeneratedStudyImage = {
 export interface StudyImageProvider {
   readonly id: string;
   generate(input: StudyImageInput): Promise<GeneratedStudyImage | null>;
+  candidates?(
+    query: string,
+    applicationId: string,
+    page?: number,
+  ): Promise<{ data: StockImageCandidate[]; total: number }>;
 }
+
+export type StockImageCandidate = {
+  id: number;
+  previewUrl: string;
+  sourceUrl: string;
+  creator: string;
+  tags: string;
+  selection: string;
+};
 
 export interface StudyImageBriefResolver {
   readonly id: string;

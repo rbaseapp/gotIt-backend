@@ -26,6 +26,7 @@ import type { RealtimeDefaults } from '../private-lessons/private-lesson.realtim
 import { ProgramAdmin } from './admin.programs.js';
 import { ConceptAdmin } from './admin.concepts.js';
 import { WordAdmin } from './admin.words.js';
+import { WordImageAdmin } from './admin.word-images.js';
 import type { StudyImageProvider } from '../practice/study-image.provider.js';
 import {
   contentSchemas,
@@ -68,6 +69,9 @@ function validateAdminPlan(...args: Parameters<typeof validateCoursePlan>) {
 const columns = `d.id,d.key,d.title,d.title AS name,d.version,d.revision,d.status,d.application_user_id AS "applicationUserId",d.created_at AS "createdAt",d.updated_at AS "updatedAt",d.content->'preferences'->>'targetLanguageCode' AS "languageCode",a.document_id AS "activeId"`;
 
 export class ProductAdminService {
+  get wordImages() {
+    return new WordImageAdmin(this, this.conceptReplacementProviders);
+  }
   get words() {
     return new WordAdmin(this);
   }

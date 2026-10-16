@@ -132,7 +132,7 @@ export class ConceptAdmin {
               : 1;
         if (old)
           await tx.query(
-            `UPDATE product_gotit.lexical_concepts SET title=$3,definition=$4,visual_description=$5,status=$6,revision=$7,image_revision=$8,stock_search_query=$9,updated_at=now() WHERE application_id=$1 AND id=$2`,
+            `UPDATE product_gotit.lexical_concepts SET title=$3,definition=$4,visual_description=$5,status=$6,revision=$7,image_revision=$8,stock_search_query=$9,automatic_identity=NULL,updated_at=now() WHERE application_id=$1 AND id=$2`,
             [
               actor.applicationId,
               conceptId,

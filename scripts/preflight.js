@@ -15,6 +15,7 @@ export async function verifyRuntimeSchema(client, { strictRole = true } = {}) {
       'image_revision',
       'visual_description',
       'stock_search_query',
+      'automatic_identity',
     ],
     concept_expressions: ['application_id', 'concept_id', 'language_code', 'normalized_text'],
     concept_image_assets: [

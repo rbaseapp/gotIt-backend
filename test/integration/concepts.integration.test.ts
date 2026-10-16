@@ -386,6 +386,8 @@ test(
       await t.test(
         'migration down/up on disposable data creates multilingual starter apple',
         async () => {
+          // The additive automatic-identity migration is now the latest migration.
+          await db.migrate('down');
           await assert.rejects(
             db.migrate('down'),
             'Authored concepts must prevent destructive rollback',
