@@ -1,7 +1,7 @@
 import { z } from 'zod';
-import { promptContentSchema } from './admin.prompt-config.js';
 import { policySchema } from '../learning/learning.policy.js';
 import { coursePlanSchema, coursePreferencesSchema } from '../courses/course.schemas.js';
+import { promptContentSchema } from './admin.prompt-config.js';
 export const promptKeys = [
   'translation',
   'reading',
@@ -47,7 +47,24 @@ export const contentSchemas = {
   policies: policySchema,
   programs: z
     .object({ preferences: coursePreferencesSchema, plan: coursePlanSchema.nullable() })
-    .strict(),
+    .strict()
+    .transform((content) => {
+      if (content.plan)
+        for (const unit of content.plan.units)
+          for (const lesson of unit.lessons) {
+            const material = lesson.material;
+            if (
+              material &&
+              !material.words.length &&
+              !material.readingPassage &&
+              !material.teacherInstructions &&
+              !material.realtimeInstructions &&
+              !material.practice
+            )
+              delete lesson.material;
+          }
+      return content;
+    }),
   support: z
     .object({
       subject: z.string().trim().min(3).max(200),
@@ -75,6 +92,9 @@ export const documentSchema = z
   .strict();
 export const saveSchema = commandSchema
   .extend({ expectedRevision: z.number().int().nonnegative().nullable(), document: documentSchema })
+  .strict();
+export const assignmentSaveSchema = saveSchema
+  .extend({ reviseCompleted: z.boolean().optional() })
   .strict();
 export const publishSchema = commandSchema
   .extend({

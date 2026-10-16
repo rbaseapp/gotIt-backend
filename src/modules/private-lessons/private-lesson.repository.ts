@@ -113,8 +113,8 @@ export class PostgresPrivateLessonJournal implements PrivateLessonJournal {
       `INSERT INTO product_gotit.private_lesson_sessions
        (id,application_id,application_user_id,target_language_code,support_language_code,level,topic,
         grammar_focus,focus_areas,custom_focus,correction_mode,vocabulary_mode,lesson_mode,teaching_language,continuity,teacher_voice,speech_rate,
-        planned_duration_seconds,target_words,roadmap_id,milestone_id,course_context,word_pack_context)
-       VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10,$11,$12,$13,$14,$15::jsonb,$16,$17,$18,$19::jsonb,$20,$21,$22::jsonb,$23::jsonb)`,
+        planned_duration_seconds,target_words,roadmap_id,milestone_id,course_context,word_pack_context,realtime_contract)
+       VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10,$11,$12,$13,$14,$15::jsonb,$16,$17,$18,$19::jsonb,$20,$21,$22::jsonb,$23::jsonb,$24::jsonb)`,
       [
         plan.id,
         scope.applicationId,
@@ -139,6 +139,7 @@ export class PostgresPrivateLessonJournal implements PrivateLessonJournal {
         plan.roadmap?.milestoneId ?? null,
         plan.course ? JSON.stringify(plan.course) : null,
         plan.wordPack ? JSON.stringify(plan.wordPack) : null,
+        plan.realtimeContract ? JSON.stringify(plan.realtimeContract) : null,
       ],
     );
   }

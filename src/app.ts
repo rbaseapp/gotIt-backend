@@ -37,6 +37,16 @@ export function createApp(dependencies: AppDependencies) {
     app.use('/api/v1', createRateLimit(dependencies.rateLimiter, 'ip', 240));
   app.use('/api/v1/pronunciation/assessments', express.json({ limit: '1mb' }));
   app.use('/api/v1/courses/transcribe', express.json({ limit: '700kb' }));
+  app.use(
+    [
+      '/api/v1/admin/programs',
+      '/api/v1/admin/assignments',
+      '/api/v1/admin/catalog-units',
+      '/api/v1/admin/learner-units',
+      '/api/v1/admin/units',
+    ],
+    express.json({ limit: '2mb' }),
+  );
   app.use(express.json({ limit: '256kb' }));
   app.use(createRoutes(dependencies));
   app.use(notFoundHandler);

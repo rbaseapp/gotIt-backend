@@ -320,6 +320,8 @@ export class PrivateLessonService {
             translationText: word.translationText,
           })),
       };
+      if (wordPack.materials?.[wordPack.station])
+        plan.wordPack = { ...wordPack, material: wordPack.materials[wordPack.station] };
     }
     const childCourse = plan.course?.preferences.ageGroup === 'child';
     if (childCourse)
@@ -356,7 +358,15 @@ export class PrivateLessonService {
     const controller = new AbortController();
     let timeout: ReturnType<typeof setTimeout> | undefined;
     try {
-      if (this.options.lessonContentGenerator) {
+      const authoredMaterial = plan.course?.material ?? plan.wordPack?.material;
+      const hasAuthoredMaterial = Boolean(
+        authoredMaterial &&
+          (authoredMaterial.words.length ||
+            authoredMaterial.readingPassage ||
+            authoredMaterial.teacherInstructions ||
+            authoredMaterial.practice),
+      );
+      if (this.options.lessonContentGenerator && !hasAuthoredMaterial) {
         let languageIssue: string | null = null;
         for (let attempt = 0; attempt < 2; attempt++) {
           const teachingBrief = await this.options.lessonContentGenerator.generate(
@@ -395,7 +405,7 @@ export class PrivateLessonService {
 
       if (!input.courseId && !input.packId)
         await this.options.roadmaps?.savePreferences(scope, input, plan);
-      await this.options.journal?.create(scope, plan);
+      await this.options.journal?.create(scope, { ...plan, realtimeContract: contract });
       if (ticketId) await this.options.realtimeCallGuard!.issue(ticketId, secret.value);
       return {
         lesson: publicPlan(plan),
@@ -703,8 +713,10 @@ export class PrivateLessonService {
 function publicStoredLesson(lesson: StoredPrivateLesson) {
   // Keep the unit and station available to the learning map and lesson history.
   return {
-    course: lesson.course ?? null,
-    wordPack: lesson.wordPack ?? null,
+    course: lesson.course ? { ...lesson.course, material: undefined } : null,
+    wordPack: lesson.wordPack
+      ? { ...lesson.wordPack, material: undefined, materials: undefined }
+      : null,
     id: lesson.id,
     targetLanguageCode: lesson.targetLanguageCode,
     supportLanguageCode: lesson.supportLanguageCode,
@@ -735,8 +747,10 @@ function publicStoredLesson(lesson: StoredPrivateLesson) {
 function publicPlan(plan: PrivateLessonPlan) {
   const wrapUpLeadSeconds = Math.min(5, Math.max(3, Math.floor(plan.durationSeconds * 0.02)));
   return {
-    course: plan.course ?? null,
-    wordPack: plan.wordPack ?? null,
+    course: plan.course ? { ...plan.course, material: undefined } : null,
+    wordPack: plan.wordPack
+      ? { ...plan.wordPack, material: undefined, materials: undefined }
+      : null,
     id: plan.id,
     durationSeconds: plan.durationSeconds,
     wrapUpAfterSeconds: Math.max(0, plan.durationSeconds - wrapUpLeadSeconds),
