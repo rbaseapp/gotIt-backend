@@ -34,7 +34,7 @@ export class ProfileService implements ProfileServiceContract {
   }
 }
 
-function normalizePatch(input: ProfilePatchInput): ProfilePatchInput {
+export function normalizePatch(input: ProfilePatchInput): ProfilePatchInput {
   return {
     ...input,
     ...(input.defaultSourceLanguage !== undefined

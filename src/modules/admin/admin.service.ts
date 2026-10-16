@@ -10,6 +10,17 @@ import { coursePlanSchema, type CourseDocument } from '../courses/course.schemas
 import { syllabusFor, validateCoursePlan } from '../courses/course.curriculum.js';
 import { promptReference } from './admin.prompt-reference.generated.js';
 import type { CourseGenerator } from '../courses/course.provider.js';
+import { ProfileRepository } from '../profile/profile.repository.js';
+import { learnerSettingsSchema, updateLearnerSettings } from './admin.learner.js';
+import {
+  learnerOverview,
+  learnerHistory,
+  updateLearnerProfile,
+  learnerPageSchema,
+  learnerSectionSchema,
+  learnerProfileSchema,
+} from './admin.learner.js';
+
 import { validatePromptContent, type PromptContent } from './admin.prompt-config.js';
 import { promptPreviewSchema, previewRealtimePrompt } from './admin.prompt-preview.js';
 import type { RealtimeDefaults } from '../private-lessons/private-lesson.realtime.js';
@@ -101,6 +112,7 @@ export class ProductAdminService {
         'usage',
         'quotas',
         'audit',
+        'learners',
       ],
     };
   }
@@ -111,6 +123,85 @@ export class ProductAdminService {
     const scope = { applicationId: actor.applicationId, applicationUserId: id };
     await this.profiles.getProfile(scope);
     return scope;
+  }
+  async learner(
+    actor: AdminActor,
+    id: string,
+    section: z.infer<typeof learnerSectionSchema>,
+    query: z.infer<typeof learnerPageSchema>,
+  ) {
+    await this.access(actor);
+    // Validate ownership through Core even for disabled accounts and users without a product profile.
+    await this.core.getAdminUser(actor.token, id, actor.requestId);
+    const scope = { applicationId: actor.applicationId, applicationUserId: id };
+    if (section === 'overview')
+      return withTransaction(
+        this.db,
+        (tx) => learnerOverview(tx, new ProfileRepository(this.db), scope),
+        true,
+      );
+    return withTransaction(this.db, (tx) => learnerHistory(tx, scope, section, query), true);
+  }
+  async updateLearner(actor: AdminActor, id: string, input: z.infer<typeof learnerProfileSchema>) {
+    return this.command(
+      actor,
+      'users.write',
+      'learner.profile.update',
+      'learners',
+      id,
+      input,
+      async (tx) => {
+        await this.core.getAdminUser(actor.token, id, actor.requestId);
+        return updateLearnerProfile(
+          tx,
+          new ProfileRepository(this.db),
+          { applicationId: actor.applicationId, applicationUserId: id },
+          input,
+        );
+      },
+    );
+  }
+  async learnerCourse(actor: AdminActor, id: string, courseId: string) {
+    await this.access(actor);
+    await this.core.getAdminUser(actor.token, id, actor.requestId);
+    return withTransaction(
+      this.db,
+      async (tx) => {
+        const result = await learnerHistory(
+          tx,
+          { applicationId: actor.applicationId, applicationUserId: id },
+          'courses',
+          { page: 1, perPage: 1 },
+          courseId,
+        );
+        if (!result.data[0]) throw notFound();
+        return { data: result.data[0] };
+      },
+      true,
+    );
+  }
+  async updateLearnerSettings(
+    actor: AdminActor,
+    id: string,
+    input: z.infer<typeof learnerSettingsSchema>,
+  ) {
+    return this.command(
+      actor,
+      'users.write',
+      `learner.${input.kind}.update`,
+      'learners',
+      id,
+      input,
+      async (tx) => {
+        const user = await this.core.getAdminUser(actor.token, id, actor.requestId);
+        return updateLearnerSettings(
+          tx,
+          { applicationId: actor.applicationId, applicationUserId: id },
+          input,
+          user,
+        );
+      },
+    );
   }
   async defaults(applicationId: string) {
     for (const key of promptKeys)

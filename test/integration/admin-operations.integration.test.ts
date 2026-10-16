@@ -538,6 +538,191 @@ test(
       );
       await profiles.getProfile(actor);
       await t.test(
+        'learner inspection: complete scoped histories, recorded time and unknown usage',
+        async () => {
+          const inspectId = randomUUID();
+          await database.adminPool.query(
+            `INSERT INTO core.application_users(application_id,id,email,email_verified_at,status) VALUES($1,$2,'inspect@example.test',now(),'disabled')`,
+            [appId, inspectId],
+          );
+          const inspectScope = { applicationId: appId, applicationUserId: inspectId };
+          await profiles.getProfile(inspectScope);
+          await profiles.patchProfile(inspectScope, { timezone: 'Asia/Jerusalem' });
+          await database.adminPool.query(
+            `INSERT INTO product_gotit.user_daily_activity(application_id,application_user_id,activity_date,practice_seconds,attempts,correct_attempts,xp_earned) VALUES($1,$2,'2026-10-15',120,3,2,25)`,
+            [appId, inspectId],
+          );
+          for (let i = 0; i < 3; i++)
+            await database.adminPool.query(
+              `INSERT INTO product_gotit.practice_sessions(application_id,application_user_id,session_type,status,started_at,duration_seconds) VALUES($1,$2,'flashcards','completed','2026-10-15T10:00:00Z',900)`,
+              [appId, inspectId],
+            );
+          await database.adminPool.query(
+            `INSERT INTO product_gotit.private_lesson_sessions(id,application_id,application_user_id,target_language_code,level,topic,teacher_voice,speech_rate,planned_duration_seconds,actual_duration_seconds,status,started_at) VALUES($3,$1,$2,'en','A1','Inspection','female','normal',300,180,'completed','2026-10-15T22:30:00Z')`,
+            [appId, inspectId, randomUUID()],
+          );
+          const page = { page: 1, perPage: 2 };
+          const overview = (await service.learner(actor, inspectId, 'overview', page))
+            .data as Record<string, any>;
+          assert.equal(overview.activity.activeDays, 2);
+          assert.equal(overview.activity.measuredSeconds, 300); // Never add 3 x 900 elapsed-session seconds.
+          assert.equal(overview.tokens.inputTokens, null);
+          assert.equal(overview.tokens.events, 0);
+          for (const section of [
+            'activity',
+            'games',
+            'sessions',
+            'attempts',
+            'xp',
+            'lessons',
+            'courses',
+            'homework',
+            'roadmaps',
+            'packs',
+            'usage',
+          ] as const) {
+            const history = await service.learner(actor, inspectId, section, page);
+            assert.ok('total' in history);
+            assert.ok(Array.isArray(history.data));
+            assert.doesNotMatch(
+              JSON.stringify(history),
+              /expected_answer_text|refresh_token_hash|provider_subject/,
+            );
+          }
+          const sessions = await service.learner(actor, inspectId, 'sessions', page);
+          assert.equal('total' in sessions ? sessions.total : 0, 3);
+          assert.equal((sessions.data as unknown[]).length, 2);
+          assert.equal(
+            (
+              (await service.learner(actor, inspectId, 'sessions', { ...page, page: 2 }))
+                .data as unknown[]
+            ).length,
+            1,
+          );
+          const daily = (await service.learner(actor, inspectId, 'activity', page)).data as Record<
+            string,
+            unknown
+          >[];
+          assert.equal(daily[0]!.date, '2026-10-16'); // 22:30 UTC is next day for this profile.
+          assert.equal(daily[0]!.lessonSeconds, 180);
+          await assert.rejects(() => service.learner(actor, otherUser, 'overview', page), {
+            code: 'NOT_FOUND',
+          });
+          for (const section of ['emails', 'sessions', 'subscriptions', 'payments'] as const) {
+            const history = await core.learnerHistory(context, inspectId, section, page);
+            assert.doesNotMatch(
+              JSON.stringify(history),
+              /refresh_token_hash|password_hash|provider_subject/,
+            );
+            await assert.rejects(() => core.learnerHistory(context, otherUser, section, page), {
+              code: 'NOT_FOUND',
+            });
+          }
+          const input = {
+            ...command(),
+            expectedRevision: overview.revision,
+            changes: {
+              dailyGoal: { type: 'minutes' as const, value: 20 },
+              defaultSourceLanguage: 'EN',
+            },
+          };
+          await assert.rejects(
+            () => service.updateLearner({ ...actor, stepUp: undefined }, inspectId, input),
+            { code: 'ADMIN_MFA_REQUIRED' },
+          );
+          const saved = await service.updateLearner(actor, inspectId, input);
+          assert.deepEqual(await service.updateLearner(actor, inspectId, input), saved);
+          assert.equal((await profiles.getProfile(inspectScope)).defaultSourceLanguage, 'en');
+          await assert.rejects(
+            () => service.updateLearner(actor, inspectId, { ...input, ...command() }),
+            { code: 'CONFLICT' },
+          );
+          await assert.rejects(
+            () =>
+              service.updateLearner(actor, inspectId, { ...input, changes: { timezone: 'UTC' } }),
+            { code: 'CONFLICT' },
+          );
+          const fresh = (await service.learner(actor, inspectId, 'overview', page)).data as Record<
+            string,
+            any
+          >;
+          const concurrent = await Promise.allSettled(
+            [10, 15].map((value) =>
+              service.updateLearner(actor, inspectId, {
+                ...command(),
+                expectedRevision: fresh.revision,
+                changes: { dailyGoal: { type: 'minutes', value } },
+              }),
+            ),
+          );
+          assert.equal(concurrent.filter((r) => r.status === 'fulfilled').length, 1);
+          assert.equal(concurrent.filter((r) => r.status === 'rejected').length, 1);
+          assert.equal(
+            (
+              await database.adminPool.query(
+                `SELECT count(*)::int AS n FROM product_gotit.admin_audit_events WHERE application_id=$1 AND target_id=$2 AND action='learner.profile.update'`,
+                [appId, inspectId],
+              )
+            ).rows[0].n,
+            2,
+          );
+          const notifications = {
+            ...command(),
+            kind: 'notifications' as const,
+            expectedRevision: null,
+            changes: { practiceEmail: true, practicePush: false, reminderHour: 9 },
+          };
+          const notifySaved = await service.updateLearnerSettings(actor, inspectId, notifications);
+          assert.deepEqual(
+            await service.updateLearnerSettings(actor, inspectId, notifications),
+            notifySaved,
+          );
+          await assert.rejects(
+            () =>
+              service.updateLearnerSettings(actor, inspectId, { ...notifications, ...command() }),
+            { code: 'CONFLICT' },
+          );
+          const lesson = {
+            ...command(),
+            kind: 'lesson' as const,
+            expectedRevision: null,
+            changes: {
+              targetLanguageCode: 'en',
+              supportLanguageCode: 'he',
+              lessonMode: 'standard' as const,
+              teachingLanguage: 'target' as const,
+              requestedDurationMinutes: 10 as const,
+              teacherVoice: 'female' as const,
+              speechRate: 'slow' as const,
+              correctionMode: 'recast' as const,
+              vocabularyMode: 'learned' as const,
+              focusAreas: ['speaking' as const],
+              customFocus: null,
+            },
+          };
+          await service.updateLearnerSettings(actor, inspectId, lesson);
+          const settings = (await service.learner(actor, inspectId, 'overview', page))
+            .data as Record<string, any>;
+          assert.equal(settings.notifications.reminderHour, 9);
+          assert.equal(settings.notifications.deliveryEmail, 'inspect@example.test');
+          assert.equal(settings.lessonPreferences[0].requestedDurationMinutes, 10);
+          await database.adminPool.query(
+            `UPDATE core.application_users SET email_verified_at=NULL WHERE application_id=$1 AND id=$2`,
+            [appId, inspectId],
+          );
+          await assert.rejects(
+            () =>
+              service.updateLearnerSettings(actor, inspectId, {
+                ...notifications,
+                ...command(),
+                expectedRevision: settings.notifications.revision,
+              }),
+            { code: 'VERIFIED_EMAIL_REQUIRED' },
+          );
+        },
+      );
+
+      await t.test(
         'prepared catalog exposes the real English-from-zero units without learner progress',
         async () => {
           const response = await service.list(actor, 'catalog-programs', query);
@@ -786,6 +971,22 @@ test(
           assert.equal(courses.rowCount, 1);
           assert.equal(courses.rows[0].document.activeVersion, 1);
           assert.deepEqual(courses.rows[0].document.versions[0].plan, plan);
+          const summaries = await service.learner(actor, userId, 'courses', {
+            page: 1,
+            perPage: 25,
+          });
+          assert.ok(Array.isArray(summaries.data));
+          assert.equal('plan' in (summaries.data as Record<string, unknown>[])[0]!, false);
+          const detail = await service.learnerCourse(actor, userId, courseId);
+          assert.deepEqual(detail.data.plan, plan);
+          assert.equal(detail.data.nextLesson.lessonIndex, 0);
+          await assert.rejects(() => service.learnerCourse(actor, adminId, courseId), {
+            code: 'NOT_FOUND',
+          });
+          await assert.rejects(() => service.learnerCourse(actor, otherUser, courseId), {
+            code: 'NOT_FOUND',
+          });
+
           await assert.rejects(
             () =>
               service.assign(actor, programId, {

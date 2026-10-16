@@ -1,5 +1,9 @@
 export const API_ROUTES = [
   ['GET', '/admin/access'],
+  ['GET', '/admin/learners/:id/:section'],
+  ['GET', '/admin/learners/:id/courses/:courseId'],
+  ['PATCH', '/admin/learners/:id/profile'],
+  ['PATCH', '/admin/learners/:id/settings'],
   ['POST', '/admin/prompts/preview'],
   ...[
     'prompts',

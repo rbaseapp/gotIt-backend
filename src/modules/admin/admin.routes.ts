@@ -3,6 +3,12 @@ import { z } from 'zod';
 import { AppError } from '../../shared/errors/app-error.js';
 import { ProductAdminService, type AdminActor } from './admin.service.js';
 import {
+  learnerPageSchema,
+  learnerSectionSchema,
+  learnerProfileSchema,
+  learnerSettingsSchema,
+} from './admin.learner.js';
+import {
   listSchema,
   saveSchema,
   publishSchema,
@@ -31,6 +37,43 @@ export function createProductAdminRouter(service: ProductAdminService) {
     next();
   });
   router.get('/access', async (req, res) => res.json(await service.access(actor(req))));
+  router.get('/learners/:id/courses/:courseId', async (req, res) =>
+    res.json(
+      await service.learnerCourse(
+        actor(req),
+        z.uuid().parse(req.params.id),
+        z.uuid().parse(req.params.courseId),
+      ),
+    ),
+  );
+  router.get('/learners/:id/:section', async (req, res) =>
+    res.json(
+      await service.learner(
+        actor(req),
+        z.uuid().parse(req.params.id),
+        learnerSectionSchema.parse(req.params.section),
+        learnerPageSchema.parse(req.query),
+      ),
+    ),
+  );
+  router.patch('/learners/:id/profile', async (req, res) =>
+    res.json(
+      await service.updateLearner(
+        actor(req),
+        z.uuid().parse(req.params.id),
+        learnerProfileSchema.parse(req.body),
+      ),
+    ),
+  );
+  router.patch('/learners/:id/settings', async (req, res) =>
+    res.json(
+      await service.updateLearnerSettings(
+        actor(req),
+        z.uuid().parse(req.params.id),
+        learnerSettingsSchema.parse(req.body),
+      ),
+    ),
+  );
   router.post('/prompts/preview', async (req, res) =>
     res.json(await service.previewPrompt(actor(req), req.body)),
   );
