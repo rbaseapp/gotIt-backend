@@ -6,14 +6,58 @@ import { verifyBaseline } from './migrate.js';
 /** Read-only production gate. Results never include connections, identities or data. */
 export async function verifyRuntimeSchema(client, { strictRole = true } = {}) {
   await verifyBaseline(client);
+  const resolver = (
+    await client.query(
+      `SELECT to_regprocedure('product_gotit.resolve_image_concept(uuid,text,text,text,text)') IS NOT NULL present`,
+    )
+  ).rows[0];
+  if (!resolver?.present) throw new Error('GOTIT_IMAGE_CONCEPT_RESOLVER_REQUIRED');
   const requirements = {
-    learning_item_concepts: ['application_id','application_user_id','learning_item_id','learning_revision','concept_id','meaning_revision','job_generation'],
-    concept_assignment_jobs: ['application_id','application_user_id','learning_item_id','generation','priority','status','claim_id','claim_until','descriptor'],
-    lexical_concepts: ['application_id','id','key','revision','image_revision','meaning_revision','origin','canonical_lemma','canonical_pos','visual_description','stock_search_query'],
-    concept_expressions: ['application_id','concept_id','language_code','normalized_text'],
-    concept_image_assets: ['application_id','concept_id','image_revision','claim_id','claim_until','image_data'],
+    learning_item_concepts: [
+      'application_id',
+      'application_user_id',
+      'learning_item_id',
+      'learning_revision',
+      'concept_id',
+      'meaning_revision',
+      'job_generation',
+    ],
+    concept_assignment_jobs: [
+      'application_id',
+      'application_user_id',
+      'learning_item_id',
+      'generation',
+      'priority',
+      'status',
+      'claim_id',
+      'claim_until',
+      'descriptor',
+    ],
+    lexical_concepts: [
+      'application_id',
+      'id',
+      'key',
+      'revision',
+      'image_revision',
+      'meaning_revision',
+      'origin',
+      'canonical_lemma',
+      'canonical_pos',
+      'automatic_identity',
+      'visual_description',
+      'stock_search_query',
+    ],
+    concept_expressions: ['application_id', 'concept_id', 'language_code', 'normalized_text'],
+    concept_image_assets: [
+      'application_id',
+      'concept_id',
+      'image_revision',
+      'claim_id',
+      'claim_until',
+      'image_data',
+    ],
     admin_documents: ['application_id', 'resource', 'revision', 'content'],
-    admin_unit_content: ['application_id','application_user_id','pack_id','revision','content'],
+    admin_unit_content: ['application_id', 'application_user_id', 'pack_id', 'revision', 'content'],
     admin_active_revisions: ['application_id', 'resource', 'document_id'],
     admin_audit_events: ['application_id', 'actor_id', 'action'],
     admin_command_receipts: [

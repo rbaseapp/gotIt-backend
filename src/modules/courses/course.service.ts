@@ -136,20 +136,36 @@ export class CourseService {
         .filter((d): d is HomeworkDocument => d.kind === 'homework')
         .map(homeworkSummary),
       available: this.available,
-      templates: await this.store.templates?.(scope) ?? [],
+      templates: (await this.store.templates?.(scope)) ?? [],
     };
   }
   async useTemplate(scope: ProfileScope, id: string, eventId: string) {
-    const fingerprint=commandFingerprint(['template',id]);
-    const replay=await this.store.replay(scope,eventId,fingerprint);
-    if(replay) return publicCourse(asCourse(replay));
-    const template=await this.store.template?.(scope,id);
-    if(!template) throw courseNotFound();
-    validateCoursePlan(template.plan,template.preferences);
+    const fingerprint = commandFingerprint(['template', id]);
+    const replay = await this.store.replay(scope, eventId, fingerprint);
+    if (replay) return publicCourse(asCourse(replay));
+    const template = await this.store.template?.(scope, id);
+    if (!template) throw courseNotFound();
+    validateCoursePlan(template.plan, template.preferences);
     await this.profiles.getProfile(scope);
-    const createdAt=now();
-    const course:CourseDocument={templateSource:{id},kind:'course',id:eventId,revision:0,createdAt,preferences:template.preferences,approvedPreferences:template.preferences,preferencesApprovedAt:createdAt,ready:true,messages:[],suggestions:[],versions:[{version:1,...template,createdAt}],activeVersion:1,draftVersion:null,evidence:[]};
-    return publicCourse(asCourse(await this.store.save(scope,course,null,eventId,fingerprint)));
+    const createdAt = now();
+    const course: CourseDocument = {
+      templateSource: { id },
+      kind: 'course',
+      id: eventId,
+      revision: 0,
+      createdAt,
+      preferences: template.preferences,
+      approvedPreferences: template.preferences,
+      preferencesApprovedAt: createdAt,
+      ready: true,
+      messages: [],
+      suggestions: [],
+      versions: [{ version: 1, ...template, createdAt }],
+      activeVersion: 1,
+      draftVersion: null,
+      evidence: [],
+    };
+    return publicCourse(asCourse(await this.store.save(scope, course, null, eventId, fingerprint)));
   }
   async course(scope: ProfileScope, id: string) {
     const document = await this.store.get(scope, id);
@@ -920,7 +936,10 @@ export class CourseService {
         source: { report, turns: learningExcerpts(report, turns) },
         content: lesson.course?.material?.practice ?? lesson.wordPack?.material?.practice ?? null,
         qualityVersion: HOMEWORK_QUALITY_VERSION,
-        progress: (lesson.course?.material?.practice ?? lesson.wordPack?.material?.practice)?.tasks.map(() => ({ attempts: [], hintUsed: false, done: false, draft: '' })) ?? [],
+        progress:
+          (lesson.course?.material?.practice ?? lesson.wordPack?.material?.practice)?.tasks.map(
+            () => ({ attempts: [], hintUsed: false, done: false, draft: '' }),
+          ) ?? [],
       };
       try {
         await this.store.save(
@@ -1370,9 +1389,18 @@ export function publicCourse(course: CourseDocument) {
             }
           : null,
     evidence,
-    versions: course.versions.filter(
-      (v) => v.version === course.draftVersion || v.version === course.activeVersion,
-    ).map(v=>({...v,plan:{...v.plan,units:v.plan.units.map(unit=>({...unit,lessons:unit.lessons.map(({material:_private,...lesson})=>lesson)}))}})),
+    versions: course.versions
+      .filter((v) => v.version === course.draftVersion || v.version === course.activeVersion)
+      .map((v) => ({
+        ...v,
+        plan: {
+          ...v.plan,
+          units: v.plan.units.map((unit) => ({
+            ...unit,
+            lessons: unit.lessons.map(({ material: _private, ...lesson }) => lesson),
+          })),
+        },
+      })),
     nextLesson: next
       ? {
           unitKey: next.unit.key,

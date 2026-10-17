@@ -3,7 +3,12 @@ import type { Pool } from 'pg';
 import { withTransaction } from '../../shared/database/transaction.js';
 import { AppError } from '../../shared/errors/app-error.js';
 import type { ProfileScope } from '../profile/profile.types.js';
-import { coursePlanSchema, coursePreferencesSchema, type LearningDocument, type CourseDocument } from './course.schemas.js';
+import {
+  coursePlanSchema,
+  coursePreferencesSchema,
+  type LearningDocument,
+  type CourseDocument,
+} from './course.schemas.js';
 
 export const courseConflict = () =>
   new AppError(409, 'COURSE_CHANGED', 'Saved work has changed. Reload before continuing.');
@@ -13,8 +18,18 @@ export const commandFingerprint = (value: unknown) =>
   createHash('sha256').update(JSON.stringify(value)).digest('hex');
 const scopeValues = (scope: ProfileScope) => [scope.applicationId, scope.applicationUserId];
 export interface LearningDocumentStore {
-  templates?(scope: ProfileScope): Promise<Array<{id:string;title:string;targetLanguageCode:string;supportLanguageCode:string}>>;
-  template?(scope: ProfileScope, id: string): Promise<{preferences: CourseDocument['preferences'];plan: CourseDocument['versions'][number]['plan']} | null>;
+  templates?(
+    scope: ProfileScope,
+  ): Promise<
+    Array<{ id: string; title: string; targetLanguageCode: string; supportLanguageCode: string }>
+  >;
+  template?(
+    scope: ProfileScope,
+    id: string,
+  ): Promise<{
+    preferences: CourseDocument['preferences'];
+    plan: CourseDocument['versions'][number]['plan'];
+  } | null>;
   get(scope: ProfileScope, id: string): Promise<LearningDocument | null>;
   list(scope: ProfileScope, kind: 'course' | 'homework'): Promise<LearningDocument[]>;
   deleteCourse(scope: ProfileScope, id: string): Promise<boolean>;
@@ -34,11 +49,31 @@ export interface LearningDocumentStore {
 export class PostgresLearningDocumentStore implements LearningDocumentStore {
   constructor(private readonly pool: Pool) {}
   async templates(scope: ProfileScope) {
-    return (await this.pool.query(`SELECT d.id,d.title,d.content->'preferences'->>'targetLanguageCode' AS "targetLanguageCode",d.content->'preferences'->>'supportLanguageCode' AS "supportLanguageCode" FROM product_gotit.admin_active_revisions a JOIN product_gotit.admin_documents d ON d.application_id=a.application_id AND d.id=a.document_id WHERE a.application_id=$1 AND a.resource='programs' AND d.status='published' ORDER BY d.title,d.id LIMIT 100`, [scope.applicationId])).rows as Array<{id:string;title:string;targetLanguageCode:string;supportLanguageCode:string}>;
+    return (
+      await this.pool.query(
+        `SELECT d.id,d.title,d.content->'preferences'->>'targetLanguageCode' AS "targetLanguageCode",d.content->'preferences'->>'supportLanguageCode' AS "supportLanguageCode" FROM product_gotit.admin_active_revisions a JOIN product_gotit.admin_documents d ON d.application_id=a.application_id AND d.id=a.document_id WHERE a.application_id=$1 AND a.resource='programs' AND d.status='published' ORDER BY d.title,d.id LIMIT 100`,
+        [scope.applicationId],
+      )
+    ).rows as Array<{
+      id: string;
+      title: string;
+      targetLanguageCode: string;
+      supportLanguageCode: string;
+    }>;
   }
-  async template(scope: ProfileScope,id:string) {
-    const row=(await this.pool.query(`SELECT d.content FROM product_gotit.admin_active_revisions a JOIN product_gotit.admin_documents d ON d.application_id=a.application_id AND d.id=a.document_id WHERE a.application_id=$1 AND a.resource='programs' AND d.status='published' AND d.id=$2`,[scope.applicationId,id])).rows[0];
-    return row?{preferences:coursePreferencesSchema.parse(row.content.preferences),plan:coursePlanSchema.parse(row.content.plan)}:null;
+  async template(scope: ProfileScope, id: string) {
+    const row = (
+      await this.pool.query(
+        `SELECT d.content FROM product_gotit.admin_active_revisions a JOIN product_gotit.admin_documents d ON d.application_id=a.application_id AND d.id=a.document_id WHERE a.application_id=$1 AND a.resource='programs' AND d.status='published' AND d.id=$2`,
+        [scope.applicationId, id],
+      )
+    ).rows[0];
+    return row
+      ? {
+          preferences: coursePreferencesSchema.parse(row.content.preferences),
+          plan: coursePlanSchema.parse(row.content.plan),
+        }
+      : null;
   }
   async get(scope: ProfileScope, id: string) {
     return (

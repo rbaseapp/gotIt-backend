@@ -1,4 +1,4 @@
-import assert from 'node:assert/strict';
+﻿import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import test from 'node:test';
 import { resolve } from 'node:path';
@@ -173,7 +173,7 @@ test(
           const metadata = await database.adminPool.query(
             'SELECT count(*)::integer AS count FROM gotit_migrations.pgmigrations',
           );
-          assert.equal(metadata.rows[0].count, 37);
+          assert.equal(metadata.rows[0].count, 39);
           const catalog = await database.adminPool.query(`
             SELECT tp.slug,
               count(DISTINCT tr.id)::integer AS tracks,

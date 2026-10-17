@@ -1189,8 +1189,16 @@ test('course HTTP routes enforce Core identity, entitlement, strict input and pr
     new Set(API_ROUTES.map(({ method, path }) => `${method} ${path}`)).size,
     API_ROUTES.length,
   );
-  assert.ok(API_ROUTES.some(({method,path})=>method==='POST'&&path==='/api/v1/courses/templates/:id/use'));
-  assert.ok(API_ROUTES.some(({method,path})=>method==='POST'&&path==='/api/v1/admin/programs/preview'));
+  assert.ok(
+    API_ROUTES.some(
+      ({ method, path }) => method === 'POST' && path === '/api/v1/courses/templates/:id/use',
+    ),
+  );
+  assert.ok(
+    API_ROUTES.some(
+      ({ method, path }) => method === 'POST' && path === '/api/v1/admin/programs/preview',
+    ),
+  );
 });
 
 test('course session resolves approved language and objective before creating the Realtime session', async () => {

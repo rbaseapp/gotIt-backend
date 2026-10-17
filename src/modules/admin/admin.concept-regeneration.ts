@@ -36,7 +36,8 @@ export async function regenerateConcept(
   providers: Partial<Record<'stock' | 'ai', StudyImageProvider>>,
   actor: AdminActor,
   id: string,
-  input: z.infer<typeof regenerateConceptSchema>,
+  input: z.infer<typeof regenerateConceptSchema> & { stockSelection?: string },
+  wordGuard?: { id: string; revision: number },
 ) {
   await owner.access(actor, 'content.write');
   const provider = providers[input.source];
@@ -49,6 +50,7 @@ export async function regenerateConcept(
     id,
     input,
     async (tx) => {
+      if (wordGuard) await checkWord(tx, actor.applicationId, wordGuard);
       const row = (
         await tx.query(
           `SELECT * FROM product_gotit.lexical_concepts WHERE application_id=$1 AND id=$2 FOR UPDATE`,
@@ -57,7 +59,11 @@ export async function regenerateConcept(
       ).rows[0];
       if (!row) throw new AppError(404, 'NOT_FOUND', 'Concept not found');
       if (row.status !== 'active' || row.revision !== input.expectedRevision) throw conflict();
-      if (input.source === 'stock' && !(input.searchQuery || row.stock_search_query))
+      if (
+        input.source === 'stock' &&
+        !input.stockSelection &&
+        !(input.searchQuery || row.stock_search_query)
+      )
         throw new AppError(400, 'VALIDATION_ERROR', 'An English stock search query is required');
       const revision = (
         await tx.query(
@@ -84,6 +90,7 @@ export async function regenerateConcept(
   if (await complete()) return reservation;
   const token = randomUUID();
   const row = await withTransaction(owner.db, async (tx) => {
+    if (wordGuard) await checkWord(tx, actor.applicationId, wordGuard);
     // Serialize claims across different operation UUIDs for this meaning.
     await tx.lock(['concept-regeneration', actor.applicationId, id]);
     const current = (
@@ -109,16 +116,19 @@ export async function regenerateConcept(
         keys.slice(0, 2),
       )
     ).rows;
-    if (forms.length < 2) throw conflict();
+    if (!forms.length) throw conflict();
+    const second =
+      forms.find((form) => form.language_code !== forms[0].language_code) ?? forms[1] ?? forms[0];
     const query = input.searchQuery || row.stock_search_query;
     const image = await provider.generate({
       scope: actor,
       sourceText: forms[0].expression,
       sourceLanguageCode: forms[0].language_code,
-      translationText: forms[1].expression,
-      translationLanguageCode: forms[1].language_code,
+      translationText: second.expression,
+      translationLanguageCode: second.language_code,
       context: null,
       excludeSourceUrls: row.image_source_url ? [row.image_source_url] : [],
+      ...(input.stockSelection ? { stockSelection: input.stockSelection } : {}),
       visual: {
         senseKey: `concept.${id}.${imageRevision}`,
         subject: row.title,
@@ -135,10 +145,11 @@ export async function regenerateConcept(
       !image ||
       !conceptImageDto(image, row.title) ||
       image.kind !== (input.source === 'stock' ? 'stock' : 'generated') ||
-      (image.sourceUrl && image.sourceUrl === row.image_source_url)
+      (!input.stockSelection && image.sourceUrl && image.sourceUrl === row.image_source_url)
     )
       throw unavailable();
     await withTransaction(owner.db, async (tx) => {
+      if (wordGuard) await checkWord(tx, actor.applicationId, wordGuard);
       const current = (
         await tx.query(
           `SELECT revision,status FROM product_gotit.lexical_concepts WHERE application_id=$1 AND id=$2 FOR UPDATE`,
@@ -189,4 +200,18 @@ export async function regenerateConcept(
       [...keys, token],
     );
   }
+}
+
+async function checkWord(
+  tx: import('../../shared/database/transaction.js').DatabaseTransaction,
+  applicationId: string,
+  word: { id: string; revision: number },
+) {
+  const row = (
+    await tx.query(
+      `SELECT learning_revision FROM product_gotit.learning_items WHERE application_id=$1 AND id=$2 FOR UPDATE`,
+      [applicationId, word.id],
+    )
+  ).rows[0];
+  if (row?.learning_revision !== word.revision) throw conflict();
 }

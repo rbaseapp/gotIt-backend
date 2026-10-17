@@ -25,6 +25,8 @@ import { DEFAULT_LEARNING_POLICY } from '../../src/modules/learning/learning.pol
 import { WordPackStudyService } from '../../src/modules/word-packs/word-pack-study.service.js';
 import type { WordPackRepository } from '../../src/modules/word-packs/word-packs.repository.js';
 import { AppError } from '../../src/shared/errors/app-error.js';
+import { withTransaction } from '../../src/shared/database/transaction.js';
+import { ensureWordImageConcept } from '../../src/modules/concepts/automatic-word-images.js';
 
 test(
   'automatic concept assignment is durable, semantic, revision-safe and shared across languages',
@@ -228,6 +230,18 @@ test(
           const visible = await admin.words.list(actor, wordListSchema.parse({}), word.id);
           assert.equal(visible.data.conceptId, findId);
           assert.equal(visible.data.conceptAssignmentStatus, 'completed');
+          const imageTarget = await withTransaction(db.runtimePool, async (tx) => {
+            const savedWord = (
+              await tx.query(
+                `SELECT li.*,tr.translation_text FROM product_gotit.learning_items li
+                JOIN product_gotit.item_translations tr ON tr.application_id=li.application_id AND tr.application_user_id=li.application_user_id AND tr.learning_item_id=li.id AND tr.is_current AND tr.is_primary
+                WHERE li.application_id=$1 AND li.application_user_id=$2 AND li.id=$3`,
+                [scope.applicationId, scope.applicationUserId, word.id],
+              )
+            ).rows[0]!;
+            return ensureWordImageConcept(tx, scope.applicationId, savedWord);
+          });
+          assert.equal(imageTarget.id, findId, 'card replacement must use the assigned meaning');
           const imageService = new ConceptImagesService(
             db.runtimePool,
             {

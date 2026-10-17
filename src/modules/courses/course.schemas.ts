@@ -57,7 +57,15 @@ export const courseUnitSchema = z
     grammar: z.array(text(160)).max(12),
     vocabulary: z.array(text(120)).max(8),
     lessons: z
-      .array(z.object({ title: text(150), objective: text(350), material: lessonMaterialSchema.optional() }).strict())
+      .array(
+        z
+          .object({
+            title: text(150),
+            objective: text(350),
+            material: lessonMaterialSchema.optional(),
+          })
+          .strict(),
+      )
       .min(2)
       .max(10),
     estimatedMinutes: z.number().int().min(10).max(600),
@@ -77,7 +85,17 @@ export const coursePlanSchema = z
 export type CoursePlan = z.infer<typeof coursePlanSchema>;
 // Admin-only optional authored content must not alter the provider's strict plan schema.
 export const generatedCoursePlanSchema = coursePlanSchema.extend({
-  units:z.array(courseUnitSchema.extend({lessons:z.array(courseUnitSchema.shape.lessons.element.omit({material:true})).min(2).max(10)})).min(3).max(40),
+  units: z
+    .array(
+      courseUnitSchema.extend({
+        lessons: z
+          .array(courseUnitSchema.shape.lessons.element.omit({ material: true }))
+          .min(2)
+          .max(10),
+      }),
+    )
+    .min(3)
+    .max(40),
 });
 export type CourseUnit = z.infer<typeof courseUnitSchema>;
 export type CourseVersion = {
@@ -97,7 +115,7 @@ export type CourseEvidence = {
   recordedAt: string;
 };
 export type CourseDocument = {
-  templateSource?: {id:string};
+  templateSource?: { id: string };
   adminAssignment?: { templateId: string; templateVersion: number; actorId: string };
   kind: 'course';
   id: string;

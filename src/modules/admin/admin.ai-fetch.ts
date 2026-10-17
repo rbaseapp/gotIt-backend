@@ -61,13 +61,26 @@ export function adminAiFetch(
     // lesson-live is composed before session creation so all response.create
     // directives use the same immutable revision, including opening and closing.
     if (prompt && body && operation !== 'lesson-live') {
-      if (typeof body.instructions === 'string') body.instructions = composePrompt(body.instructions, prompt);
-      else if (body.session && typeof body.session === 'object' && 'instructions' in body.session && typeof body.session.instructions === 'string')
+      if (typeof body.instructions === 'string')
+        body.instructions = composePrompt(body.instructions, prompt);
+      else if (
+        body.session &&
+        typeof body.session === 'object' &&
+        'instructions' in body.session &&
+        typeof body.session.instructions === 'string'
+      )
         body.session.instructions = composePrompt(body.session.instructions, prompt);
       else if (Array.isArray(body.messages)) {
-        const systemMessages = body.messages.filter(m => m?.role === 'system' || m?.role === 'developer');
-        const base = systemMessages.map(m => typeof m.content === 'string' ? m.content : JSON.stringify(m.content)).join('\n\n');
-        body.messages = [{ role: 'system', content: composePrompt(base, prompt) }, ...body.messages.filter(m => m?.role !== 'system' && m?.role !== 'developer')];
+        const systemMessages = body.messages.filter(
+          (m) => m?.role === 'system' || m?.role === 'developer',
+        );
+        const base = systemMessages
+          .map((m) => (typeof m.content === 'string' ? m.content : JSON.stringify(m.content)))
+          .join('\n\n');
+        body.messages = [
+          { role: 'system', content: composePrompt(base, prompt) },
+          ...body.messages.filter((m) => m?.role !== 'system' && m?.role !== 'developer'),
+        ];
       } else if (typeof body.prompt === 'string') body.prompt = composePrompt(body.prompt, prompt);
       options = { ...init, body: JSON.stringify(body) };
     }

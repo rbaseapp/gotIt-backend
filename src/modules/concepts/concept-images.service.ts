@@ -40,45 +40,54 @@ export function conceptImageDto(image: GeneratedStudyImage, alt: string) {
   };
 }
 
-/** Staff-approved senses only. Never infer equivalence from spelling or an AI sense key. */
+/** Reviewed multilingual meanings precede exact recorded automatic pairs. */
 export class ConceptImagesService {
   constructor(
     private readonly db: Pool,
     private readonly provider?: StudyImageProvider,
     private readonly automaticAssignments = false,
   ) {}
-  async pending(input:StudyImageInput) {
-    if(!this.automaticAssignments||!input.scope||!input.learningItemId)return false;
-    return Boolean((await this.db.query(`SELECT 1 FROM product_gotit.concept_assignment_jobs WHERE application_id=$1 AND application_user_id=$2 AND learning_item_id=$3 AND status<>'completed'`,
-      [input.scope.applicationId,input.scope.applicationUserId,input.learningItemId])).rowCount);
+  async pending(input: StudyImageInput) {
+    if (!this.automaticAssignments || !input.scope || !input.learningItemId) return false;
+    return Boolean(
+      (
+        await this.db.query(
+          `SELECT 1 FROM product_gotit.concept_assignment_jobs WHERE application_id=$1 AND application_user_id=$2 AND learning_item_id=$3 AND status<>'completed'`,
+          [input.scope.applicationId, input.scope.applicationUserId, input.learningItemId],
+        )
+      ).rowCount,
+    );
   }
   async resolve(input: StudyImageInput): Promise<ResolvedConcept | null> {
     if (!input.scope) return null;
-    if(input.learningItemId){
-      const linked=(await this.db.query(`SELECT c.* FROM product_gotit.learning_item_concepts b
+    if (input.learningItemId) {
+      const linked = (
+        await this.db.query(
+          `SELECT c.* FROM product_gotit.learning_item_concepts b
         JOIN product_gotit.lexical_concepts c ON c.application_id=b.application_id AND c.id=b.concept_id AND c.meaning_revision=b.meaning_revision AND c.status='active'
         JOIN product_gotit.learning_items li ON li.application_id=b.application_id AND li.application_user_id=b.application_user_id AND li.id=b.learning_item_id AND li.learning_revision=b.learning_revision AND li.deleted_at IS NULL
         JOIN product_gotit.concept_assignment_jobs j ON j.application_id=b.application_id AND j.application_user_id=b.application_user_id AND j.learning_item_id=b.learning_item_id AND j.generation=b.job_generation AND j.status='completed'
-        WHERE b.application_id=$1 AND b.application_user_id=$2 AND b.learning_item_id=$3`,[input.scope.applicationId,input.scope.applicationUserId,input.learningItemId])).rows[0];
-      if(linked)return linked as ResolvedConcept;
+        WHERE b.application_id=$1 AND b.application_user_id=$2 AND b.learning_item_id=$3`,
+          [input.scope.applicationId, input.scope.applicationUserId, input.learningItemId],
+        )
+      ).rows[0];
+      if (linked) return linked as ResolvedConcept;
     }
-    const rows = (
-      await this.db.query(
-        `SELECT c.* FROM product_gotit.lexical_concepts c
-      WHERE c.application_id=$1 AND c.status='active'
-      AND EXISTS(SELECT 1 FROM product_gotit.concept_expressions e WHERE e.application_id=c.application_id AND e.concept_id=c.id AND e.language_code=$2 AND e.normalized_text=$3)
-      AND EXISTS(SELECT 1 FROM product_gotit.concept_expressions e WHERE e.application_id=c.application_id AND e.concept_id=c.id AND e.language_code=$4 AND e.normalized_text=$5)
-      LIMIT 2`,
-        [
-          input.scope.applicationId,
-          input.sourceLanguageCode,
-          lookupText(input.sourceText),
-          input.translationLanguageCode,
-          lookupText(input.translationText),
-        ],
-      )
-    ).rows;
-    return rows.length === 1 ? (rows[0] as ResolvedConcept) : null;
+    return (
+      ((
+        await this.db.query(
+          `SELECT c.* FROM product_gotit.resolve_image_concept($1,$2,$3,$4,$5) resolved
+      JOIN product_gotit.lexical_concepts c ON c.application_id=$1 AND c.id=resolved.concept_id`,
+          [
+            input.scope.applicationId,
+            input.sourceLanguageCode,
+            lookupText(input.sourceText),
+            input.translationLanguageCode,
+            lookupText(input.translationText),
+          ],
+        )
+      ).rows[0] as ResolvedConcept) ?? null
+    );
   }
   async cached(concept: ResolvedConcept, alt: string) {
     const row = (

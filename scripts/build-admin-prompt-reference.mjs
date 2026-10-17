@@ -64,12 +64,17 @@ for (const [key, description, ...files] of definitions) {
         add(`${file}: instructions`, node.initializer);
       if (
         ts.isVariableDeclaration(node) &&
-        ['instructions', 'planInstruction', 'prompt', 'privateLessonBriefInstruction'].includes(node.name.getText(ast))
+        ['instructions', 'planInstruction', 'prompt', 'privateLessonBriefInstruction'].includes(
+          node.name.getText(ast),
+        )
       )
         add(`${file}: ${node.name.getText(ast)}`, node.initializer);
       if (ts.isFunctionDeclaration(node) && node.name?.text === 'instructions')
         add(`${file}: translation template`, node.body);
-      if (ts.isFunctionDeclaration(node) && ['buildPrivateLessonPrompt', 'defaultLessonDirectives'].includes(node.name?.text)) {
+      if (
+        ts.isFunctionDeclaration(node) &&
+        ['buildPrivateLessonPrompt', 'defaultLessonDirectives'].includes(node.name?.text)
+      ) {
         // Include conditional policy fragments as well as the final template.
         const fragment = (part) => {
           if (ts.isTemplateExpression(part) || ts.isNoSubstitutionTemplateLiteral(part))

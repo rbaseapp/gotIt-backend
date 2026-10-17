@@ -386,7 +386,10 @@ test(
       await t.test(
         'migration down/up on disposable data creates multilingual starter apple',
         async () => {
-          await db.migrate('down'); // Remove the later assignment queue on this disposable fixture.
+          await db.migrate('down'); // Remove the later assignment queue.
+          // Remove the read-only resolver, then the empty automatic-identity layer.
+          await db.migrate('down');
+          await db.migrate('down');
           await assert.rejects(
             db.migrate('down'),
             'Authored concepts must prevent destructive rollback',

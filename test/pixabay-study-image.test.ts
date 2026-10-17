@@ -21,6 +21,63 @@ const input = {
 
 const jpeg = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3, 4]);
 
+test('gallery selection is cached, explicit, application-bound and rejects forged URLs', async () => {
+  let searches = 0;
+  const downloaded: string[] = [];
+  const provider = new PixabayStudyImageProvider('gallery-secret', (async (value) => {
+    const url = new URL(String(value));
+    if (url.hostname === 'pixabay.com') {
+      searches++;
+      assert.equal(url.searchParams.get('q'), 'bank');
+      assert.equal(url.searchParams.has('colors'), false);
+      return Response.json({
+        hits: [1, 2].map((id) => ({
+          id,
+          pageURL: `https://pixabay.com/photos/${id}/`,
+          webformatURL: `https://cdn.pixabay.com/${id}.jpg`,
+          tags: 'bank',
+          user: 'Artist',
+        })),
+      });
+    }
+    downloaded.push(url.href);
+    return new Response(jpeg);
+  }) as typeof fetch);
+  const first = await provider.candidates('bank', 'app');
+  await provider.candidates('bank', 'app');
+  assert.equal(searches, 1);
+  assert.equal(downloaded.length, 0);
+  const selection = first.data[1]!.selection;
+  const image = await provider.generate({
+    ...input,
+    scope: { applicationId: 'app', applicationUserId: 'user' },
+    stockSelection: selection,
+  });
+  assert.equal(image?.sourceUrl, 'https://pixabay.com/photos/2/');
+  assert.deepEqual(downloaded, ['https://cdn.pixabay.com/2.jpg']);
+  assert.equal(
+    await provider.generate({
+      ...input,
+      scope: { applicationId: 'other', applicationUserId: 'user' },
+      stockSelection: selection,
+    }),
+    null,
+  );
+  assert.equal(
+    await provider.generate({
+      ...input,
+      scope: { applicationId: 'app', applicationUserId: 'user' },
+      stockSelection: selection + 'x',
+    }),
+    null,
+  );
+  assert.equal(
+    await provider.generate({ ...input, stockSelection: 'https://internal.test/admin' }),
+    null,
+  );
+  assert.equal(downloaded.length, 1);
+});
+
 test('Pixabay replacement excludes the current source even when reusing cached search results', async () => {
   const downloaded: string[] = [];
   const provider = new PixabayStudyImageProvider('fixture', (async (value) => {

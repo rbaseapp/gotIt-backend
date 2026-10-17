@@ -1,5 +1,6 @@
-import { createHash } from 'node:crypto';
+import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
 import { z } from 'zod';
+import { AppError } from '../../shared/errors/app-error.js';
 import type {
   GeneratedStudyImage,
   StudyImageInput,
@@ -16,7 +17,10 @@ const hitSchema = z.object({
   likes: z.number().int().nonnegative().default(0),
   imageType: z.enum(['photo', 'illustration', 'vector']).optional(),
 });
-const searchSchema = z.object({ hits: z.array(hitSchema).max(20) });
+const searchSchema = z.object({
+  hits: z.array(hitSchema).max(20),
+  totalHits: z.number().int().nonnegative().optional(),
+});
 type PixabayHit = z.output<typeof hitSchema>;
 
 const SEARCH_TTL_MS = 24 * 60 * 60 * 1_000;
@@ -173,7 +177,10 @@ async function boundedBody(response: Response) {
 
 export class PixabayStudyImageProvider implements StudyImageProvider {
   readonly id = 'pixabay:v2-isolated';
-  private readonly cache = new Map<string, { expiresAt: number; hits: PixabayHit[] }>();
+  private readonly cache = new Map<
+    string,
+    { expiresAt: number; hits: PixabayHit[]; total: number }
+  >();
   private readonly pending = new Map<string, Promise<GeneratedStudyImage | null>>();
 
   constructor(
@@ -182,6 +189,10 @@ export class PixabayStudyImageProvider implements StudyImageProvider {
   ) {}
 
   async generate(raw: StudyImageInput): Promise<GeneratedStudyImage | null> {
+    if (raw.stockSelection) {
+      const selected = this.verifySelection(raw.stockSelection, raw.scope?.applicationId);
+      return selected ? this.download(selected) : null;
+    }
     const input = {
       ...raw,
       sourceText: bounded(raw.sourceText, 100),
@@ -206,7 +217,7 @@ export class PixabayStudyImageProvider implements StudyImageProvider {
     const visual = input.visual ?? literalStudyImageBrief(input);
     const hits = (
       await Promise.all(visual.searchQueries.slice(0, 3).map((query) => this.search(query)))
-    ).flat();
+    ).flatMap((result) => result.hits);
     const uniqueHits = [...new Map(hits.map((hit) => [hit.id, hit])).values()];
     for (const hit of rank(uniqueHits, { ...input, visual })
       .filter((hit) => !input.excludeSourceUrls?.includes(hit.pageURL))
@@ -217,12 +228,59 @@ export class PixabayStudyImageProvider implements StudyImageProvider {
     return null;
   }
 
-  private async search(subject: string) {
+  async candidates(query: string, applicationId: string, page = 1) {
+    const { hits, total } = await this.search(query, page, true);
+    return {
+      data: hits.map((hit) => ({
+        id: hit.id,
+        previewUrl: hit.webformatURL,
+        sourceUrl: hit.pageURL,
+        creator: hit.user,
+        tags: hit.tags,
+        selection: this.signSelection(hit, applicationId),
+      })),
+      total,
+    };
+  }
+  private signSelection(hit: PixabayHit, applicationId: string) {
+    const data = Buffer.from(
+      JSON.stringify({ hit, applicationId, expires: Date.now() + SEARCH_TTL_MS }),
+    ).toString('base64url');
+    return `${data}.${createHmac('sha256', this.apiKey)
+      .update('gotit-stock-selection:' + data)
+      .digest('base64url')}`;
+  }
+  private verifySelection(value: string, applicationId?: string): PixabayHit | null {
+    try {
+      const [data, signature, extra] = value.split('.');
+      if (!data || !signature || extra || !applicationId) return null;
+      const expected = createHmac('sha256', this.apiKey)
+        .update('gotit-stock-selection:' + data)
+        .digest();
+      const actual = Buffer.from(signature, 'base64url');
+      if (actual.length !== expected.length || !timingSafeEqual(actual, expected)) return null;
+      const payload = JSON.parse(Buffer.from(data, 'base64url').toString('utf8'));
+      if (
+        payload.applicationId !== applicationId ||
+        !Number.isFinite(payload.expires) ||
+        payload.expires < Date.now()
+      )
+        return null;
+      const hit = hitSchema.parse(payload.hit);
+      return allowedPixabayUrl(hit.pageURL, true) && allowedPixabayUrl(hit.webformatURL)
+        ? hit
+        : null;
+    } catch {
+      return null;
+    }
+  }
+  private async search(subject: string, page = 1, gallery = false) {
     const base = normalized(subject).slice(0, 80);
-    const query = bounded(/\bisolated\b/u.test(base) ? base : `${base} isolated`, 100);
-    if (!query) return [];
-    const cached = this.cache.get(query);
-    if (cached && cached.expiresAt > Date.now()) return cached.hits;
+    const query = bounded(gallery || /\bisolated\b/u.test(base) ? base : `${base} isolated`, 100);
+    if (!query) return { hits: [], total: 0 };
+    const cacheKey = JSON.stringify([query, page, gallery]);
+    const cached = this.cache.get(cacheKey);
+    if (cached && cached.expiresAt > Date.now()) return cached;
     const url = new URL('https://pixabay.com/api/');
     url.search = new URLSearchParams({
       key: this.apiKey,
@@ -230,31 +288,45 @@ export class PixabayStudyImageProvider implements StudyImageProvider {
       image_type: 'all',
       safesearch: 'true',
       order: 'popular',
-      colors: 'transparent',
+      ...(gallery ? {} : { colors: 'transparent' }),
+      page: String(page),
       min_width: '400',
       min_height: '400',
       per_page: '20',
     }).toString();
     try {
       const response = await this.request(url, { signal: AbortSignal.timeout(8_000) });
-      if (!response.ok) return [];
+      if (!response.ok) throw new Error('Pixabay search failed');
       const body = await response.text();
-      if (body.length > 250_000) return [];
+      if (body.length > 250_000) throw new Error('Pixabay response too large');
       const parsed = searchSchema.safeParse(JSON.parse(body));
-      if (!parsed.success) return [];
+      if (!parsed.success) throw new Error('Invalid Pixabay response');
       const hits = parsed.data.hits.filter(
         (hit) => allowedPixabayUrl(hit.pageURL, true) && allowedPixabayUrl(hit.webformatURL, false),
       );
-      this.cache.set(query, { expiresAt: Date.now() + SEARCH_TTL_MS, hits });
-      return hits;
+      if (this.cache.size >= 1000) this.cache.delete(this.cache.keys().next().value!);
+      const result = {
+        expiresAt: Date.now() + SEARCH_TTL_MS,
+        hits,
+        total: parsed.data.totalHits ?? hits.length,
+      };
+      this.cache.set(cacheKey, result);
+      return result;
     } catch {
-      return [];
+      if (gallery)
+        throw new AppError(
+          503,
+          'STOCK_SEARCH_UNAVAILABLE',
+          'Pixabay search is unavailable. Please retry.',
+        );
+      return { hits: [], total: 0 };
     }
   }
 
   private async download(hit: PixabayHit): Promise<GeneratedStudyImage | null> {
     try {
       const response = await this.request(hit.webformatURL, {
+        redirect: 'error',
         headers: { Accept: 'image/avif,image/webp,image/png,image/jpeg' },
         signal: AbortSignal.timeout(10_000),
       });

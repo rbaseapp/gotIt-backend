@@ -174,7 +174,13 @@ export class WordPackRepository {
           row.title = override.title;
           for (const entry of entries) {
             const edited = override.entries.find((item) => item.id === entry.id);
-            if (edited) Object.assign(entry, { ...(!entry.learningItemId ? { sourceText: edited.sourceText, translationText: edited.translationText } : {}), exampleText: edited.exampleText });
+            if (edited)
+              Object.assign(entry, {
+                ...(!entry.learningItemId
+                  ? { sourceText: edited.sourceText, translationText: edited.translationText }
+                  : {}),
+                exampleText: edited.exampleText,
+              });
           }
         }
         return { pack: this.dto(row), entries };
@@ -185,7 +191,7 @@ export class WordPackRepository {
 
   async lessonUnit(scope: ProfileScope, id: string): Promise<LessonUnit> {
     const { pack, entries } = await this.detail(scope, id);
-    const materials = (await unitOverride(this.pool,scope,id))?.materials;
+    const materials = (await unitOverride(this.pool, scope, id))?.materials;
     if (!pack.teacherStations.length) throw missingPack();
     const stage = currentWordStage(pack.wordCount, pack.progress.introduced);
     const stageEntries = entries.slice(stage.start, stage.end).filter((entry) => !entry.excludedAt);
@@ -412,10 +418,14 @@ export class WordPackRepository {
       const override = await unitOverride(tx, scope, id);
       for (const entry of entries) {
         const edited = override?.entries.find((item) => item.id === entry.id);
-        if (edited) Object.assign(entry, {
-          source_text: edited.sourceText, normalized_source_text: lookupText(edited.sourceText),
-          translation_text: edited.translationText, normalized_translation_text: lookupText(edited.translationText), example_text: edited.exampleText,
-        });
+        if (edited)
+          Object.assign(entry, {
+            source_text: edited.sourceText,
+            normalized_source_text: lookupText(edited.sourceText),
+            translation_text: edited.translationText,
+            normalized_translation_text: lookupText(edited.translationText),
+            example_text: edited.exampleText,
+          });
       }
       if (entries.filter((entry) => selected.has(entry.id)).length !== selected.size)
         throw new AppError(400, 'VALIDATION_ERROR', 'A selected word is not part of this pack');

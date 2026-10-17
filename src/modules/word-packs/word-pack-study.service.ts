@@ -131,7 +131,7 @@ export class WordPackStudyService {
   async cachedImage(scope: ProfileScope, packId: string, entryId: string) {
     const input = await this.input(scope, packId, entryId);
     const concepts = new ConceptImagesService(this.pool, this.images, this.automaticConcepts);
-    if(await concepts.pending(input)) return { image: null };
+    if (await concepts.pending(input)) return { image: null };
     const concept = await concepts.resolve(input);
     if (concept) return { image: await concepts.image(concept, input, false) };
     return input.visual ? { image: null } : this.packs.image(scope, packId, entryId);
@@ -140,7 +140,7 @@ export class WordPackStudyService {
   async image(scope: ProfileScope, packId: string, entryId: string) {
     const input = await this.input(scope, packId, entryId);
     const concepts = new ConceptImagesService(this.pool, this.images, this.automaticConcepts);
-    if(await concepts.pending(input)) return { image: null };
+    if (await concepts.pending(input)) return { image: null };
     const concept = await concepts.resolve(input);
     if (concept) return { image: await concepts.image(concept, input, true) };
     const cached = input.visual ? { image: null } : await this.packs.image(scope, packId, entryId);

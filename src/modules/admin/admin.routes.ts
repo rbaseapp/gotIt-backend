@@ -13,6 +13,7 @@ import { learnerSettingsSchema } from './admin.learner.js';
 import { conceptSaveSchema } from '../concepts/concepts.schema.js';
 import { regenerateConceptSchema } from './admin.concept-regeneration.js';
 import { wordListSchema, wordSectionSchema } from './admin.words.js';
+import { stockSearchSchema, wordImageSchema } from './admin.word-images.js';
 import {
   listSchema,
   usageListSchema,
@@ -44,10 +45,45 @@ export function createProductAdminRouter(service: ProductAdminService) {
     next();
   });
   router.get('/access', async (req, res) => res.json(await service.access(actor(req))));
-  router.get('/words', async (req, res) => res.json(await service.words.list(actor(req), wordListSchema.parse(req.query))));
-  router.get('/words/:id', async (req, res) => res.json(await service.words.list(actor(req), wordListSchema.parse({}), z.uuid().parse(req.params.id))));
-  router.get('/word-images/:id', async (req, res) => res.json(await service.words.image(actor(req), z.uuid().parse(req.params.id))));
-  router.get('/words/:id/:section', async (req, res) => res.json(await service.words.section(actor(req), z.uuid().parse(req.params.id), wordSectionSchema.parse(req.params.section), listSchema.parse(req.query))));
+  router.get('/words', async (req, res) =>
+    res.json(await service.words.list(actor(req), wordListSchema.parse(req.query))),
+  );
+  router.get('/words/:id', async (req, res) =>
+    res.json(
+      await service.words.list(actor(req), wordListSchema.parse({}), z.uuid().parse(req.params.id)),
+    ),
+  );
+  router.get('/words/:id/stock-images', async (req, res) =>
+    res.json(
+      await service.wordImages.search(
+        actor(req),
+        z.uuid().parse(req.params.id),
+        stockSearchSchema.parse(req.query),
+      ),
+    ),
+  );
+  router.post('/words/:id/image', async (req, res) =>
+    res.json(
+      await service.wordImages.replace(
+        actor(req),
+        z.uuid().parse(req.params.id),
+        wordImageSchema.parse(req.body),
+      ),
+    ),
+  );
+  router.get('/word-images/:id', async (req, res) =>
+    res.json(await service.words.image(actor(req), z.uuid().parse(req.params.id))),
+  );
+  router.get('/words/:id/:section', async (req, res) =>
+    res.json(
+      await service.words.section(
+        actor(req),
+        z.uuid().parse(req.params.id),
+        wordSectionSchema.parse(req.params.section),
+        listSchema.parse(req.query),
+      ),
+    ),
+  );
   router.get('/learners/:id/courses/:courseId', async (req, res) =>
     res.json(
       await service.learnerCourse(
@@ -89,7 +125,13 @@ export function createProductAdminRouter(service: ProductAdminService) {
     ),
   );
   router.post('/concepts/:id/regenerate', async (req, res) =>
-    res.json(await service.concepts.regenerate(actor(req), z.uuid().parse(req.params.id), regenerateConceptSchema.parse(req.body))),
+    res.json(
+      await service.concepts.regenerate(
+        actor(req),
+        z.uuid().parse(req.params.id),
+        regenerateConceptSchema.parse(req.body),
+      ),
+    ),
   );
   for (const resource of ['catalog-units', 'learner-units'] as const) {
     router.get(`/${resource}`, async (req, res) =>
@@ -185,7 +227,13 @@ export function createProductAdminRouter(service: ProductAdminService) {
     'audit',
   ] as const) {
     router.get(`/${resource}`, async (req, res) =>
-      res.json(await service.list(actor(req), resource, (resource === 'usage' ? usageListSchema : listSchema).parse(req.query))),
+      res.json(
+        await service.list(
+          actor(req),
+          resource,
+          (resource === 'usage' ? usageListSchema : listSchema).parse(req.query),
+        ),
+      ),
     );
     router.get(`/${resource}/:id`, async (req, res) =>
       res.json(

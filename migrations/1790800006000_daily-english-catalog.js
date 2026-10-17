@@ -2,8 +2,7 @@ import tiers from './data/daily-english-en-he.json' with { type: 'json' };
 
 const uuid = (family, number) =>
   `d${family}000000-0000-4000-8000-${String(number).padStart(12, '0')}`;
-const sql = (value) =>
-  value === null ? 'NULL' : `'${String(value).replaceAll("'", "''")}'`;
+const sql = (value) => (value === null ? 'NULL' : `'${String(value).replaceAll("'", "''")}'`);
 const insert = (pgm, table, columns, rows) => {
   pgm.sql(
     `INSERT INTO product_gotit.${table} (${columns.join(',')}) VALUES\n${rows
@@ -52,7 +51,15 @@ export const up = (pgm) => {
     pgm,
     'word_topics',
     ['id', 'slug', 'title', 'description', 'sort_order'],
-    [[uuid(1, 1), 'daily-english', 'אנגלית יום־יומית', 'מסלול מדורג של מילים וביטויים שימושיים', 5]],
+    [
+      [
+        uuid(1, 1),
+        'daily-english',
+        'אנגלית יום־יומית',
+        'מסלול מדורג של מילים וביטויים שימושיים',
+        5,
+      ],
+    ],
   );
   insert(
     pgm,
@@ -93,17 +100,28 @@ export const up = (pgm) => {
       insert(
         pgm,
         'word_packs',
-        ['id', 'track_id', 'slug', 'module_number', 'title', 'description', 'version', 'sort_order'],
-        [[
-          packId,
-          uuid(2, tierIndex + 1),
-          `daily-english-${track.slug}-${String(unit).padStart(2, '0')}-en-he`,
-          unit,
-          `יחידה ${unit}: ${track.title}`,
-          `פריטים ${((unit - 1) * 50 + 1).toLocaleString('en-US')}–${(unit * 50).toLocaleString('en-US')} במסלול`,
-          1,
-          unit * 10,
-        ]],
+        [
+          'id',
+          'track_id',
+          'slug',
+          'module_number',
+          'title',
+          'description',
+          'version',
+          'sort_order',
+        ],
+        [
+          [
+            packId,
+            uuid(2, tierIndex + 1),
+            `daily-english-${track.slug}-${String(unit).padStart(2, '0')}-en-he`,
+            unit,
+            `יחידה ${unit}: ${track.title}`,
+            `פריטים ${((unit - 1) * 50 + 1).toLocaleString('en-US')}–${(unit * 50).toLocaleString('en-US')} במסלול`,
+            1,
+            unit * 10,
+          ],
+        ],
       );
       insert(
         pgm,
@@ -120,18 +138,20 @@ export const up = (pgm) => {
           'example_text',
           'sort_order',
         ],
-        tiers[tierIndex].slice((unit - 1) * 50, unit * 50).map((entry, index) => [
-          uuid(4, tierIndex * 1000 + (unit - 1) * 50 + index + 1),
-          packId,
-          entry.en,
-          entry.en.toLowerCase(),
-          entry.he,
-          entry.he.normalize('NFC'),
-          entry.type,
-          entry.pos,
-          null,
-          (index + 1) * 10,
-        ]),
+        tiers[tierIndex]
+          .slice((unit - 1) * 50, unit * 50)
+          .map((entry, index) => [
+            uuid(4, tierIndex * 1000 + (unit - 1) * 50 + index + 1),
+            packId,
+            entry.en,
+            entry.en.toLowerCase(),
+            entry.he,
+            entry.he.normalize('NFC'),
+            entry.type,
+            entry.pos,
+            null,
+            (index + 1) * 10,
+          ]),
       );
     }
   }

@@ -158,11 +158,18 @@ const enrichment = createEnrichment(env, [], aiDailyQuota, providerFetch('transl
 const learningPolicy = runtimeLearningPolicy(
   policySchema.parse(env.LEARNING_POLICY_JSON ? JSON.parse(env.LEARNING_POLICY_JSON) : {}),
 );
-const conceptAssignments = new ConceptAssignmentService(pool,
-  env.OPENAI_API_KEY ? new OpenAiConceptAssignmentProvider(env.OPENAI_API_KEY,
-    env.OPENAI_CONCEPT_MODEL ?? env.OPENAI_TRANSLATION_MODEL ?? env.OPENAI_PRIVATE_LESSON_MODEL,
-    providerFetch('concept-assignment'), aiDailyQuota) : undefined,
-  code => logger.warn({ code }, 'Concept assignment will retry'));
+const conceptAssignments = new ConceptAssignmentService(
+  pool,
+  env.OPENAI_API_KEY
+    ? new OpenAiConceptAssignmentProvider(
+        env.OPENAI_API_KEY,
+        env.OPENAI_CONCEPT_MODEL ?? env.OPENAI_TRANSLATION_MODEL ?? env.OPENAI_PRIVATE_LESSON_MODEL,
+        providerFetch('concept-assignment'),
+        aiDailyQuota,
+      )
+    : undefined,
+  (code) => logger.warn({ code }, 'Concept assignment will retry'),
+);
 const captureService = new CaptureService(
   new CaptureRepository(pool),
   profileService,
@@ -313,11 +320,14 @@ const app = createApp({
     profileService,
     learningPolicy,
     privateLessonContentGenerator,
-    { model: env.OPENAI_REALTIME_MODEL, transcriptionModel: env.OPENAI_REALTIME_TRANSCRIPTION_MODEL },
+    {
+      model: env.OPENAI_REALTIME_MODEL,
+      transcriptionModel: env.OPENAI_REALTIME_TRANSCRIPTION_MODEL,
+    },
     studyImageProvider,
     {
-      stock: studyImageProviders.find(provider => provider instanceof PixabayStudyImageProvider),
-      ai: studyImageProviders.find(provider => provider instanceof OpenAiStudyImageProvider),
+      stock: studyImageProviders.find((provider) => provider instanceof PixabayStudyImageProvider),
+      ai: studyImageProviders.find((provider) => provider instanceof OpenAiStudyImageProvider),
     },
   ),
   logger,

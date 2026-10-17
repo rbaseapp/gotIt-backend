@@ -26,7 +26,9 @@ export type PrivateLessonTarget = {
 };
 
 export type PrivateLessonPlan = {
-  realtimeContract?: ReturnType<typeof import('./private-lesson.realtime.js').buildRealtimeLessonContract>;
+  realtimeContract?: ReturnType<
+    typeof import('./private-lesson.realtime.js').buildRealtimeLessonContract
+  >;
   wordPack?: LessonUnit | null;
   course?: CourseLessonContext | null;
   teachingBrief?: PrivateLessonBrief;

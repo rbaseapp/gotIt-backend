@@ -10,6 +10,8 @@ export const API_ROUTES = [
   ['GET', '/admin/word-images/:id'],
   ['GET', '/admin/words/:id/:section'],
   ['POST', '/admin/concepts/:id/regenerate'],
+  ['GET', '/admin/words/:id/stock-images'],
+  ['POST', '/admin/words/:id/image'],
   ['GET', '/admin/concepts/:id'],
   ['POST', '/admin/concepts'],
   ['PATCH', '/admin/concepts/:id'],

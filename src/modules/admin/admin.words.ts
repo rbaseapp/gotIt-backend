@@ -30,11 +30,8 @@ const concepts = `LEFT JOIN product_gotit.concept_assignment_jobs assignment ON 
     ON c.application_id=b.application_id AND c.id=b.concept_id AND c.meaning_revision=b.meaning_revision AND c.status='active'
     WHERE b.application_id=li.application_id AND b.application_user_id=li.application_user_id AND b.learning_item_id=li.id
       AND b.learning_revision=li.learning_revision AND b.job_generation=assignment.generation AND assignment.status='completed') bound ON true
-  LEFT JOIN LATERAL(SELECT array_agg(candidate.id ORDER BY candidate.id) ids FROM (SELECT c.id FROM product_gotit.lexical_concepts c WHERE c.application_id=li.application_id AND c.status='active'
-  AND (c.id=bound.id OR (bound.id IS NULL
-    AND EXISTS(SELECT 1 FROM product_gotit.concept_expressions e WHERE e.application_id=c.application_id AND e.concept_id=c.id AND e.language_code=li.source_language_code AND e.normalized_text=li.normalized_source_text)
-    AND EXISTS(SELECT 1 FROM product_gotit.concept_expressions e WHERE e.application_id=c.application_id AND e.concept_id=c.id AND e.language_code=li.translation_language_code AND e.normalized_text=tr.normalized_text))) LIMIT 2) candidate) matches ON true`;
-const fields = `li.id,li.source_text AS "sourceText",li.source_language_code AS "sourceLanguageCode",li.translation_language_code AS "translationLanguageCode",li.application_user_id AS "applicationUserId",tr.translation_text AS "primaryTranslation",li.part_of_speech AS "partOfSpeech",li.phonetic_text AS "phoneticText",li.item_type AS "itemType",li.user_status AS "userStatus",li.learning_status AS "learningStatus",li.learning_revision AS "learningRevision",li.overall_mastery_score AS "mastery",li.review_stage AS "reviewStage",li.next_review_at AS "nextReviewAt",li.created_at AS "createdAt",li.updated_at AS "updatedAt",li.deleted_at AS "deletedAt",CASE WHEN cardinality(matches.ids)=1 THEN matches.ids[1] END AS "conceptId",COALESCE(cardinality(matches.ids)>1,false) AS "conceptAmbiguous"`;
+  LEFT JOIN LATERAL product_gotit.resolve_image_concept(li.application_id,li.source_language_code,li.normalized_source_text,li.translation_language_code,tr.normalized_text) resolved ON bound.id IS NULL LEFT JOIN product_gotit.lexical_concepts concept ON concept.application_id=li.application_id AND concept.id=COALESCE(bound.id,resolved.concept_id)`;
+const fields = `li.id,li.source_text AS "sourceText",li.source_language_code AS "sourceLanguageCode",li.translation_language_code AS "translationLanguageCode",li.application_user_id AS "applicationUserId",tr.translation_text AS "primaryTranslation",li.part_of_speech AS "partOfSpeech",li.phonetic_text AS "phoneticText",li.item_type AS "itemType",li.user_status AS "userStatus",li.learning_status AS "learningStatus",li.learning_revision AS "learningRevision",li.overall_mastery_score AS "mastery",li.review_stage AS "reviewStage",li.next_review_at AS "nextReviewAt",li.created_at AS "createdAt",li.updated_at AS "updatedAt",li.deleted_at AS "deletedAt",concept.id AS "conceptId",concept.revision AS "conceptRevision",CASE WHEN bound.id IS NOT NULL THEN false ELSE resolved.ambiguous END AS "conceptAmbiguous"`;
 
 export class WordAdmin {
   constructor(private readonly owner: ProductAdminService) {}
@@ -59,7 +56,7 @@ export class WordAdmin {
       if (query.applicationUserId) add('li.application_user_id=?', query.applicationUserId);
       if (query.state === 'active') where.push('li.deleted_at IS NULL');
       if (query.state === 'deleted') where.push('li.deleted_at IS NOT NULL');
-      if (query.state === 'unlinked') where.push('COALESCE(cardinality(matches.ids),0)<>1');
+      if (query.state === 'unlinked') where.push('concept.id IS NULL');
     }
     const from = `FROM product_gotit.learning_items li ${primary} ${concepts} WHERE ${where.join(' AND ')}`;
     const countFrom = `FROM product_gotit.learning_items li ${primary} ${!id && query.state === 'unlinked' ? concepts : ''} WHERE ${where.join(' AND ')}`;
@@ -70,7 +67,7 @@ export class WordAdmin {
         `SELECT ${fields},assignment.status AS "conceptAssignmentStatus",assignment.last_error AS "conceptAssignmentError" ${from} ORDER BY "${query.sort}" ${query.order},li.id ${query.order} LIMIT $${values.length + 1} OFFSET $${values.length + 2}`,
         [...values, id ? 1 : query.perPage, id ? 0 : (query.page - 1) * query.perPage],
       )
-    ).rows;
+    ).rows.map((row) => ({ ...row, imageSources: this.owner.wordImages.sources }));
     if (!id) return { data: rows, total };
     const row = rows[0];
     if (!row) throw new AppError(404, 'NOT_FOUND', 'Word not found');
@@ -103,7 +100,7 @@ export class WordAdmin {
     const service = new ConceptImagesService(this.owner.db);
     const concept = row.translation_text
       ? await service.resolve({
-          scope: {applicationId:actor.applicationId,applicationUserId:row.application_user_id},
+          scope: { applicationId: actor.applicationId, applicationUserId: row.application_user_id },
           learningItemId: row.id,
           sourceText: row.source_text,
           sourceLanguageCode: row.source_language_code,
