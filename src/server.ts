@@ -252,6 +252,7 @@ const privateLessonContentGenerator = privateLessonContentApiKey
       env.OPENAI_REALTIME_TRANSCRIPTION_MODEL,
       fetch,
       aiDailyQuota,
+      { logger },
     )
   : undefined;
 const courseService = new CourseService(

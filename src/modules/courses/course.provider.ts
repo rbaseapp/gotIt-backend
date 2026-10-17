@@ -1,7 +1,8 @@
 import { createHash } from 'node:crypto';
 import { z } from 'zod';
+import type { Logger } from 'pino';
 import { AppError } from '../../shared/errors/app-error.js';
-import { readProviderJson } from '../enrichment/providers/http.js';
+import { ProviderHttpError, readProviderJson } from '../enrichment/providers/http.js';
 import type { ProfileScope } from '../profile/profile.types.js';
 import { validateWav } from '../speech/speech.service.js';
 import type { AiDailyQuota } from '../../shared/middleware/ai-daily-quota.js';
@@ -23,6 +24,10 @@ export class OpenAiCourseGenerator implements CourseGenerator {
     private readonly transcriptionModel: string,
     private readonly fetchImpl: typeof fetch = fetch,
     private readonly dailyQuota?: Pick<AiDailyQuota, 'consume'>,
+    private readonly diagnostics?: {
+      logger: Pick<Logger, 'warn'>;
+      requestId?: () => string | undefined;
+    },
   ) {}
   async generate<T>(
     scope: ProfileScope,
@@ -38,7 +43,14 @@ export class OpenAiCourseGenerator implements CourseGenerator {
     const signal = AbortSignal.timeout(
       ['course_plan', 'lesson_homework'].includes(name) ? 100_000 : 65_000,
     );
+    const startedAt = Date.now();
+    let stage: 'schema' | 'request' | 'response' = 'schema';
+    let providerRequestId: string | null = null;
+    let providerStatus: number | undefined;
+    let responseFailure: 'incomplete' | 'refusal' | undefined;
     try {
+      const jsonSchema = z.toJSONSchema(schema, { io: 'input' });
+      stage = 'request';
       const response = await this.fetchImpl('https://api.openai.com/v1/responses', {
         method: 'POST',
         signal,
@@ -66,11 +78,17 @@ export class OpenAiCourseGenerator implements CourseGenerator {
               type: 'json_schema',
               name,
               strict: true,
-              schema: z.toJSONSchema(schema, { io: 'input' }),
+              schema: jsonSchema,
             },
           },
         }),
       });
+      providerRequestId = response.headers.get('x-request-id')?.slice(0, 200) ?? null;
+      providerStatus = response.status;
+      stage = 'response';
+      const raw = await readProviderJson(response, signal);
+      if (raw && typeof raw === 'object' && 'status' in raw && raw.status === 'incomplete')
+        responseFailure = 'incomplete';
       const payload = z
         .object({
           status: z.literal('completed'),
@@ -82,9 +100,12 @@ export class OpenAiCourseGenerator implements CourseGenerator {
             }),
           ),
         })
-        .parse(await readProviderJson(response, signal));
+        .parse(raw);
       const content = payload.output.flatMap((item) => item.content ?? []);
-      if (content.some((item) => item.type === 'refusal')) throw new Error('Refused');
+      if (content.some((item) => item.type === 'refusal')) {
+        responseFailure = 'refusal';
+        throw new Error('Refused');
+      }
       return schema.parse(
         JSON.parse(
           content
@@ -93,7 +114,26 @@ export class OpenAiCourseGenerator implements CourseGenerator {
             .join(''),
         ),
       );
-    } catch {
+    } catch (error) {
+      // Never log errors, provider bodies, schema values or learner data here.
+      this.diagnostics?.logger.warn(
+        {
+          requestId: this.diagnostics.requestId?.(),
+          operation: name,
+          model: this.model,
+          stage,
+          providerStatus,
+          providerRequestId,
+          failureCode:
+            error instanceof ProviderHttpError
+              ? error.failureCode
+              : signal.aborted
+                ? 'timeout'
+                : (responseFailure ?? (stage === 'request' ? 'upstream' : 'invalid_response')),
+          durationMs: Date.now() - startedAt,
+        },
+        'Course generation failed',
+      );
       throw new AppError(
         503,
         'COURSE_AI_UNAVAILABLE',
