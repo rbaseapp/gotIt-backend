@@ -70,7 +70,7 @@ export class ConceptAssignmentService {
         await this.db.query(
           `SELECT j.application_id,j.application_user_id,j.learning_item_id FROM product_gotit.concept_assignment_jobs j
       JOIN product_gotit.learning_items li ON li.application_id=j.application_id AND li.application_user_id=j.application_user_id AND li.id=j.learning_item_id
-      WHERE j.status<>'completed' AND j.next_attempt_at<=now() AND (j.claim_until IS NULL OR j.claim_until<now())
+      WHERE j.status<>'completed' AND (j.next_attempt_at<=now() OR j.last_error='CONCEPT_DAILY_LIMIT_REACHED') AND (j.claim_until IS NULL OR j.claim_until<now())
       ORDER BY j.priority DESC,j.next_attempt_at,li.created_at DESC,j.learning_item_id LIMIT 1`,
           [],
         )
@@ -87,7 +87,7 @@ export class ConceptAssignmentService {
     const job = (
       await this.db.query(
         `UPDATE product_gotit.concept_assignment_jobs SET status='processing',claim_id=$4,claim_until=now()+interval '2 minutes',attempts=attempts+1,updated_at=now()
-      WHERE application_id=$1 AND application_user_id=$2 AND learning_item_id=$3 AND status<>'completed' AND next_attempt_at<=now()
+      WHERE application_id=$1 AND application_user_id=$2 AND learning_item_id=$3 AND status<>'completed' AND (next_attempt_at<=now() OR last_error='CONCEPT_DAILY_LIMIT_REACHED')
         AND (claim_until IS NULL OR claim_until<now()) RETURNING *`,
         [applicationId, userId, itemId, token],
       )
@@ -125,7 +125,9 @@ export class ConceptAssignmentService {
           const quotaExceeded =
             error instanceof AppError && error.code === 'AI_DAILY_LIMIT_REACHED';
           const code = quotaExceeded
-            ? 'CONCEPT_DAILY_LIMIT_REACHED'
+            ? job.priority === 0
+              ? 'CONCEPT_BACKFILL_DAILY_LIMIT_REACHED'
+              : 'CONCEPT_LIVE_DAILY_LIMIT_REACHED'
             : (providerFailureCode(error) ??
               (error instanceof Error && /^CONCEPT_[A-Z_]+$/u.test(error.message)
                 ? error.message

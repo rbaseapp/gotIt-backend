@@ -616,7 +616,7 @@ test(
             false,
           );
           const pending = await job(word.id);
-          assert.equal(pending.last_error, 'CONCEPT_DAILY_LIMIT_REACHED');
+          assert.equal(pending.last_error, 'CONCEPT_LIVE_DAILY_LIMIT_REACHED');
           assert.ok(new Date(pending.next_attempt_at).getTime() > Date.now() + 7100_000);
           assert.equal(await bind(word.id), undefined);
         },
@@ -784,7 +784,7 @@ test(
             await limited.assign(scope.applicationId, scope.applicationUserId, old.id),
             false,
           );
-          assert.equal((await job(otherOld.id)).last_error, 'CONCEPT_DAILY_LIMIT_REACHED');
+          assert.equal((await job(otherOld.id)).last_error, 'CONCEPT_BACKFILL_DAILY_LIMIT_REACHED');
           assert.equal(
             (await job(otherOld.id)).attempts,
             0,
@@ -799,6 +799,32 @@ test(
             true,
           );
           assert.equal((await job(old.id)).status, 'pending');
+        },
+      );
+      await t.test(
+        'a retiring worker cannot strand jobs in the legacy shared quota or bypass new quota windows',
+        async () => {
+          await db.runtimePool.query(
+            `UPDATE product_gotit.concept_assignment_jobs SET next_attempt_at=now()+interval '1 day' WHERE status<>'completed'`,
+          );
+          const legacy = await capture('pear', 'אגס'),
+            current = await capture('poire', 'אגס', 'fr');
+          for (const [word, code] of [
+            [legacy, 'CONCEPT_DAILY_LIMIT_REACHED'],
+            [current, 'CONCEPT_BACKFILL_DAILY_LIMIT_REACHED'],
+          ] as const)
+            await db.runtimePool.query(
+              `UPDATE product_gotit.concept_assignment_jobs SET priority=0,last_error=$2,next_attempt_at=now()+interval '1 day' WHERE learning_item_id=$1`,
+              [word.id, code],
+            );
+          assert.deepEqual(await worker.run(2), { processed: 1 });
+          assert.equal((await job(legacy.id)).status, 'completed');
+          assert.equal((await job(current.id)).status, 'pending');
+          assert.equal((await job(current.id)).attempts, 0);
+          assert.equal(
+            await worker.assign(scope.applicationId, scope.applicationUserId, current.id),
+            false,
+          );
         },
       );
       await t.test(
