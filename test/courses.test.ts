@@ -254,6 +254,60 @@ test('course requires two explicit approvals; a preview cannot start a lesson', 
   });
   assert.equal(active.nextLesson?.unitKey, 'foundation');
 });
+test('review can correct every preference, including target language before the first plan', async () => {
+  const { store, service } = setup();
+  const course = courseFixture();
+  course.reportedAvailability = '10 minutes twice a week';
+  store.seed(course);
+  const approved = await service.approvePreferences(scope, course.id, command(0));
+  const preferences = {
+    ...course.preferences,
+    targetLanguageCode: 'de',
+    supportLanguageCode: 'fr',
+    path: 'goal' as const,
+    goal: 'Travel conversations',
+    experience: 'Some prior lessons',
+    startingLevel: 'A2' as const,
+    absoluteBeginner: false,
+    ageGroup: 'teen' as const,
+    literacy: 'developing' as const,
+    minutesPerLesson: 5 as const,
+    daysPerWeek: 2,
+    interests: [],
+    statedNeeds: ['Short explanations'],
+    recommendations: [],
+  };
+  const input = { ...command(approved.revision), preferences };
+  const edited = await service.updatePreferences(scope, course.id, input);
+  assert.deepEqual(edited.preferences, preferences);
+  assert.equal(edited.approvedPreferences, null);
+  assert.equal(edited.preferencesApprovedAt, null);
+  assert.equal(edited.reportedAvailability, undefined);
+  assert.deepEqual(await service.updatePreferences(scope, course.id, input), edited);
+  await assert.rejects(() => service.plan(scope, course.id, command(edited.revision)), conflict);
+  const reapproved = await service.approvePreferences(scope, course.id, command(edited.revision));
+  assert.deepEqual(reapproved.approvedPreferences, preferences);
+});
+
+test('target language stays fixed once a course plan exists', async () => {
+  const { store, service } = setup();
+  const course = courseFixture();
+  course.versions = [
+    { version: 1, preferences: course.preferences, plan, createdAt: course.createdAt },
+  ];
+  course.draftVersion = 1;
+  store.seed(course);
+  await assert.rejects(
+    () =>
+      service.updatePreferences(scope, course.id, {
+        ...command(0),
+        preferences: { ...course.preferences, targetLanguageCode: 'de' },
+      }),
+    conflict,
+  );
+  assert.equal((await service.course(scope, course.id)).preferences.targetLanguageCode, 'en');
+});
+
 test('preference edits invalidate approval; stale generation cannot overwrite newer preferences', async () => {
   const { store, service, ai } = setup();
   const course = courseFixture();

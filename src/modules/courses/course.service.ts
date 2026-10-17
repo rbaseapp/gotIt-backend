@@ -674,7 +674,10 @@ export class CourseService {
     const current = await this.current(scope, id, input, 'preferences', input);
     if (current.replay) return publicCourse(asCourse(current.replay));
     const course = asCourse(current.document);
-    if (input.preferences.targetLanguageCode !== course.preferences.targetLanguageCode)
+    if (
+      input.preferences.targetLanguageCode !== course.preferences.targetLanguageCode &&
+      (course.versions.length > 0 || course.activeVersion !== null || course.evidence.length > 0)
+    )
       throw courseConflict();
     const next = {
       ...course,
