@@ -8,6 +8,8 @@ import { NotificationService } from './modules/notifications/notification.servic
 import { createNotificationSender } from './modules/notifications/notification.providers.js';
 import { CaptureRepository } from './modules/capture/capture.repository.js';
 import { CaptureService } from './modules/capture/capture.service.js';
+import { ConceptAssignmentService } from './modules/concepts/concept-assignment.service.js';
+import { OpenAiConceptAssignmentProvider } from './modules/concepts/concept-assignment.provider.js';
 import { createEnrichment } from './modules/enrichment/enrichment.config.js';
 import { LibraryRepository } from './modules/library/library.repository.js';
 import { PracticeService } from './modules/practice/practice.service.js';
@@ -156,11 +158,17 @@ const enrichment = createEnrichment(env, [], aiDailyQuota, providerFetch('transl
 const learningPolicy = runtimeLearningPolicy(
   policySchema.parse(env.LEARNING_POLICY_JSON ? JSON.parse(env.LEARNING_POLICY_JSON) : {}),
 );
+const conceptAssignments = new ConceptAssignmentService(pool,
+  env.OPENAI_API_KEY ? new OpenAiConceptAssignmentProvider(env.OPENAI_API_KEY,
+    env.OPENAI_CONCEPT_MODEL ?? env.OPENAI_TRANSLATION_MODEL ?? env.OPENAI_PRIVATE_LESSON_MODEL,
+    providerFetch('concept-assignment'), aiDailyQuota) : undefined,
+  code => logger.warn({ code }, 'Concept assignment will retry'));
 const captureService = new CaptureService(
   new CaptureRepository(pool),
   profileService,
   enrichment.registry,
   enrichment.proofs,
+  conceptAssignments,
 );
 const studyImageProviders = [
   ...(env.PIXABAY_API_KEY ? [new PixabayStudyImageProvider(env.PIXABAY_API_KEY, fetch)] : []),
@@ -200,6 +208,7 @@ const wordPackStudyService = new WordPackStudyService(
         aiDailyQuota,
       )
     : undefined,
+  Boolean(env.OPENAI_API_KEY),
 );
 const practiceService: PracticeService = new PracticeService(
   pool,
@@ -207,6 +216,7 @@ const practiceService: PracticeService = new PracticeService(
   learningPolicy,
   (...args): boolean => speechService.supports(...args),
   studyImageProvider,
+  Boolean(env.OPENAI_API_KEY),
 );
 const googleSpeechAccessToken =
   env.GOOGLE_SERVICE_ACCOUNT_JSON || env.GOOGLE_APPLICATION_CREDENTIALS
@@ -303,6 +313,12 @@ const app = createApp({
     profileService,
     learningPolicy,
     privateLessonContentGenerator,
+    { model: env.OPENAI_REALTIME_MODEL, transcriptionModel: env.OPENAI_REALTIME_TRANSCRIPTION_MODEL },
+    studyImageProvider,
+    {
+      stock: studyImageProviders.find(provider => provider instanceof PixabayStudyImageProvider),
+      ai: studyImageProviders.find(provider => provider instanceof OpenAiStudyImageProvider),
+    },
   ),
   logger,
   coreAuthClient,
@@ -359,6 +375,9 @@ const cleanup = setInterval(() => {
   void rateLimiter.cleanup().catch(() => logger.warn('Request limit cleanup failed'));
 }, 60000);
 cleanup.unref();
+const conceptTimer = setInterval(() => conceptAssignments.kick(), 10_000);
+conceptTimer.unref();
+conceptAssignments.kick();
 let realtimeSweepActive = false;
 const sweepRealtime = async () => {
   if (draining || realtimeSweepActive || !realtimeCallGuard) return;
@@ -398,7 +417,9 @@ server.on('error', () => {
 async function shutdown(signal: string) {
   if (draining) return;
   draining = true;
+  const conceptDrain = conceptAssignments.stop();
   clearInterval(cleanup);
+  clearInterval(conceptTimer);
   clearInterval(realtimeTimer);
   clearInterval(notificationTimer);
   logger.info({ signal }, 'Shutting down GotIt backend');
@@ -411,6 +432,7 @@ async function shutdown(signal: string) {
 
   server.close(async () => {
     try {
+      await conceptDrain;
       await pool.end();
       clearTimeout(deadline);
       process.exit(0);

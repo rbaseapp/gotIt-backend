@@ -20,7 +20,7 @@ import {
   type RealtimeCallGuard,
 } from '../private-lessons/realtime-call-guard.js';
 import {
-  coursePlanSchema,
+  generatedCoursePlanSchema,
   MAX_HOMEWORK_TASKS,
   intakeReplySchema,
   intakeQuestionsSchema,
@@ -136,7 +136,20 @@ export class CourseService {
         .filter((d): d is HomeworkDocument => d.kind === 'homework')
         .map(homeworkSummary),
       available: this.available,
+      templates: await this.store.templates?.(scope) ?? [],
     };
+  }
+  async useTemplate(scope: ProfileScope, id: string, eventId: string) {
+    const fingerprint=commandFingerprint(['template',id]);
+    const replay=await this.store.replay(scope,eventId,fingerprint);
+    if(replay) return publicCourse(asCourse(replay));
+    const template=await this.store.template?.(scope,id);
+    if(!template) throw courseNotFound();
+    validateCoursePlan(template.plan,template.preferences);
+    await this.profiles.getProfile(scope);
+    const createdAt=now();
+    const course:CourseDocument={templateSource:{id},kind:'course',id:eventId,revision:0,createdAt,preferences:template.preferences,approvedPreferences:template.preferences,preferencesApprovedAt:createdAt,ready:true,messages:[],suggestions:[],versions:[{version:1,...template,createdAt}],activeVersion:1,draftVersion:null,evidence:[]};
+    return publicCourse(asCourse(await this.store.save(scope,course,null,eventId,fingerprint)));
   }
   async course(scope: ProfileScope, id: string) {
     const document = await this.store.get(scope, id);
@@ -740,7 +753,7 @@ export class CourseService {
     const preservedUnits = active?.plan.units.filter((u) => preservedKeys.has(u.key)) ?? [];
     const preferences = course.approvedPreferences;
     const plan = validateCoursePlan(
-      await this.ai().generate(scope, coursePlanSchema, 'course_plan', planInstruction, {
+      await this.ai().generate(scope, generatedCoursePlanSchema, 'course_plan', planInstruction, {
         preferences,
         learnerAnswers: course.intakeAnswers ?? null,
         learnerCorrections: course.intakeQuestions
@@ -823,6 +836,7 @@ export class CourseService {
       courseTitle: next.version.plan.title,
       unitTitle: next.unit.title,
       lessonTitle: next.lesson.title,
+      ...(next.lesson.material ? { material: next.lesson.material } : {}),
       level: next.unit.level,
       objective: next.lesson.objective,
       successTask: next.unit.successTask,
@@ -904,8 +918,9 @@ export class CourseService {
         supportLanguageCode: lesson.supportLanguageCode ?? lesson.targetLanguageCode,
         title: lesson.topic,
         source: { report, turns: learningExcerpts(report, turns) },
-        content: null,
-        progress: [],
+        content: lesson.course?.material?.practice ?? lesson.wordPack?.material?.practice ?? null,
+        qualityVersion: HOMEWORK_QUALITY_VERSION,
+        progress: (lesson.course?.material?.practice ?? lesson.wordPack?.material?.practice)?.tasks.map(() => ({ attempts: [], hintUsed: false, done: false, draft: '' })) ?? [],
       };
       try {
         await this.store.save(
@@ -1357,13 +1372,14 @@ export function publicCourse(course: CourseDocument) {
     evidence,
     versions: course.versions.filter(
       (v) => v.version === course.draftVersion || v.version === course.activeVersion,
-    ),
+    ).map(v=>({...v,plan:{...v.plan,units:v.plan.units.map(unit=>({...unit,lessons:unit.lessons.map(({material:_private,...lesson})=>lesson)}))}})),
     nextLesson: next
       ? {
           unitKey: next.unit.key,
           unitTitle: next.unit.title,
           lessonIndex: next.lessonIndex,
-          ...next.lesson,
+          title: next.lesson.title,
+          objective: next.lesson.objective,
         }
       : null,
     syllabus: syllabusFor(course.preferences),

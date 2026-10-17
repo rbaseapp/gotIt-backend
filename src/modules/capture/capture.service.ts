@@ -13,6 +13,7 @@ export class CaptureService {
     private readonly profiles: ProfileServiceContract,
     private readonly enrichment = new EnrichmentRegistry(),
     private readonly proofs = new SelectionProofs(undefined),
+    private readonly conceptAssignments?: { kick(): void },
   ) {}
   async preview(scope: ProfileScope, input: PreviewInput) {
     const profile = await this.profiles.getProfile(scope).catch(() => {
@@ -172,9 +173,11 @@ export class CaptureService {
     const token = input.translation.selectionToken;
     const claim = token ? this.proofs.decode(token) : null;
     const hash = captureIntentHash(input, claim?.facts ?? null);
-    return this.repository.save(scope, key, input, hash, () =>
+    const result = await this.repository.save(scope, key, input, hash, () =>
       claim && token ? this.proofs.verify(token, claim, scope, input) : null,
     );
+    this.conceptAssignments?.kick();
+    return result;
   }
   getDetail(scope: ProfileScope, id: string) {
     return this.repository.getDetail(scope, id);

@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { languageSchema } from '../capture/capture.validation.js';
 import { CEFR_LEVELS } from '../profile/profile.types.js';
+import { lessonMaterialSchema, type LessonMaterial } from './lesson-material.schema.js';
 
 const text = (max = 500) => z.string().trim().min(1).max(max);
 export const coursePreferencesSchema = z
@@ -56,7 +57,7 @@ export const courseUnitSchema = z
     grammar: z.array(text(160)).max(12),
     vocabulary: z.array(text(120)).max(8),
     lessons: z
-      .array(z.object({ title: text(150), objective: text(350) }).strict())
+      .array(z.object({ title: text(150), objective: text(350), material: lessonMaterialSchema.optional() }).strict())
       .min(2)
       .max(10),
     estimatedMinutes: z.number().int().min(10).max(600),
@@ -74,8 +75,13 @@ export const coursePlanSchema = z
   })
   .strict();
 export type CoursePlan = z.infer<typeof coursePlanSchema>;
+// Admin-only optional authored content must not alter the provider's strict plan schema.
+export const generatedCoursePlanSchema = coursePlanSchema.extend({
+  units:z.array(courseUnitSchema.extend({lessons:z.array(courseUnitSchema.shape.lessons.element.omit({material:true})).min(2).max(10)})).min(3).max(40),
+});
 export type CourseUnit = z.infer<typeof courseUnitSchema>;
 export type CourseVersion = {
+  adminContentRevision?: boolean;
   version: number;
   preferences: CoursePreferences;
   plan: CoursePlan;
@@ -91,6 +97,7 @@ export type CourseEvidence = {
   recordedAt: string;
 };
 export type CourseDocument = {
+  templateSource?: {id:string};
   adminAssignment?: { templateId: string; templateVersion: number; actorId: string };
   kind: 'course';
   id: string;
@@ -114,6 +121,7 @@ export type CourseDocument = {
   pendingPlanChange?: string;
 };
 export type CourseLessonContext = {
+  material?: LessonMaterial;
   courseId: string;
   version: number;
   unitKey: string;

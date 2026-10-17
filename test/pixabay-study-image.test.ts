@@ -21,6 +21,34 @@ const input = {
 
 const jpeg = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3, 4]);
 
+test('Pixabay replacement excludes the current source even when reusing cached search results', async () => {
+  const downloaded: string[] = [];
+  const provider = new PixabayStudyImageProvider('fixture', (async (value) => {
+    const url = new URL(String(value));
+    if (url.hostname === 'pixabay.com')
+      return Response.json({
+        hits: [1, 2].map((id) => ({
+          id,
+          pageURL: `https://pixabay.com/photos/river-${id}/`,
+          webformatURL: `https://cdn.pixabay.com/river-${id}.jpg`,
+          tags: 'river, bank, isolated',
+          user: 'Artist',
+          likes: 3 - id,
+        })),
+      });
+    downloaded.push(url.href);
+    return new Response(jpeg);
+  }) as typeof fetch);
+  const first = await provider.generate(input);
+  const next = await provider.generate({ ...input, excludeSourceUrls: [first!.sourceUrl!] });
+  assert.notEqual(next?.sourceUrl, first?.sourceUrl);
+  assert.equal(downloaded.length, 2);
+  assert.equal(
+    await provider.generate({ ...input, excludeSourceUrls: [first!.sourceUrl!, next!.sourceUrl!] }),
+    null,
+  );
+});
+
 test('Pixabay searches only for the resolved visual sense and never sends raw context', async () => {
   const requests: URL[] = [];
   const provider = new PixabayStudyImageProvider('pixabay-secret', (async (value) => {

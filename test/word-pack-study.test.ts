@@ -15,6 +15,7 @@ test('pronoun study rejects old lexical images and generates a person rather tha
   const service = new WordPackStudyService(
     {
       query: async (_sql: string, keys: unknown[]) => {
+        if (_sql.includes('lexical_concepts')) return { rows: [] };
         assert.equal(keys[4], 'fixture:unit-pronouns-v1');
         return { rows: [] };
       },

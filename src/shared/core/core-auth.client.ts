@@ -131,7 +131,14 @@ export class CoreAuthClient {
   async getAdminUser(accessToken: string, id: string, requestId?: string) {
     z.uuid().parse(id);
     return z
-      .object({ data: z.object({ id: z.uuid(), status: z.enum(['active', 'disabled']) }) })
+      .object({
+        data: z.object({
+          id: z.uuid(),
+          status: z.enum(['active', 'disabled']),
+          email: z.email().optional(),
+          emailVerified: z.boolean().optional(),
+        }),
+      })
       .parse(await this.adminRequest(accessToken, `users/${id}`, requestId)).data;
   }
   constructor(

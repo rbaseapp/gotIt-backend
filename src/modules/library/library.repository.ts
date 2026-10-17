@@ -283,7 +283,9 @@ export class LibraryRepository {
     return row;
   }
   async edit(scope: ProfileScope, id: string, input: EditInput) {
-    return withTransaction(this.pool, async (tx) => {
+    return withTransaction(this.pool, (tx) => this.editInTransaction(tx, scope, id, input));
+  }
+  async editInTransaction(tx: DatabaseTransaction, scope: ProfileScope, id: string, input: EditInput) {
       const initial = (
         await tx.query(
           `SELECT * FROM product_gotit.learning_items WHERE application_id=$1 AND application_user_id=$2 AND id=$3 AND deleted_at IS NULL`,
@@ -427,7 +429,6 @@ export class LibraryRepository {
         learningRevision: row.learning_revision + (semanticChange ? 1 : 0),
         progressReset: semanticChange,
       };
-    });
   }
   async bulk(scope: ProfileScope, input: BulkInput) {
     return withTransaction(this.pool, async (tx) => {

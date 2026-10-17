@@ -62,8 +62,9 @@ export class ProfileRepository {
     scope: ProfileScope,
     defaults: ProfileDefaults,
     patch: ProfilePatchInput,
+    transaction?: DatabaseTransaction,
   ): Promise<GotItProfile> {
-    return withTransaction(this.pool, async (client) => {
+    const apply = async (client: DatabaseTransaction) => {
       await this.ensureProfile(client, scope, defaults);
 
       const currentResult = await client.query<ProfileRow>(
@@ -141,7 +142,8 @@ export class ProfileRepository {
 
       const profile = await this.loadProfile(client, scope);
       return profile;
-    });
+    };
+    return transaction ? apply(transaction) : withTransaction(this.pool, apply);
   }
 
   async recordSystemAssessment(
@@ -343,10 +345,7 @@ export class ProfileRepository {
     }
   }
 
-  private async loadProfile(
-    client: DatabaseTransaction,
-    scope: ProfileScope,
-  ): Promise<GotItProfile> {
+  async loadProfile(client: DatabaseTransaction, scope: ProfileScope): Promise<GotItProfile> {
     // A transaction uses one PostgreSQL client; await each query on that client.
     const profileResult = await client.query<ProfileRow>(
       `

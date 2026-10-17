@@ -1,6 +1,7 @@
 import type { Pool } from 'pg';
 import { adminRuntimeContext } from './admin.context.js';
 import type { Logger } from 'pino';
+import { composePrompt } from './admin.prompt-config.js';
 
 async function boundedPayload(response: Response, maxBytes: number) {
   const reader = response.body?.getReader();
@@ -57,20 +58,17 @@ export function adminAiFetch(
             typeof body.session.model === 'string'
           ? body.session.model
           : null;
-    if (prompt?.instructions && body) {
-      if (typeof body.instructions === 'string')
-        body.instructions += `\nApproved application teaching guidance:\n${prompt.instructions}`;
-      else if (
-        body.session &&
-        typeof body.session === 'object' &&
-        'instructions' in body.session &&
-        typeof body.session.instructions === 'string'
-      )
-        body.session.instructions += `\nApproved application teaching guidance:\n${prompt.instructions}`;
-      else if (Array.isArray(body.messages))
-        body.messages.unshift({ role: 'system', content: prompt.instructions });
-      else if (typeof body.prompt === 'string')
-        body.prompt += `\nApproved visual guidance:\n${prompt.instructions}`;
+    // lesson-live is composed before session creation so all response.create
+    // directives use the same immutable revision, including opening and closing.
+    if (prompt && body && operation !== 'lesson-live') {
+      if (typeof body.instructions === 'string') body.instructions = composePrompt(body.instructions, prompt);
+      else if (body.session && typeof body.session === 'object' && 'instructions' in body.session && typeof body.session.instructions === 'string')
+        body.session.instructions = composePrompt(body.session.instructions, prompt);
+      else if (Array.isArray(body.messages)) {
+        const systemMessages = body.messages.filter(m => m?.role === 'system' || m?.role === 'developer');
+        const base = systemMessages.map(m => typeof m.content === 'string' ? m.content : JSON.stringify(m.content)).join('\n\n');
+        body.messages = [{ role: 'system', content: composePrompt(base, prompt) }, ...body.messages.filter(m => m?.role !== 'system' && m?.role !== 'developer')];
+      } else if (typeof body.prompt === 'string') body.prompt = composePrompt(body.prompt, prompt);
       options = { ...init, body: JSON.stringify(body) };
     }
     let response: Response;

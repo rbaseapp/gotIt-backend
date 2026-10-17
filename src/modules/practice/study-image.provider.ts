@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import type { ProfileScope } from '../profile/profile.types.js';
 
 export type StudyImageInput = {
+  learningItemId?: string;
   sourceText: string;
   translationText: string;
   sourceLanguageCode: string;
@@ -9,6 +10,7 @@ export type StudyImageInput = {
   context: string | null;
   visual?: StudyImageVisualBrief;
   scope?: ProfileScope;
+  excludeSourceUrls?: string[];
 };
 
 export type StudyImageVisualBrief = {

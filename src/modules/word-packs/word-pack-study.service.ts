@@ -8,6 +8,7 @@ import type {
 } from '../practice/study-image.provider.js';
 import { literalStudyImageBrief } from '../practice/study-image.provider.js';
 import { AppError } from '../../shared/errors/app-error.js';
+import { ConceptImagesService } from '../concepts/concept-images.service.js';
 import { validWordExample, type WordPackExampleProvider } from './word-pack-example.provider.js';
 
 const pronounSubjects: Record<string, string> = {
@@ -51,6 +52,7 @@ export class WordPackStudyService {
     private readonly packs: WordPackRepository,
     private readonly images?: StudyImageProvider,
     private readonly exampleProvider?: WordPackExampleProvider,
+    private readonly automaticConcepts = false,
   ) {}
 
   private async input(
@@ -67,6 +69,7 @@ export class WordPackStudyService {
         ? pronounSubjects[pronoun]
         : undefined;
     return {
+      learningItemId: entry.learningItemId ?? undefined,
       sourceText: entry.sourceText,
       translationText: entry.translationText,
       sourceLanguageCode: pack.track.sourceLanguageCode,
@@ -127,11 +130,19 @@ export class WordPackStudyService {
   /** Read-only: pronouns must not expose stale lexical images from owned items. */
   async cachedImage(scope: ProfileScope, packId: string, entryId: string) {
     const input = await this.input(scope, packId, entryId);
+    const concepts = new ConceptImagesService(this.pool, this.images, this.automaticConcepts);
+    if(await concepts.pending(input)) return { image: null };
+    const concept = await concepts.resolve(input);
+    if (concept) return { image: await concepts.image(concept, input, false) };
     return input.visual ? { image: null } : this.packs.image(scope, packId, entryId);
   }
 
   async image(scope: ProfileScope, packId: string, entryId: string) {
     const input = await this.input(scope, packId, entryId);
+    const concepts = new ConceptImagesService(this.pool, this.images, this.automaticConcepts);
+    if(await concepts.pending(input)) return { image: null };
+    const concept = await concepts.resolve(input);
+    if (concept) return { image: await concepts.image(concept, input, true) };
     const cached = input.visual ? { image: null } : await this.packs.image(scope, packId, entryId);
     if (cached.image || !this.images) return cached;
     const key = this.key(input);

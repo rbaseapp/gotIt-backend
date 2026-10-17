@@ -1,4 +1,5 @@
 import type { CefrLevel } from '../profile/profile.types.js';
+import type { LessonMaterial } from '../courses/lesson-material.schema.js';
 
 export type TeacherStation = 'supported' | 'midpoint' | 'review';
 
@@ -16,6 +17,8 @@ export function teacherStations(total: number, introduced: number) {
 }
 
 export type LessonUnit = {
+  material?: LessonMaterial;
+  materials?: Partial<Record<TeacherStation, LessonMaterial>>;
   packId: string;
   title: string;
   moduleNumber: number;

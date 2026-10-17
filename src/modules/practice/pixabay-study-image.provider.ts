@@ -188,7 +188,12 @@ export class PixabayStudyImageProvider implements StudyImageProvider {
     };
     if (!input.sourceText) return null;
     const key = createHash('sha256')
-      .update(JSON.stringify(input.visual ?? literalStudyImageBrief(input)))
+      .update(
+        JSON.stringify([
+          input.visual ?? literalStudyImageBrief(input),
+          input.excludeSourceUrls ?? [],
+        ]),
+      )
       .digest('hex');
     const existing = this.pending.get(key);
     if (existing) return existing;
@@ -203,7 +208,9 @@ export class PixabayStudyImageProvider implements StudyImageProvider {
       await Promise.all(visual.searchQueries.slice(0, 3).map((query) => this.search(query)))
     ).flat();
     const uniqueHits = [...new Map(hits.map((hit) => [hit.id, hit])).values()];
-    for (const hit of rank(uniqueHits, { ...input, visual }).slice(0, 3)) {
+    for (const hit of rank(uniqueHits, { ...input, visual })
+      .filter((hit) => !input.excludeSourceUrls?.includes(hit.pageURL))
+      .slice(0, 3)) {
       const image = await this.download(hit);
       if (image) return image;
     }
