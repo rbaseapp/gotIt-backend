@@ -20,4 +20,9 @@ test('daily AI quotas are scoped to user and feature and reject only the exhaust
   );
   await quota.consume(user, 'course_generation');
   await quota.consume({ ...user, applicationUserId: 'user-two' }, 'study_image_generation');
+  for (let index = 0; index < 200; index++)
+    await quota.consume(user, 'concept_assignment_backfill');
+  await assert.rejects(quota.consume(user, 'concept_assignment_backfill'));
+  await quota.consume(user, 'concept_assignment_live');
+  await quota.consume(user, 'ai_translation');
 });

@@ -125,7 +125,15 @@ export async function createTestDatabase() {
       connectionString: adminUrl.replace('://postgres@', '://gotit_test_runtime@'),
       connectionTimeoutMillis: 1000,
     });
-    return { adminPool, runtimePool, dispose, migrate };
+    const rollbackAfter = async (name: string) => {
+      const applied = (
+        await adminPool!.query(`SELECT name FROM gotit_migrations.pgmigrations ORDER BY id DESC`)
+      ).rows;
+      const count = applied.findIndex((row) => row.name === name);
+      if (count < 0) throw new Error('Requested disposable migration baseline is not applied');
+      for (let index = 0; index < count; index++) await migrate('down');
+    };
+    return { adminPool, runtimePool, dispose, migrate, rollbackAfter };
   } catch (error) {
     try {
       await dispose();

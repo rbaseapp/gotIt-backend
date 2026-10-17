@@ -8,7 +8,8 @@ export type AiDailyFeature =
   | 'private_lesson_brief'
   | 'private_lesson_report'
   | 'ai_translation'
-  | 'concept_assignment'
+  | 'concept_assignment_live'
+  | 'concept_assignment_backfill'
   | 'study_image_brief'
   | 'study_image_generation';
 
@@ -18,7 +19,8 @@ const LIMITS: Record<AiDailyFeature, number> = {
   private_lesson_brief: 60,
   private_lesson_report: 60,
   ai_translation: 100,
-  concept_assignment: 200,
+  concept_assignment_live: 200,
+  concept_assignment_backfill: 200,
   study_image_brief: 60,
   study_image_generation: 20,
 };

@@ -31,6 +31,7 @@ type Job = {
   claim_id: string;
   attempts: number;
   descriptor: unknown;
+  priority: number;
 };
 type Queryable = {
   query(text: string, values: unknown[]): Promise<{ rows: Record<string, any>[] }>;
@@ -67,9 +68,10 @@ export class ConceptAssignmentService {
       // Re-select after each decision so newly captured words can overtake backfill.
       const row = (
         await this.db.query(
-          `SELECT application_id,application_user_id,learning_item_id FROM product_gotit.concept_assignment_jobs
-      WHERE status<>'completed' AND next_attempt_at<=now() AND (claim_until IS NULL OR claim_until<now())
-      ORDER BY priority DESC,next_attempt_at,updated_at,learning_item_id LIMIT 1`,
+          `SELECT j.application_id,j.application_user_id,j.learning_item_id FROM product_gotit.concept_assignment_jobs j
+      JOIN product_gotit.learning_items li ON li.application_id=j.application_id AND li.application_user_id=j.application_user_id AND li.id=j.learning_item_id
+      WHERE j.status<>'completed' AND j.next_attempt_at<=now() AND (j.claim_until IS NULL OR j.claim_until<now())
+      ORDER BY j.priority DESC,j.next_attempt_at,li.created_at DESC,j.learning_item_id LIMIT 1`,
           [],
         )
       ).rows[0];
@@ -156,6 +158,14 @@ export class ConceptAssignmentService {
           WHERE application_id=$1 AND application_user_id=$2 AND learning_item_id=$3 AND claim_id=$4`,
             [...keys(job), token, code, retry],
           );
+          // One exhausted owner's historical queue must not consume the live budget,
+          // churn through every row, or delay another owner's eligible work.
+          if (quotaExceeded)
+            await this.db.query(
+              `UPDATE product_gotit.concept_assignment_jobs SET last_error=$4,next_attempt_at=GREATEST(next_attempt_at,now()+($5::int*interval '1 second'))
+              WHERE application_id=$1 AND application_user_id=$2 AND (priority=0)=$3 AND status='pending' AND claim_id IS NULL`,
+              [applicationId, userId, job.priority === 0, code, retry],
+            );
           this.warn(code);
           return false;
         }
@@ -181,6 +191,7 @@ export class ConceptAssignmentService {
       translationLanguageCode: row.translation_language_code,
       context: row.context ?? null,
       partOfSpeech: row.part_of_speech,
+      workload: job.priority === 0 ? 'backfill' : 'live',
     };
   }
   private candidates(

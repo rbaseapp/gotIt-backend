@@ -673,8 +673,166 @@ test(
         },
       );
       await t.test(
+        'name automatically extends an existing automatic pair across scripts, marks and regional tags',
+        async () => {
+          const english = await capture('name', 'שם');
+          const nameId = await withTransaction(db.runtimePool, async (tx) => {
+            const row = (
+              await tx.query(`SELECT * FROM product_gotit.learning_items WHERE id=$1`, [english.id])
+            ).rows[0]!;
+            return (
+              await ensureWordImageConcept(tx, scope.applicationId, {
+                ...row,
+                translation_text: 'שם',
+              })
+            ).id;
+          });
+          const languagePairs = [
+            ['ar', 'إسم', 'he', 'שֵׁם'],
+            ['fr', 'nom', 'de', 'Name'],
+            ['es', 'nombre', 'ru', 'имя'],
+            ['zh', '名字', 'ja', '名前'],
+            ['hi', 'नाम', 'tr', 'isim'],
+            ['ru', 'имя', 'fr', 'nom'],
+            ['yi', 'נאָמען', 'he', 'שם'],
+            ['en-US', 'name', 'fr-CA', 'nom'],
+          ];
+          const semantic = new ConceptAssignmentService(db.runtimePool, {
+            id: 'multilingual-name-fixture',
+            describe: async (input) => ({
+              ...pear,
+              key: 'name-designation',
+              lemma: 'name',
+              synonyms: ['designation'],
+              definition: 'A word by which a person or thing is known.',
+              sourceLemma: input.sourceText,
+              translationLemma: input.translationText,
+            }),
+            choose: async (_input, _descriptor, candidates) => {
+              assert.ok(
+                candidates.some((c) => c.id === nameId),
+                'English meaning pivot recalls the automatic concept without a shared input language',
+              );
+              return nameId;
+            },
+          });
+          for (const [sl, st, tl, tt] of [['en', 'name', 'he', 'שם'], ...languagePairs]) {
+            const word = sl === 'en' ? english : await capture(st!, tt!, sl!, tl!);
+            const before = (
+              await db.runtimePool.query(
+                `SELECT learning_revision,overall_mastery_score,review_stage FROM product_gotit.learning_items WHERE id=$1`,
+                [word.id],
+              )
+            ).rows[0];
+            assert.equal(
+              await semantic.assign(scope.applicationId, scope.applicationUserId, word.id),
+              true,
+            );
+            assert.equal((await bind(word.id)).concept_id, nameId);
+            assert.equal(
+              (await admin.words.list(actor, wordListSchema.parse({}), word.id)).data.conceptId,
+              nameId,
+            );
+            assert.deepEqual(
+              (
+                await db.runtimePool.query(
+                  `SELECT learning_revision,overall_mastery_score,review_stage FROM product_gotit.learning_items WHERE id=$1`,
+                  [word.id],
+                )
+              ).rows[0],
+              before,
+            );
+          }
+          const expressions = (
+            await db.runtimePool.query(
+              `SELECT language_code,expression FROM product_gotit.concept_expressions WHERE application_id=$1 AND concept_id=$2`,
+              [scope.applicationId, nameId],
+            )
+          ).rows;
+          for (const [sl, st, tl, tt] of languagePairs) {
+            assert.ok(expressions.some((e) => e.language_code === sl && e.expression === st));
+            assert.ok(expressions.some((e) => e.language_code === tl && e.expression === tt));
+          }
+        },
+      );
+      await t.test(
+        'backfill quota defers only the exhausted owner and workload while fresh words continue',
+        async () => {
+          await db.runtimePool.query(
+            `UPDATE product_gotit.concept_assignment_jobs SET next_attempt_at=now()+interval '1 hour' WHERE status<>'completed'`,
+          );
+          const old = await capture('pear', 'אגס'),
+            otherOld = await capture('poire', 'אגס', 'fr'),
+            fresh = await capture('pear', 'אגס'),
+            foreign = await capture('pear', 'אגס', 'en', 'he', other);
+          await db.runtimePool.query(
+            `UPDATE product_gotit.concept_assignment_jobs SET priority=0 WHERE learning_item_id=ANY($1::uuid[])`,
+            [[old.id, otherOld.id, foreign.id]],
+          );
+          const limited = new ConceptAssignmentService(db.runtimePool, {
+            ...provider,
+            describe: async (input) => {
+              if (
+                input.workload === 'backfill' &&
+                input.scope.applicationId === scope.applicationId
+              )
+                throw new AppError(429, 'AI_DAILY_LIMIT_REACHED', 'limit', { retryAfter: 7200 });
+              return provider.describe(input);
+            },
+          });
+          assert.equal(
+            await limited.assign(scope.applicationId, scope.applicationUserId, old.id),
+            false,
+          );
+          assert.equal((await job(otherOld.id)).last_error, 'CONCEPT_DAILY_LIMIT_REACHED');
+          assert.equal(
+            (await job(otherOld.id)).attempts,
+            0,
+            'do not burn attempts on every row in an exhausted queue',
+          );
+          assert.equal(
+            await limited.assign(scope.applicationId, scope.applicationUserId, fresh.id),
+            true,
+          );
+          assert.equal(
+            await limited.assign(other.applicationId, other.applicationUserId, foreign.id),
+            true,
+          );
+          assert.equal((await job(old.id)).status, 'pending');
+        },
+      );
+      await t.test(
         'the new migration guards resolved work and backfills historical words after a safe disposable rollback',
         async () => {
+          await db.migrate('down'); // Workload migration is deliberately data-preserving.
+          const [historical] = (
+            await db.runtimePool.query(
+              `SELECT * FROM product_gotit.concept_assignment_jobs WHERE priority=0 AND status='pending' LIMIT 1`,
+            )
+          ).rows;
+          await db.runtimePool.query(
+            `UPDATE product_gotit.concept_assignment_jobs SET last_error='CONCEPT_DAILY_LIMIT_REACHED',next_attempt_at=now()+interval '1 day' WHERE application_id=$1 AND application_user_id=$2 AND learning_item_id=$3`,
+            [
+              historical.application_id,
+              historical.application_user_id,
+              historical.learning_item_id,
+            ],
+          );
+          await db.migrate('up');
+          const released = (
+            await db.runtimePool.query(
+              `SELECT last_error,next_attempt_at,descriptor FROM product_gotit.concept_assignment_jobs WHERE application_id=$1 AND application_user_id=$2 AND learning_item_id=$3`,
+              [
+                historical.application_id,
+                historical.application_user_id,
+                historical.learning_item_id,
+              ],
+            )
+          ).rows[0];
+          assert.equal(released.last_error, null);
+          assert.ok(new Date(released.next_attempt_at).getTime() <= Date.now());
+          assert.deepEqual(released.descriptor, historical.descriptor);
+          await db.migrate('down');
           await assert.rejects(db.migrate('down'));
           await db.runtimePool.query(`DELETE FROM product_gotit.learning_item_concepts`);
           await db.runtimePool.query(

@@ -64,7 +64,7 @@ test('semantic provider uses strict bounded output, private per-user quota, safe
       consume: async (scope, feature) => {
         quota++;
         assert.deepEqual(scope, input.scope);
-        assert.equal(feature, 'concept_assignment');
+        assert.equal(feature, 'concept_assignment_live');
       },
     },
   );
@@ -102,4 +102,56 @@ test('semantic provider rejects malformed, refused, incomplete and oversized res
     async () => new Response('x'.repeat(140000)),
   );
   await assert.rejects(oversized.describe(input), /too large/);
+});
+
+test('historical semantic calls use a separate budget without sending scheduling metadata to AI', async () => {
+  const features: string[] = [];
+  const id = randomUUID();
+  const provider = new OpenAiConceptAssignmentProvider(
+    'fixture',
+    'configured',
+    async (_url, init) => {
+      const body = JSON.parse(String(init?.body));
+      assert.doesNotMatch(body.input[0].content, /workload|backfill/);
+      return Response.json({
+        status: 'completed',
+        output: [
+          {
+            content: [
+              {
+                type: 'output_text',
+                text: JSON.stringify(
+                  body.text.format.name === 'concept_descriptor' ? descriptor : { conceptId: id },
+                ),
+              },
+            ],
+          },
+        ],
+      });
+    },
+    {
+      consume: async (_scope, feature) => {
+        features.push(feature);
+      },
+    },
+  );
+  const historical = { ...input, workload: 'backfill' as const };
+  await provider.describe(historical);
+  await provider.choose(historical, descriptor, [
+    {
+      id,
+      key: 'find',
+      title: 'Find',
+      definition: descriptor.definition,
+      revision: 0,
+      meaning_revision: 1,
+      expressions: [],
+    },
+  ]);
+  await provider.describe(input);
+  assert.deepEqual(features, [
+    'concept_assignment_backfill',
+    'concept_assignment_backfill',
+    'concept_assignment_live',
+  ]);
 });

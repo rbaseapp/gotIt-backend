@@ -16,9 +16,7 @@ test(
   async (t) => {
     const db = await createTestDatabase();
     try {
-      await db.migrate('down'); // Later automatic semantic assignment.
-      await db.migrate('down'); // Read-only translation resolver.
-      await db.migrate('down');
+      await db.rollbackAfter('1792191000000_multilingual-concepts');
       const app = randomUUID(),
         foreign = randomUUID(),
         user = randomUUID(),
@@ -271,8 +269,7 @@ test(
             (await imageService.cached(linked, 'banana'))?.url,
             `data:image/png;base64,${Buffer.from('later-catalog-picture').toString('base64')}`,
           );
-          await db.migrate('down'); // Remove the empty assignment queue.
-          await db.migrate('down'); // Resolver rollback retains all meanings and media.
+          await db.rollbackAfter('1792192000000_automatic-word-images');
           await assert.rejects(db.migrate('down'));
         },
       );
