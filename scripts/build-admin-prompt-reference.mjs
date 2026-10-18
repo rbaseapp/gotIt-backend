@@ -44,7 +44,7 @@ const catalog = {};
 for (const [key, description, ...files] of definitions) {
   const templates = [];
   for (const file of files) {
-    const source = await readFile(path.join(root, 'src/modules', file), 'utf8');
+    const source = (await readFile(path.join(root, 'src/modules', file), 'utf8')).replace(/\r\n/g, '\n');
     const ast = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true);
     const add = (name, node) => {
       if (

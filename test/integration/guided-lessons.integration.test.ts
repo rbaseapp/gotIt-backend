@@ -145,6 +145,9 @@ test(
       await assert.rejects(
         db.runtimePool.query('CREATE TABLE product_gotit.runtime_ddl_forbidden (id integer)'),
       );
+      // Undo the two newer additive admin migrations before the activity migration.
+      await db.migrate('down');
+      await db.migrate('down');
       await db.migrate('down');
       assert.equal(
         (

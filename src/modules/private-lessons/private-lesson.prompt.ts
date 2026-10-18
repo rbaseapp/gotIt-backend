@@ -80,7 +80,7 @@ export type PrivateLessonWordPackContext = {
   level: CefrLevel;
   station: 'supported' | 'midpoint' | 'review';
   introduced?: number;
-  teacherStations?: ReturnType<typeof import('../word-packs/word-pack-journey.js').wordPackJourney>;
+  teacherStations?: LessonUnit['teacherStations'];
   completed: number;
   total: number;
   words: {

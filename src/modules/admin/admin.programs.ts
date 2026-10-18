@@ -15,6 +15,7 @@ import type { PrivateLessonPlan } from '../private-lessons/private-lesson.prompt
 import { unitContentSchema } from './admin.unit-content.js';
 import { commandSchema, listSchema } from './admin.schemas.js';
 import type { AdminActor, ProductAdminService } from './admin.service.js';
+import { supportsTeacherStations, teacherStations } from '../word-packs/teacher-stations.js';
 
 export const unitIdSchema = z
   .string()
@@ -62,7 +63,10 @@ export class ProgramAdmin {
     if (!metadata) throw missing();
     const plan: PrivateLessonPlan = {
       id: packId,
-      durationSeconds: input.station === 'review' ? 600 : 300,
+      durationSeconds:
+        teacherStations(input.content.entries.length, 0, input.content.stationSettings).find(
+          (station) => station.station === input.station,
+        )!.durationMinutes * 60,
       targetLanguageCode: metadata.source_language_code,
       supportLanguageCode: metadata.translation_language_code,
       level: metadata.cefr_from,
@@ -154,13 +158,19 @@ export class ProgramAdmin {
     ).rows;
     const own = overrides.find((item) => item.application_user_id === userId);
     const inherited = own ?? overrides[0];
+    const metadata = (
+      await this.owner.db.query(
+        `SELECT t.id AS "programId",t.title AS "programTitle",t.slug,tr.source_language_code,tr.translation_language_code FROM product_gotit.word_packs p JOIN product_gotit.word_tracks tr ON tr.id=p.track_id JOIN product_gotit.word_topics t ON t.id=tr.topic_id WHERE p.id=$1`,
+        [packId],
+      )
+    ).rows[0];
     const entries = (
       await this.owner.db.query(
         `SELECT e.id,COALESCE(li.source_text,e.source_text) AS "sourceText",COALESCE((SELECT translation_text FROM product_gotit.item_translations t WHERE t.application_id=li.application_id AND t.application_user_id=li.application_user_id AND t.learning_item_id=li.id AND t.is_current AND t.is_primary LIMIT 1),e.translation_text) AS "translationText",e.example_text AS "exampleText",li.id AS "learningItemId",li.updated_at AS "expectedUpdatedAt" FROM product_gotit.word_pack_entries e LEFT JOIN product_gotit.learning_item_pack_entries link ON link.application_id=$1 AND link.application_user_id=$3 AND link.pack_id=e.pack_id AND link.entry_id=e.id LEFT JOIN product_gotit.learning_items li ON li.application_id=link.application_id AND li.application_user_id=link.application_user_id AND li.id=link.learning_item_id AND li.deleted_at IS NULL WHERE e.pack_id=$2 ORDER BY e.sort_order,e.id`,
         [actor.applicationId, packId, userId],
       )
     ).rows;
-    const content = inherited
+    const content: z.infer<typeof unitContentSchema> = inherited
       ? unitContentSchema.parse(inherited.content)
       : {
           title: row.title,
@@ -186,6 +196,22 @@ export class ProgramAdmin {
         revision: own?.revision ?? 0,
         inherited: !own && Boolean(inherited),
         content,
+        programId: metadata.programId,
+        programTitle: metadata.programTitle,
+        learningPath: {
+          enabled: supportsTeacherStations(
+            metadata.slug,
+            metadata.source_language_code,
+            metadata.translation_language_code,
+          ),
+          stations: supportsTeacherStations(
+            metadata.slug,
+            metadata.source_language_code,
+            metadata.translation_language_code,
+          )
+            ? teacherStations(content.entries.length, 0, content.stationSettings)
+            : [],
+        },
       },
     };
   }
@@ -240,6 +266,27 @@ export class ProgramAdmin {
         );
         if (new Set(senses).size !== senses.length)
           throw new AppError(400, 'VALIDATION_ERROR', 'Duplicate word senses');
+        if (input.content.stationSettings) {
+          const metadata = (
+            await tx.query(
+              `SELECT t.slug,tr.source_language_code,tr.translation_language_code FROM product_gotit.word_packs p JOIN product_gotit.word_tracks tr ON tr.id=p.track_id JOIN product_gotit.word_topics t ON t.id=tr.topic_id WHERE p.id=$1`,
+              [packId],
+            )
+          ).rows[0];
+          if (
+            !metadata ||
+            !supportsTeacherStations(
+              metadata.slug,
+              metadata.source_language_code,
+              metadata.translation_language_code,
+            )
+          )
+            throw new AppError(
+              400,
+              'VALIDATION_ERROR',
+              'Teacher stations are not enabled for this unit',
+            );
+        }
         if (userId) {
           const repository = new LibraryRepository(this.owner.db);
           for (const entry of [...input.content.entries].sort((a, b) => a.id.localeCompare(b.id))) {

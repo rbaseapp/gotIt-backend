@@ -5,10 +5,13 @@ import { scopeValues } from '../library/library.repository.js';
 import { PROFILE_DEFAULTS } from '../profile/profile.constants.js';
 import type { ProfileScope } from '../profile/profile.types.js';
 import type { AddInput, CatalogQuery, KnownInput, RemovalInput } from './word-packs.validation.js';
-
-import { wordPackJourney } from './word-pack-journey.js';
 import { unitLearnedPredicate } from './unit-learning.js';
-import { currentWordStage, type LessonUnit } from './teacher-stations.js';
+import {
+  currentWordStage,
+  teacherStations,
+  supportsTeacherStations,
+  type LessonUnit,
+} from './teacher-stations.js';
 import { unitOverride } from '../admin/admin.unit-content.js';
 import { lookupText } from '../capture/capture.validation.js';
 
@@ -29,7 +32,6 @@ export class WordPackRepository {
       version: row.version,
       wordCount: Number(row.word_count),
       installed: row.installed_status === 'active',
-      teacherStations: wordPackJourney(Number(row.word_count), Number(row.introduced_count)),
       installedVersion: row.installed_version === null ? null : Number(row.installed_version),
       topic: { id: row.topic_id, slug: row.topic_slug, title: row.topic_title },
       track: {
@@ -57,6 +59,17 @@ export class WordPackRepository {
           Number(row.prepared_meetings) === 3,
         due: Number(row.due_count),
       },
+      teacherStations: supportsTeacherStations(
+        row.topic_slug,
+        row.source_language_code,
+        row.translation_language_code,
+      )
+        ? teacherStations(
+            Number(row.word_count),
+            Number(row.introduced_count),
+            row.station_settings ?? undefined,
+          )
+        : [],
     };
   }
 
@@ -72,6 +85,7 @@ export class WordPackRepository {
           tr.id track_id,tr.slug track_slug,tr.title track_title,tr.level_code,tr.cefr_from,tr.cefr_to,
           tr.source_language_code,tr.translation_language_code,tr.sort_order track_sort_order,
           tp.id topic_id,tp.slug topic_slug,tp.title topic_title,tp.sort_order topic_sort_order,
+          (SELECT c.content->'stationSettings' FROM product_gotit.admin_unit_content c WHERE c.application_id=$1 AND c.pack_id=p.id AND (c.application_user_id=$2 OR c.application_user_id IS NULL) ORDER BY c.application_user_id NULLS LAST LIMIT 1) AS station_settings,
           up.status installed_status,up.installed_version,
           count(DISTINCT e.id)::integer word_count,
           count(DISTINCT link.learning_item_id) FILTER(WHERE up.status='active' AND link.excluded_at IS NULL)::integer linked_count,
@@ -240,9 +254,19 @@ export class WordPackRepository {
 
   async lessonUnit(scope: ProfileScope, id: string): Promise<LessonUnit> {
     const { pack, entries } = await this.detail(scope, id);
-    const materials = (await unitOverride(this.pool, scope, id))?.materials;
+    const override = await unitOverride(this.pool, scope, id);
+    const materials = override?.materials;
     if (!pack.teacherStations.length) throw missingPack();
-    const stage = currentWordStage(pack.wordCount, pack.progress.introduced);
+    const stations = teacherStations(
+      pack.wordCount,
+      pack.progress.introduced,
+      override?.stationSettings,
+    );
+    const stage = currentWordStage(
+      pack.wordCount,
+      pack.progress.introduced,
+      override?.stationSettings,
+    );
     const stageEntries = entries.slice(stage.start, stage.end).filter((entry) => !entry.excludedAt);
     const pending = stageEntries.findIndex((entry) => !entry.introduced);
     const stageWords = stageEntries
@@ -269,11 +293,11 @@ export class WordPackRepository {
       introduced: pack.progress.introduced,
       completed: pack.progress.completed,
       total: pack.wordCount,
-      teacherStations: pack.teacherStations,
+      teacherStations: stations,
       stageWords,
       stageWordsByStation: Object.fromEntries(
-        pack.teacherStations.map((station, index) => {
-          const start = index ? pack.teacherStations[index - 1]!.requiredWords : 0;
+        stations.map((station, index) => {
+          const start = index ? stations[index - 1]!.requiredWords : 0;
           const availableEntries = entries
             .slice(start, station.requiredWords)
             .filter((entry) => !entry.excludedAt);

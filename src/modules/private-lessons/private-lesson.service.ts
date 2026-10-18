@@ -1,7 +1,7 @@
 import { adminRuntimeContext } from '../admin/admin.context.js';
 import { buildRealtimeLessonContract } from './private-lesson.realtime.js';
 import { createHash, randomUUID } from 'node:crypto';
-import { childCourseTeacherVoice } from './private-lesson.teachers.js';
+import { privateLessonTeachers, childCourseTeacherVoice } from './private-lesson.teachers.js';
 import { z } from 'zod';
 import { AppError } from '../../shared/errors/app-error.js';
 import type { AddonAccessContract } from '../addons/addon-access.js';
@@ -19,7 +19,11 @@ import type {
   ProfileScope,
   ProfileServiceContract,
 } from '../profile/profile.types.js';
-import { type PrivateLessonPlan } from './private-lesson.prompt.js';
+import {
+  buildPrivateLessonPrompt,
+  describeLessonLanguage,
+  type PrivateLessonPlan,
+} from './private-lesson.prompt.js';
 import {
   privateLessonNotFound,
   type PrivateLessonJournal,
@@ -261,6 +265,7 @@ export class PrivateLessonService {
         'Private voice lessons are unavailable',
       );
 
+    let stationDurationMinutes: number | undefined;
     const path =
       input.packId && this.options.mapWordPacks
         ? await this.getLearningMap(scope, input.packId)
@@ -313,7 +318,7 @@ export class PrivateLessonService {
             introducedWords: unit.context.introduced ?? 0,
           },
         );
-      input.requestedDurationMinutes = station.durationMinutes;
+      stationDurationMinutes = station.durationMinutes;
     }
     if (unit)
       input = {
@@ -427,6 +432,7 @@ export class PrivateLessonService {
     if (unit)
       plan = {
         ...plan,
+        durationSeconds: stationDurationMinutes! * 60,
         wordPack: unit.context,
         targets: unit.targets,
         roadmap: null,
@@ -511,7 +517,8 @@ export class PrivateLessonService {
       }
       timeout = setTimeout(() => controller.abort(), this.requestTimeoutMs);
       const contract = buildRealtimeLessonContract(plan, this.options, runtimePrompt);
-      if (this.options.activities && plan.teachingBrief) contract.session.audio.input.turn_detection.create_response = false;
+      if (this.options.activities && plan.teachingBrief)
+        contract.session.audio.input.turn_detection.create_response = false;
       const response = await this.fetchImpl('https://api.openai.com/v1/realtime/client_secrets', {
         method: 'POST',
         headers: {
@@ -547,7 +554,9 @@ export class PrivateLessonService {
           connectionUrl: ticketId
             ? REALTIME_CONNECT_PATH
             : 'https://api.openai.com/v1/realtime/calls',
-          openingEvent: activity ? this.activityEvent(plan, activity.tutorText) : contract.events.opening,
+          openingEvent: activity
+            ? this.activityEvent(plan, activity.tutorText)
+            : contract.events.opening,
           continuationEvent: contract.events.continuation,
           wrapUpEvent: contract.events.wrapUp,
           translationEvent: contract.events.translation,
