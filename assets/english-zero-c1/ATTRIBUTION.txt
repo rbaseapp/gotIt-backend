@@ -1,0 +1,8 @@
+The NGSL/NAWL derived lexical data retains CC BY-SA 4.0 licensing.
+New General Service List / New Academic Word List: Browne, C., Culligan, B., and Phillips, J. (2013; version 1.2 updates).
+Official source: https://www.newgeneralservicelist.com/new-general-service-list
+Academic source: https://www.newgeneralservicelist.com/new-academic-word-list
+License: https://creativecommons.org/licenses/by-sa/4.0/
+Changes made here: proposed curriculum band/unit allocation, learner-facing viewer, selected draft Hebrew glosses, target-slot classification and review-status metadata. These allocations are our proposal and are not endorsed CEFR mappings by the source authors.
+Definitions in lexicon.json/words.html attributed to the source downloadable NGSL/NAWL files. The original lesson narratives, questions and handbook are separate new authored material; this notice identifies the source-derived lexical dataset and does not represent a licensing decision for the user's independent application.
+Do not remove attribution or ShareAlike licensing from redistributed adapted lexical data. No source project endorsement is implied.

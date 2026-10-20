@@ -145,10 +145,15 @@ test(
       await assert.rejects(
         db.runtimePool.query('CREATE TABLE product_gotit.runtime_ddl_forbidden (id integer)'),
       );
-      // Undo the two newer additive admin migrations before the activity migration.
-      await db.migrate('down');
-      await db.migrate('down');
-      await db.migrate('down');
+      // Rehearse the named historical boundary even when additive migrations follow it.
+      const installed = await db.adminPool.query(
+        'SELECT name FROM gotit_migrations.pgmigrations ORDER BY name DESC',
+      );
+      const boundary = installed.rows.findIndex((row) =>
+        String(row.name).includes('1791280000000_guided-lesson-activities'),
+      );
+      assert.ok(boundary >= 0);
+      for (let index = 0; index <= boundary; index++) await db.migrate('down');
       assert.equal(
         (
           await db.adminPool.query(

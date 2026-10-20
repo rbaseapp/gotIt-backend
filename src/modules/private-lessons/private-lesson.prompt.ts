@@ -26,6 +26,14 @@ export type PrivateLessonTarget = {
 };
 
 export type PrivateLessonPlan = {
+  curriculum?: {
+    lessonId: string;
+    version: string;
+    cursor: number;
+    title: string;
+    script: Array<Record<string, unknown>>;
+    branches: Record<string, string>;
+  } | null;
   realtimeContract?: ReturnType<
     typeof import('./private-lesson.realtime.js').buildRealtimeLessonContract
   >;

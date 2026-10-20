@@ -15,7 +15,12 @@ export interface CourseGenerator {
     instruction: string,
     data: unknown,
   ): Promise<T>;
-  transcribe(scope: ProfileScope, audio: string, language: string): Promise<string>;
+  transcribe(
+    scope: ProfileScope,
+    audio: string,
+    language: string,
+    maximumSeconds?: number,
+  ): Promise<string>;
 }
 export class OpenAiCourseGenerator implements CourseGenerator {
   constructor(
@@ -38,7 +43,11 @@ export class OpenAiCourseGenerator implements CourseGenerator {
   ): Promise<T> {
     await this.dailyQuota?.consume(
       scope,
-      name === 'private_lesson_brief' ? 'private_lesson_brief' : 'course_generation',
+      name.startsWith('curriculum_')
+        ? 'curriculum_generation'
+        : name === 'private_lesson_brief'
+          ? 'private_lesson_brief'
+          : 'course_generation',
     );
     const signal = AbortSignal.timeout(
       ['course_plan', 'lesson_homework'].includes(name) ? 100_000 : 65_000,
@@ -141,10 +150,13 @@ export class OpenAiCourseGenerator implements CourseGenerator {
       );
     }
   }
-  async transcribe(scope: ProfileScope, encoded: string, language: string) {
+  async transcribe(scope: ProfileScope, encoded: string, language: string, maximumSeconds = 15) {
     const audio = Buffer.from(encoded, 'base64');
-    validateWav(audio);
-    await this.dailyQuota?.consume(scope, 'course_transcription');
+    validateWav(audio, maximumSeconds);
+    await this.dailyQuota?.consume(
+      scope,
+      maximumSeconds > 15 ? 'curriculum_transcription' : 'course_transcription',
+    );
     const form = new FormData();
     form.set('file', new Blob([new Uint8Array(audio)], { type: 'audio/wav' }), 'answer.wav');
     form.set('model', this.transcriptionModel);

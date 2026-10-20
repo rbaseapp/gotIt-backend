@@ -38,6 +38,10 @@ export const privateLessonTeachingLanguages = ['target', 'support'] as const;
 
 export const privateLessonInputSchema = z
   .object({
+    curriculumLessonId: z
+      .string()
+      .regex(/^(?:P\d{2}|A[12]\d{2}|B[12]\d{2}|C1\d{2})-L[12]$/u)
+      .optional(),
     courseId: z.uuid().optional(),
     packId: z.uuid().optional(),
     station: z.enum(['supported', 'midpoint', 'review']).optional(),
@@ -66,7 +70,10 @@ export const privateLessonInputSchema = z
   })
   .strict()
   .superRefine((value, context) => {
-    if (value.interactionMode === 'conversation' && (value.courseId || value.packId))
+    if (
+      value.interactionMode === 'conversation' &&
+      (value.courseId || value.packId || value.curriculumLessonId)
+    )
       context.addIssue({
         code: 'custom',
         path: ['interactionMode'],
@@ -74,6 +81,12 @@ export const privateLessonInputSchema = z
       });
     if ((value.courseId && value.packId) || (value.station && !value.packId))
       context.addIssue({ code: 'custom', path: ['packId'], message: 'Choose one lesson context' });
+    if (value.curriculumLessonId && (value.courseId || value.packId))
+      context.addIssue({
+        code: 'custom',
+        path: ['curriculumLessonId'],
+        message: 'Choose one lesson context',
+      });
     if (value.lessonMode === 'absolute_beginner' && value.teachingLanguage === 'target')
       context.addIssue({
         code: 'custom',

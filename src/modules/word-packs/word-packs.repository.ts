@@ -130,6 +130,8 @@ export class WordPackRepository {
           ON known.application_id=$1 AND known.application_user_id=$2
           AND known.pack_id=p.id AND known.entry_id=e.id
         WHERE p.is_active AND ($3::uuid IS NULL OR p.id=$3)
+          AND ($3::uuid IS NOT NULL OR NOT EXISTS (SELECT 1 FROM product_gotit.structured_program_catalog_overrides visibility
+            WHERE visibility.topic_slug=tp.slug AND visibility.hidden))
           AND (COALESCE($4::text,profile.default_source_language) IS NULL OR
             split_part(lower(COALESCE($4::text,profile.default_source_language)),'-',1)=split_part(lower(tr.source_language_code),'-',1))
           AND (COALESCE($5::text,profile.default_translation_language) IS NULL OR

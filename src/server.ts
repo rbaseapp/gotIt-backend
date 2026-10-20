@@ -1,4 +1,6 @@
 import { ProfileRepository } from './modules/profile/profile.repository.js';
+import { CurriculumService } from './modules/curriculum/curriculum.service.js';
+import { CurriculumStore } from './modules/curriculum/curriculum.store.js';
 import { ProductAdminService } from './modules/admin/admin.service.js';
 import { runtimeLearningPolicy } from './modules/admin/admin.context.js';
 import { adminAiFetch } from './modules/admin/admin.ai-fetch.js';
@@ -275,7 +277,20 @@ const courseService = new CourseService(
   new PostgresCourseWordSource(pool),
   new PostgresPrivateLessonJournal(pool),
 );
+const curriculumService = new CurriculumService(
+  new CurriculumStore(pool),
+  profileService,
+  privateLessonContentGenerator,
+  privateLessonContentApiKey
+    ? {
+        apiKey: privateLessonContentApiKey,
+        fetchImpl: providerFetch('courses'),
+        consume: (scope) => aiDailyQuota.consume(scope, 'curriculum_audio'),
+      }
+    : undefined,
+);
 const privateLessonService = new PrivateLessonService({
+  curriculum: curriculumService,
   wordPacks: new PostgresPrivateLessonWordPackSource(pool),
   mapWordPacks: new WordPackRepository(pool),
   activities: privateLessonContentGenerator
@@ -314,6 +329,7 @@ const readingGenerator =
     : undefined;
 
 const app = createApp({
+  curriculumService,
   adminService: new ProductAdminService(
     pool,
     coreAuthClient,

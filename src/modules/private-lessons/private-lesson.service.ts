@@ -1,4 +1,5 @@
 import { adminRuntimeContext } from '../admin/admin.context.js';
+import type { CurriculumService } from '../curriculum/curriculum.service.js';
 import { buildRealtimeLessonContract } from './private-lesson.realtime.js';
 import { createHash, randomUUID } from 'node:crypto';
 import { privateLessonTeachers, childCourseTeacherVoice } from './private-lesson.teachers.js';
@@ -80,6 +81,7 @@ export interface PrivateLessonVocabularySource {
 }
 
 export type PrivateLessonServiceOptions = {
+  curriculum?: CurriculumService;
   wordPacks?: PrivateLessonWordPackSource;
   mapWordPacks?: Pick<WordPackRepository, 'lessonUnit'>;
   activities?: LessonActivityService;
@@ -265,6 +267,29 @@ export class PrivateLessonService {
         'Private voice lessons are unavailable',
       );
 
+    const curriculum = input.curriculumLessonId
+      ? await this.options.curriculum?.prepareLesson(scope, input.curriculumLessonId)
+      : null;
+    if (input.curriculumLessonId && !curriculum)
+      throw new AppError(503, 'CURRICULUM_UNAVAILABLE', 'Structured lessons are unavailable');
+    if (curriculum && curriculum.context.cursor >= curriculum.context.script.length)
+      throw new AppError(
+        409,
+        'CURRICULUM_LESSON_COMPLETED',
+        'This lesson is complete. Continue with its practice on the learning path.',
+      );
+    if (curriculum)
+      input = {
+        ...input,
+        targetLanguageCode: 'en',
+        supportLanguageCode: 'he',
+        requestedLevel: curriculum.band === 'Pre-A1' ? 'A1' : curriculum.band,
+        lessonMode: ['Pre-A1', 'A1'].includes(curriculum.band) ? 'absolute_beginner' : 'standard',
+        teachingLanguage: ['Pre-A1', 'A1'].includes(curriculum.band) ? 'support' : 'target',
+        vocabularyMode: 'none',
+        topic: curriculum.title,
+      };
+
     let stationDurationMinutes: number | undefined;
     const path =
       input.packId && this.options.mapWordPacks
@@ -400,7 +425,11 @@ export class PrivateLessonService {
       ) ?? null;
     const activeRoadmap =
       loadedRoadmap ??
-      (this.options.roadmaps && !input.courseId && !input.packId && targetBaseLanguage === 'en'
+      (this.options.roadmaps &&
+      !input.courseId &&
+      !input.packId &&
+      !curriculum &&
+      targetBaseLanguage === 'en'
         ? await this.options.roadmaps.create(
             scope,
             input.targetLanguageCode,
@@ -429,6 +458,20 @@ export class PrivateLessonService {
       preferences,
       activeRoadmap,
     );
+    if (curriculum)
+      plan = {
+        ...plan,
+        curriculum: curriculum.context,
+        roadmap: null,
+        continuity: null,
+        topic: curriculum.title,
+        grammarFocus: curriculum.grammar.slice(0, 160),
+        durationSeconds:
+          Math.min(curriculum.minutes, input.requestedDurationMinutes ?? curriculum.minutes) * 60,
+        customFocus:
+          'Follow the approved structured curriculum phases, stopping at a natural phase boundary when time expires.',
+        targets: [],
+      };
     if (unit)
       plan = {
         ...plan,
@@ -483,13 +526,15 @@ export class PrivateLessonService {
     let timeout: ReturnType<typeof setTimeout> | undefined;
     try {
       const authoredMaterial = plan.course?.material ?? plan.wordPack?.material;
-      const hasAuthoredMaterial = Boolean(
-        authoredMaterial &&
-          (authoredMaterial.words.length ||
-            authoredMaterial.readingPassage ||
-            authoredMaterial.teacherInstructions ||
-            authoredMaterial.practice),
-      );
+      const hasAuthoredMaterial =
+        Boolean(plan.curriculum) ||
+        Boolean(
+          authoredMaterial &&
+            (authoredMaterial.words.length ||
+              authoredMaterial.readingPassage ||
+              authoredMaterial.teacherInstructions ||
+              authoredMaterial.practice),
+        );
       if (this.options.lessonContentGenerator && !hasAuthoredMaterial) {
         let languageIssue: string | null = null;
         for (let attempt = 0; attempt < 2; attempt++) {
@@ -531,7 +576,7 @@ export class PrivateLessonService {
       });
       const secret = clientSecretSchema.parse(await readProviderJson(response, controller.signal));
 
-      if (!input.courseId && !input.packId)
+      if (!input.courseId && !input.packId && !curriculum)
         await this.options.roadmaps?.savePreferences(scope, input, plan);
       journalAttempted = Boolean(this.options.journal);
       await this.options.journal?.create(scope, { ...plan, realtimeContract: contract });
@@ -621,7 +666,9 @@ export class PrivateLessonService {
             safetyIdentifier(scope),
           )
         : basicPrivateLessonReport(claimed);
-      await this.options.courses?.recordLesson(scope, claimed, report, reportTurns);
+      if (!claimed.curriculum)
+        await this.options.courses?.recordLesson(scope, claimed, report, reportTurns);
+      await this.options.curriculum?.recordLesson(scope, claimed, report, reportTurns);
       const completed = await journal.complete(scope, id, report);
       await this.options.roadmaps?.recordEvidence(scope, claimed, report).catch(() => undefined);
       if (this.options.proficiency)
@@ -958,6 +1005,9 @@ export class PrivateLessonService {
 
 function publicStoredLesson(lesson: StoredPrivateLesson) {
   return {
+    curriculum: lesson.curriculum
+      ? { lessonId: lesson.curriculum.lessonId, version: lesson.curriculum.version }
+      : null,
     course: lesson.course ? { ...lesson.course, material: undefined } : null,
     wordPack: lesson.wordPack
       ? { ...lesson.wordPack, material: undefined, materials: undefined }
@@ -992,6 +1042,9 @@ function publicStoredLesson(lesson: StoredPrivateLesson) {
 function publicPlan(plan: PrivateLessonPlan) {
   const wrapUpLeadSeconds = Math.min(5, Math.max(3, Math.floor(plan.durationSeconds * 0.02)));
   return {
+    curriculum: plan.curriculum
+      ? { lessonId: plan.curriculum.lessonId, version: plan.curriculum.version }
+      : null,
     course: plan.course ? { ...plan.course, material: undefined } : null,
     wordPack: plan.wordPack
       ? { ...plan.wordPack, material: undefined, materials: undefined }

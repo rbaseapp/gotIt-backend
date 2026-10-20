@@ -21,6 +21,7 @@ import type { NotificationService } from '../../modules/notifications/notificati
 import type { ProductAdminService } from '../../modules/admin/admin.service.js';
 
 export type AppDependencies = {
+  curriculumService?: import('../../modules/curriculum/curriculum.service.js').CurriculumService;
   adminService?: ProductAdminService;
   logger: Logger;
   checkDatabase: () => Promise<void>;
