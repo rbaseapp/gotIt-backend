@@ -24,6 +24,7 @@ export type CurriculumState = {
   heartbeat?: { activityId: string; at: string; credited: number };
   articleJob?: string;
   activeAttempts?: Record<string, string>;
+  practiceItems?: Record<string, string>;
 };
 export type Enrollment = { revision: number; state: CurriculumState };
 export type Grade = {

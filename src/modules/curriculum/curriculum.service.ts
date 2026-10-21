@@ -1,3 +1,4 @@
+import { curriculumUnitUnlocked, curriculumPlacedBelow } from './curriculum.practice.js';
 import { randomInt, randomUUID } from 'node:crypto';
 import { withTransaction } from '../../shared/database/transaction.js';
 import { z } from 'zod';
@@ -197,6 +198,18 @@ export class CurriculumService {
           Date.parse(a[1].dueAt) - Date.parse(b[1].dueAt),
       );
     const dose = READING_DOSE[currentUnit.band];
+    const activePractice = state
+      ? (
+          await this.store.pool.query(
+            `SELECT DISTINCT ON (selection->'curriculum'->>'unitId')
+      id,selection->'curriculum'->>'unitId' AS unit FROM product_gotit.practice_sessions
+      WHERE application_id=$1 AND application_user_id=$2 AND status='active' AND session_type='smart_review'
+        AND selection->'curriculum'->>'version'=$3
+      ORDER BY selection->'curriculum'->>'unitId',started_at DESC,id DESC`,
+            [scope.applicationId, scope.applicationUserId, PROGRAM_VERSION],
+          )
+        ).rows
+      : [];
     return {
       program: {
         id: PROGRAM_ID,
@@ -208,6 +221,9 @@ export class CurriculumService {
       },
       revision: enrollment?.revision ?? 0,
       enrolled: Boolean(enrollment),
+      practiceSessions: Object.fromEntries(
+        activePractice.map((row) => [String(row.unit), String(row.id)]),
+      ),
       settings: state
         ? { minutes: state.minutes, literacy: state.literacy, timezone: state.timezone }
         : null,
@@ -300,43 +316,10 @@ export class CurriculumService {
     };
   }
   unitUnlocked(state: CurriculumState, id: string): boolean {
-    if (id === 'C1E') return this.unitUnlocked(state, 'C101');
-    const index = content.units.findIndex((unit) => unit.id === id);
-    if (index < 0) return false;
-    const previous = content.units[index - 1];
-    const requiredTest = previous
-      ? content.unseen.find((test) => test.proposed_unit_block.at(-1) === previous.id)
-      : null;
-    if (
-      index === 0 ||
-      (previous &&
-        state.completed[`gate:${previous.id}`] &&
-        (!requiredTest || state.completed[`unseen:${requiredTest.id}`]))
-    )
-      return true;
-    const band = unitById.get(id)!.band;
-    return (
-      this.placedBelow(state, band) ||
-      (content.units.find((unit) => unit.band === band)?.id === id &&
-        ['reading', 'listening', 'speaking', 'writing', 'vocabulary'].every((skill) => {
-          const evidence = state.placement[skill];
-          return (
-            evidence?.independent &&
-            evidence.score >= 0.75 &&
-            BANDS.indexOf(evidence.band as Band) >= BANDS.indexOf(band)
-          );
-        }))
-    );
+    return curriculumUnitUnlocked(state, id);
   }
   private placedBelow(state: CurriculumState, band: Band) {
-    return ['reading', 'listening', 'speaking', 'writing', 'vocabulary'].every((skill) => {
-      const evidence = state.placement[skill];
-      return (
-        evidence?.independent &&
-        evidence.score >= 0.75 &&
-        BANDS.indexOf(evidence.band as Band) > BANDS.indexOf(band)
-      );
-    });
+    return curriculumPlacedBelow(state, band);
   }
   private nextAction(state: CurriculumState): {
     kind: string;
