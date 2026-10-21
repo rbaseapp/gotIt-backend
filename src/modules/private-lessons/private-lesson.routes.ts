@@ -1,3 +1,4 @@
+import { unitPathChoiceSchema } from '../word-packs/unit-path-choices.js';
 import { Router, type RequestHandler } from 'express';
 import { parseInput } from '../capture/capture.validation.js';
 import { uuidSchema } from '../capture/capture.validation.js';
@@ -19,6 +20,16 @@ export function createPrivateLessonRoutes(
   requireLessonAccess: RequestHandler,
 ) {
   const router = Router();
+  router.post('/units/:id/path-choices', async (req, res) =>
+    res.json({
+      path: await service.chooseUnitPath(
+        req.gotitAuth!,
+        parseInput(uuidSchema, req.params.id),
+        parseInput(unitPathChoiceSchema, req.body),
+      ),
+      requestId: req.id,
+    }),
+  );
   router.post('/voice-sample', requireLessonAccess, async (request, response) => {
     const input = parseInput(privateLessonVoiceSampleSchema, request.body);
     response.setHeader('Cache-Control', 'private, no-store');
