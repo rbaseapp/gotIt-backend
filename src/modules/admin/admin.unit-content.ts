@@ -3,6 +3,7 @@ import { lessonMaterialSchema } from '../courses/lesson-material.schema.js';
 import type { DatabaseTransaction } from '../../shared/database/transaction.js';
 import type { ProfileScope } from '../profile/profile.types.js';
 import { teacherStations } from '../word-packs/teacher-stations.js';
+import { authoredMaterialIssue } from '../private-lessons/private-lesson.planner.js';
 
 const stationSetting = z
   .object({
@@ -47,6 +48,15 @@ export const unitContentSchema = z
   })
   .strict()
   .superRefine((value, ctx) => {
+    for (const step of teacherStations(value.entries.length, 0, value.stationSettings)) {
+      const issue = authoredMaterialIssue(value.materials[step.station], step.durationMinutes * 60);
+      if (issue)
+        ctx.addIssue({
+          code: 'custom',
+          path: ['materials', step.station, 'adaptationPolicy'],
+          message: issue,
+        });
+    }
     if (!value.stationSettings) return;
     const stations = teacherStations(value.entries.length, 0, value.stationSettings);
     for (let i = 0; i < stations.length; i++) {

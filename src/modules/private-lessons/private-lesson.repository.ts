@@ -268,7 +268,7 @@ export class PostgresPrivateLessonJournal implements PrivateLessonJournal {
   }
 }
 
-const selectFields = `SELECT s.id,s.curriculum_context,s.target_language_code,s.support_language_code,s.level,s.topic,s.grammar_focus,
+const selectFields = `SELECT s.id,s.realtime_contract,s.curriculum_context,s.target_language_code,s.support_language_code,s.level,s.topic,s.grammar_focus,
  s.focus_areas,s.custom_focus,s.correction_mode,s.vocabulary_mode,s.lesson_mode,s.teaching_language,s.continuity,s.roadmap_id,s.milestone_id,s.course_context,s.word_pack_context,
  s.teacher_voice,s.speech_rate,s.planned_duration_seconds,s.target_words,s.status,s.started_at,s.ended_at,
  s.actual_duration_seconds,s.report,r.goal_title,m.milestone_key,m.communication_objective,m.grammar_topics,
@@ -285,6 +285,11 @@ function storedLesson(row: Record<string, unknown>): StoredPrivateLesson {
     row.report && typeof row.report === 'object' ? (row.report as Record<string, unknown>) : null;
   return {
     curriculum: (row.curriculum_context as PrivateLessonPlan['curriculum']) ?? null,
+    interactionProtocol:
+      (row.realtime_contract as { protocolVersion?: string } | null)?.protocolVersion ===
+      'adaptive-v1'
+        ? 'adaptive-v1'
+        : undefined,
     course: (row.course_context as PrivateLessonPlan['course']) ?? null,
     wordPack: (row.word_pack_context as PrivateLessonPlan['wordPack']) ?? null,
     id: String(row.id),

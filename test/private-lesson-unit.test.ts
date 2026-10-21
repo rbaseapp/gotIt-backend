@@ -221,7 +221,7 @@ test('a failed activity allocation removes its journal and releases all reservat
         return true;
       },
     } as never,
-    activities: {
+    legacyActivities: {
       create: async () => {
         throw new Error('database unavailable');
       },

@@ -1,4 +1,6 @@
 import { Router, type RequestHandler } from 'express';
+import { z } from 'zod';
+import { lessonActivityCommandSchema as legacyCommandSchema } from './private-lesson.legacy-activity.js';
 import { parseInput } from '../capture/capture.validation.js';
 import { uuidSchema } from '../capture/capture.validation.js';
 import type { PrivateLessonService } from './private-lesson.service.js';
@@ -10,7 +12,6 @@ import {
   privateLessonPreferencesInputSchema,
   privateLessonRoadmapInputSchema,
   privateLessonSetupSchema,
-  lessonReplaySchema,
   privateLessonVoiceSampleSchema,
 } from './private-lesson.validation.js';
 
@@ -78,6 +79,7 @@ export function createPrivateLessonRoutes(
   });
 
   router.post('/realtime-sessions', requireLessonAccess, async (request, response) => {
+    if (request.body?.interactionProtocol === 'adaptive-v1') response.setTimeout(210_000);
     response.status(201).json({
       ...(await service.createSession(
         request.gotitAuth!,
@@ -102,6 +104,39 @@ export function createPrivateLessonRoutes(
     });
   });
 
+  router.get('/:id/activity', requireLessonAccess, async (request, response) => {
+    response.json({
+      ...(await service.getActivity(request.gotitAuth!, parseInput(uuidSchema, request.params.id))),
+      requestId: request.id,
+    });
+  });
+  router.post('/:id/activity', requireLessonAccess, async (request, response) => {
+    response.json({
+      ...(await service.act(
+        request.gotitAuth!,
+        parseInput(uuidSchema, request.params.id),
+        parseInput(z.union([lessonActivityCommandSchema, legacyCommandSchema]), request.body),
+      )),
+      requestId: request.id,
+    });
+  });
+  router.post('/:id/replay', requireLessonAccess, async (request, response) => {
+    const input = parseInput(
+      z
+        .object({ kind: z.enum(['original', 'translation']), rate: z.enum(['normal', 'slow']) })
+        .strict(),
+      request.body,
+    );
+    response.json({
+      ...(await service.replayTurn(
+        request.gotitAuth!,
+        parseInput(uuidSchema, request.params.id),
+        input,
+      )),
+      requestId: request.id,
+    });
+  });
+
   router.post('/:id/complete', requireLessonAccess, async (request, response) => {
     response.json({
       lesson: await service.completeSession(
@@ -109,34 +144,6 @@ export function createPrivateLessonRoutes(
         parseInput(uuidSchema, request.params.id),
         parseInput(privateLessonCompletionSchema, request.body),
       ),
-      requestId: request.id,
-    });
-  });
-
-  router.get('/:id/activity', requireLessonAccess, async (request, response) => {
-    response.json({
-      ...(await service.getActivity(request.gotitAuth!, parseInput(uuidSchema, request.params.id))),
-      requestId: request.id,
-    });
-  });
-  router.post('/:id/replay', requireLessonAccess, async (request, response) => {
-    response.json({
-      ...(await service.replayTurn(
-        request.gotitAuth!,
-        parseInput(uuidSchema, request.params.id),
-        parseInput(lessonReplaySchema, request.body),
-      )),
-      requestId: request.id,
-    });
-  });
-
-  router.post('/:id/activity', requireLessonAccess, async (request, response) => {
-    response.json({
-      ...(await service.act(
-        request.gotitAuth!,
-        parseInput(uuidSchema, request.params.id),
-        parseInput(lessonActivityCommandSchema, request.body),
-      )),
       requestId: request.id,
     });
   });

@@ -91,12 +91,29 @@ export function buildCanonicalAssessment(
   const skills = Object.fromEntries(
     ASSESSMENT_SKILLS.map((skill) => {
       const raw = rawSkills[skill];
-      const evidence = raw.evidence.filter((item) =>
-        learnerText.some((turn) => turn.includes(normalizeText(item.learnerQuote))),
-      );
+      const evidence = raw.evidence
+        .filter((item) =>
+          learnerText.some((turn) => turn.includes(normalizeText(item.learnerQuote))),
+        )
+        .map((item) => ({
+          ...item,
+          independent:
+            item.independent &&
+            (plan.learningEvidence === undefined ||
+              plan.learningEvidence.some(
+                (outcome) =>
+                  outcome.outcome === 'independent' &&
+                  Boolean(outcome.learnerAnswer) &&
+                  normalizeText(outcome.learnerAnswer!).includes(normalizeText(item.learnerQuote)),
+              )),
+        }));
       const evidenceQuality = lowerQuality(raw.evidenceQuality, volumeQuality);
-      const dimensions =
+      const rawDimensions =
         raw.dimensions ?? dimensionsFromLegacyScore(raw.score, legacyTenPointScale);
+      const dimensions =
+        plan.learningEvidence !== undefined && !evidence.some((item) => item.independent)
+          ? { ...rawDimensions, independence: 0 }
+          : rawDimensions;
       const dimensionScore = weightedDimensionScore(dimensions);
       const evidenceCount = evidence.length;
       const quality = evidenceCount === 0 ? lowerQuality(evidenceQuality, 'weak') : evidenceQuality;

@@ -9,6 +9,8 @@ export type AiDailyFeature =
   | 'curriculum_audio'
   | 'curriculum_transcription'
   | 'private_lesson_brief'
+  | 'private_lesson_plan'
+  | 'private_lesson_answer'
   | 'private_lesson_report'
   | 'ai_translation'
   | 'study_image_brief'
@@ -21,6 +23,8 @@ const LIMITS: Record<AiDailyFeature, number> = {
   curriculum_audio: 120,
   curriculum_transcription: 80,
   private_lesson_brief: 60,
+  private_lesson_plan: 120,
+  private_lesson_answer: 600,
   private_lesson_report: 60,
   ai_translation: 100,
   study_image_brief: 60,

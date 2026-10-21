@@ -9,7 +9,7 @@ import {
   LessonActivityService,
   PostgresLessonActivityStore,
   type LessonActivityCommand,
-} from '../../src/modules/private-lessons/private-lesson.activity.js';
+} from '../../src/modules/private-lessons/private-lesson.legacy-activity.js';
 import { basicPrivateLessonReport } from '../../src/modules/private-lessons/private-lesson.summary.js';
 import { guidedLessonPlan } from '../helpers/private-lesson-fixtures.js';
 import { createTestDatabase } from '../helpers/postgres.js';

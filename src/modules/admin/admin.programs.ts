@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { lessonMaterialReadiness } from '../private-lessons/private-lesson.planner.js';
 import { AppError } from '../../shared/errors/app-error.js';
 import { LibraryRepository } from '../library/library.repository.js';
 import { lookupText } from '../capture/capture.validation.js';
@@ -108,6 +109,7 @@ export class ProgramAdmin {
       data: {
         id: packId,
         kind: 'unit-preview',
+        planning: lessonMaterialReadiness(plan),
         contract: buildRealtimeLessonContract(plan, this.defaults, runtime.prompts['lesson-live']),
       },
     };
@@ -347,6 +349,20 @@ export class ProgramAdmin {
       summary,
       (
         await this.owner.db.query(
+          `SELECT count(*)::int AS "adaptiveLessons",
+        sum((report->'activitySummary'->>'completed')::int)::int AS "adaptiveActivities",
+        sum((report->'activitySummary'->>'independent')::int)::int AS "independentActivities",
+        sum((report->'activitySummary'->>'assisted')::int)::int AS "assistedActivities",
+        count(*) FILTER(WHERE report->'activitySummary'->>'exhaustedEarly'='true')::int AS "earlyExhaustionLessons"
+        FROM product_gotit.private_lesson_sessions WHERE ${where} AND report->'activitySummary'->>'protocolVersion'='adaptive-v1'`,
+          values,
+        )
+      ).rows[0],
+    );
+    Object.assign(
+      summary,
+      (
+        await this.owner.db.query(
           `SELECT count(*)::int AS "homeworkCount",COALESCE(sum(jsonb_array_length(COALESCE(document->'progress','[]'::jsonb))),0)::int AS "practiceTasks",COALESCE(sum((SELECT count(*) FROM jsonb_array_elements(COALESCE(document->'progress','[]'::jsonb)) p WHERE p->>'done'='true')),0)::int AS "completedTasks",COALESCE(sum((SELECT COALESCE(sum(jsonb_array_length(COALESCE(p->'attempts','[]'::jsonb))),0) FROM jsonb_array_elements(COALESCE(document->'progress','[]'::jsonb)) p)),0)::int AS "practiceAttempts" FROM product_gotit.learning_documents WHERE application_id=$1 AND kind='homework' AND id IN (SELECT id FROM product_gotit.private_lesson_sessions WHERE ${where})`,
           values,
         )
@@ -421,6 +437,7 @@ export class ProgramAdmin {
       data: {
         id: unit.key + '_' + input.lessonIndex,
         kind: 'curriculum-preview',
+        planning: lessonMaterialReadiness(plan),
         contract: buildRealtimeLessonContract(plan, this.defaults, runtime.prompts['lesson-live']),
       },
     };

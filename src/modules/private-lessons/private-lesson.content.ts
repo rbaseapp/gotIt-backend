@@ -69,6 +69,8 @@ export function privateLessonBriefInput(plan: PrivateLessonPlan) {
         : plan.targetLanguageCode,
     lessonMode: plan.lessonMode,
     level: plan.level,
+    learnerStartingLevel: plan.learnerStartingLevel ?? plan.level,
+    curriculum: plan.curriculum ?? null,
     durationSeconds: plan.durationSeconds,
     topic: plan.topic,
     grammarFocus: plan.grammarFocus,

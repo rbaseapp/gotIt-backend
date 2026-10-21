@@ -945,6 +945,12 @@ export class CourseService {
     )
       return;
     if (!(await this.store.get(scope, lesson.id))) {
+      // A planned authored bank is not evidence it was taught. Adaptive lessons
+      // prepare homework from the authoritative performed turns/report instead.
+      const authoredPractice =
+        lesson.interactionProtocol === 'adaptive-v1'
+          ? null
+          : (lesson.course?.material?.practice ?? lesson.wordPack?.material?.practice ?? null);
       const homework: HomeworkDocument = {
         ...(lesson.wordPack
           ? { wordPack: { packId: lesson.wordPack.packId, station: lesson.wordPack.station } }
@@ -959,12 +965,15 @@ export class CourseService {
         supportLanguageCode: lesson.supportLanguageCode ?? lesson.targetLanguageCode,
         title: lesson.topic,
         source: { report, turns: learningExcerpts(report, turns) },
-        content: lesson.course?.material?.practice ?? lesson.wordPack?.material?.practice ?? null,
+        content: authoredPractice,
         qualityVersion: HOMEWORK_QUALITY_VERSION,
         progress:
-          (lesson.course?.material?.practice ?? lesson.wordPack?.material?.practice)?.tasks.map(
-            () => ({ attempts: [], hintUsed: false, done: false, draft: '' }),
-          ) ?? [],
+          authoredPractice?.tasks.map(() => ({
+            attempts: [],
+            hintUsed: false,
+            done: false,
+            draft: '',
+          })) ?? [],
       };
       try {
         await this.store.save(

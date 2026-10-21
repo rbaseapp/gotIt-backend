@@ -46,6 +46,7 @@ export const privateLessonInputSchema = z
     packId: z.uuid().optional(),
     station: z.enum(['supported', 'midpoint', 'review']).optional(),
     interactionMode: z.enum(['guided', 'conversation']).optional(),
+    interactionProtocol: z.literal('adaptive-v1').optional(),
     targetLanguageCode: languageSchema,
     supportLanguageCode: languageSchema.nullable().optional(),
     lessonMode: z.enum(privateLessonModes).optional(),

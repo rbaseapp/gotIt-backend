@@ -2,7 +2,7 @@ import { ProfileRepository } from './modules/profile/profile.repository.js';
 import { CurriculumService } from './modules/curriculum/curriculum.service.js';
 import { CurriculumStore } from './modules/curriculum/curriculum.store.js';
 import { ProductAdminService } from './modules/admin/admin.service.js';
-import { runtimeLearningPolicy } from './modules/admin/admin.context.js';
+import { adminRuntimeContext, runtimeLearningPolicy } from './modules/admin/admin.context.js';
 import { adminAiFetch } from './modules/admin/admin.ai-fetch.js';
 import { ProfileService } from './modules/profile/profile.service.js';
 import { NotificationRepository } from './modules/notifications/notification.repository.js';
@@ -40,6 +40,10 @@ import { WordPackRepository } from './modules/word-packs/word-packs.repository.j
 import { WordPackStudyService } from './modules/word-packs/word-pack-study.service.js';
 import { OpenAiWordPackExampleProvider } from './modules/word-packs/word-pack-example.provider.js';
 import { PrivateLessonService } from './modules/private-lessons/private-lesson.service.js';
+import {
+  LessonActivityService as LegacyActivityService,
+  PostgresLessonActivityStore as LegacyActivityStore,
+} from './modules/private-lessons/private-lesson.legacy-activity.js';
 import { PostgresPrivateLessonWordPackSource } from './modules/private-lessons/private-lesson.word-pack.js';
 import {
   LessonActivityService,
@@ -258,7 +262,7 @@ const privateLessonContentGenerator = privateLessonContentApiKey
       env.OPENAI_REALTIME_TRANSCRIPTION_MODEL,
       providerFetch('courses'),
       aiDailyQuota,
-      { logger },
+      { logger, requestId: () => adminRuntimeContext.getStore()?.requestId },
     )
   : undefined;
 const courseService = new CourseService(
@@ -277,6 +281,7 @@ const courseService = new CourseService(
   new PostgresCourseWordSource(pool),
   new PostgresPrivateLessonJournal(pool),
 );
+const lessonActivityStore = new PostgresLessonActivityStore(pool);
 const curriculumService = new CurriculumService(
   new CurriculumStore(pool),
   profileService,
@@ -290,14 +295,14 @@ const curriculumService = new CurriculumService(
     : undefined,
 );
 const privateLessonService = new PrivateLessonService({
+  legacyActivities: privateLessonContentGenerator
+    ? new LegacyActivityService(new LegacyActivityStore(pool), privateLessonContentGenerator)
+    : undefined,
   curriculum: curriculumService,
   wordPacks: new PostgresPrivateLessonWordPackSource(pool),
   mapWordPacks: new WordPackRepository(pool),
   activities: privateLessonContentGenerator
-    ? new LessonActivityService(
-        new PostgresLessonActivityStore(pool),
-        privateLessonContentGenerator,
-      )
+    ? new LessonActivityService(lessonActivityStore, privateLessonContentGenerator)
     : undefined,
   courses: courseService,
   lessonContentGenerator: privateLessonContentGenerator,
@@ -413,6 +418,21 @@ const cleanup = setInterval(() => {
   void rateLimiter.cleanup().catch(() => logger.warn('Request limit cleanup failed'));
 }, 60000);
 cleanup.unref();
+let activityCleanupActive = false;
+const purgeLessonActivities = async () => {
+  if (draining || activityCleanupActive) return;
+  activityCleanupActive = true;
+  try {
+    await lessonActivityStore.purgeExpired();
+  } catch {
+    logger.warn('Temporary lesson activity cleanup failed');
+  } finally {
+    activityCleanupActive = false;
+  }
+};
+const activityCleanup = setInterval(() => void purgeLessonActivities(), 3_600_000);
+activityCleanup.unref();
+void purgeLessonActivities();
 let realtimeSweepActive = false;
 const sweepRealtime = async () => {
   if (draining || realtimeSweepActive || !realtimeCallGuard) return;
@@ -453,6 +473,7 @@ async function shutdown(signal: string) {
   if (draining) return;
   draining = true;
   clearInterval(cleanup);
+  clearInterval(activityCleanup);
   clearInterval(realtimeTimer);
   clearInterval(notificationTimer);
   logger.info({ signal }, 'Shutting down GotIt backend');

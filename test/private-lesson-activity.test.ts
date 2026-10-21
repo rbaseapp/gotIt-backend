@@ -8,7 +8,7 @@ import {
   type LessonActivity,
   type LessonActivityCommand,
   type LessonActivityStore,
-} from '../src/modules/private-lessons/private-lesson.activity.js';
+} from '../src/modules/private-lessons/private-lesson.legacy-activity.js';
 import type { PrivateLessonPlan } from '../src/modules/private-lessons/private-lesson.prompt.js';
 import type { CourseGenerator } from '../src/modules/courses/course.provider.js';
 import type { ProfileScope } from '../src/modules/profile/profile.types.js';
