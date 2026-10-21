@@ -296,7 +296,7 @@ test('all authored and generated inputs use one planner and an independent seman
   assert.equal(reviewed, 1);
 });
 
-test('invalid material is bounded to two planning attempts and never accepted as sufficient', async () => {
+test('invalid material is bounded to one plan and four focused repairs and never accepted as sufficient', async () => {
   let calls = 0;
   const plan = adaptiveLesson();
   const planner = new AdaptiveLessonPlanner({
@@ -319,7 +319,7 @@ test('invalid material is bounded to two planning attempts and never accepted as
   await assert.rejects(planner.prepare(scope, plan, 'guided'), {
     code: 'PRIVATE_LESSON_PLAN_INSUFFICIENT',
   });
-  assert.equal(calls, 2);
+  assert.equal(calls, 5);
 });
 
 test('semantic repair preserves approved task order and is independently reviewed again', async () => {
@@ -335,7 +335,7 @@ test('semantic repair preserves approved task order and is independently reviewe
       if (name === 'private_lesson_plan') return schema.parse(bank);
       if (name === 'private_lesson_plan_review')
         return schema.parse({
-          valid: ++reviews === 2,
+          valid: ++reviews === 3,
           feedback: 'Repair the first prompt while preserving sound tasks.',
         });
       assert.equal(name, 'private_lesson_plan_repair');
@@ -347,7 +347,7 @@ test('semantic repair preserves approved task order and is independently reviewe
       });
     },
   }).prepare(scope, plan, 'guided');
-  assert.equal(reviews, 2);
+  assert.equal(reviews, 3);
   assert.equal(repaired.activities[0]!.prompt, 'A genuinely different first task.');
   assert.deepEqual(repaired.activities.slice(1), bank.activities.slice(1));
 });
