@@ -2181,23 +2181,16 @@ test('unit summary meetings enforce availability and use the server unit scope',
       supportLanguageCode: 'fr',
       requestedDurationMinutes: 1,
     });
-    if (introduced < 50) {
-      await assert.rejects(service.createSession(identity, input), {
-        code: 'PRIVATE_LESSON_STATION_LOCKED',
-      });
-      assert.equal(calls, 0);
-    } else {
-      const result = await service.createSession(identity, input);
-      assert.equal(calls, 1);
-      assert.equal(result.lesson.durationSeconds, 600);
-      assert.equal(result.lesson.targetLanguageCode, 'en');
-      assert.equal(result.lesson.supportLanguageCode, 'he');
-      assert.equal(result.lesson.wordPack?.station, 'review');
-      assert.equal(result.lesson.wordPack?.packId, packId);
-      assert.ok(prompt.includes('water'));
-      assert.ok(prompt.includes('Building Your First Sentences'));
-      assert.equal(result.lesson.roadmap, null);
-    }
+    const result = await service.createSession(identity, input);
+    assert.equal(calls, 1);
+    assert.equal(result.lesson.durationSeconds, 600);
+    assert.equal(result.lesson.targetLanguageCode, 'en');
+    assert.equal(result.lesson.supportLanguageCode, 'he');
+    assert.equal(result.lesson.wordPack?.station, 'review');
+    assert.equal(result.lesson.wordPack?.packId, packId);
+    assert.ok(prompt.includes('water'));
+    assert.ok(prompt.includes('Building Your First Sentences'));
+    assert.equal(result.lesson.roadmap, null);
   }
   assert.equal(
     privateLessonInputSchema.safeParse({ targetLanguageCode: 'en', station: 'review' }).success,

@@ -1,3 +1,8 @@
+import {
+  emptyUnitPathChoices,
+  unitPathDocumentId,
+  type unitPathChoiceSchema,
+} from '../word-packs/unit-path-choices.js';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { AppError } from '../../shared/errors/app-error.js';
@@ -38,9 +43,12 @@ import {
   type intakeStartSchema,
   type courseTurnSchema,
   type homeworkActionSchema,
+  type coursePathChoiceSchema,
+  type courseLessonSelectionSchema,
 } from './course.schemas.js';
 import {
   evidenceMatchesActiveUnit,
+  courseLessonSkipped,
   nextCourseLesson,
   syllabusFor,
   validateCoursePlan,
@@ -843,9 +851,116 @@ export class CourseService {
       ),
     );
   }
-  async lessonContext(scope: ProfileScope, id: string): Promise<CourseLessonContext> {
+  async unitPathChoices(scope: ProfileScope, packId: string) {
+    const document = await this.store.get(scope, unitPathDocumentId(packId));
+    if (document && (document.kind !== 'unit_path' || document.packId !== packId))
+      throw courseConflict();
+    return document ?? emptyUnitPathChoices(packId);
+  }
+  async saveUnitPathChoices(
+    scope: ProfileScope,
+    packId: string,
+    input: z.infer<typeof unitPathChoiceSchema>,
+    incomplete: import('../word-packs/unit-path-choices.js').UnitStep[],
+  ) {
+    const fingerprint = commandFingerprint([packId, 'unit-path', input]);
+    const replay = await this.store.replay(scope, input.eventId, fingerprint);
+    if (replay) {
+      if (replay.kind !== 'unit_path' || replay.packId !== packId) throw courseConflict();
+      return replay;
+    }
+    const current = await this.unitPathChoices(scope, packId);
+    if (current.revision !== input.revision) throw courseConflict();
+    const selected = input.step ? [input.step] : incomplete;
+    const steps = new Set(current.skippedSteps);
+    if (input.skipped)
+      selected.filter((step) => incomplete.includes(step)).forEach((step) => steps.add(step));
+    else if (input.step) steps.delete(input.step);
+    else steps.clear();
+    const saved = await this.store.save(
+      scope,
+      {
+        ...current,
+        skippedSteps: [...steps].sort(),
+        unitSkipped: input.step ? false : input.skipped && incomplete.length > 0,
+      },
+      current.revision < 0 ? null : current.revision,
+      input.eventId,
+      fingerprint,
+    );
+    if (saved.kind !== 'unit_path') throw courseConflict();
+    return saved;
+  }
+  async pathChoice(scope: ProfileScope, id: string, input: z.infer<typeof coursePathChoiceSchema>) {
+    const current = await this.current(scope, id, input, 'path-choice', input);
+    if (current.replay) return publicCourse(asCourse(current.replay));
+    const course = asCourse(current.document);
+    const version = course.versions.find((item) => item.version === course.activeVersion);
+    const unit = version?.plan.units.find((item) => item.key === input.unitKey);
+    if (
+      !version ||
+      version.version !== input.version ||
+      !unit ||
+      (input.lessonIndex !== undefined && !unit.lessons[input.lessonIndex])
+    )
+      throw courseConflict();
+    const skipped = (course.skippedLessons ?? []).filter(
+      (choice) =>
+        !(
+          choice.unitKey === input.unitKey &&
+          (input.lessonIndex === undefined || choice.lessonIndex === input.lessonIndex) &&
+          evidenceMatchesActiveUnit(course, choice.version, choice.unitKey)
+        ),
+    );
+    if (input.skipped)
+      unit.lessons.forEach((_lesson, lessonIndex) => {
+        if (input.lessonIndex !== undefined && input.lessonIndex !== lessonIndex) return;
+        if (
+          course.evidence.some(
+            (e) =>
+              e.unitKey === unit.key &&
+              e.lessonIndex === lessonIndex &&
+              e.independent &&
+              evidenceMatchesActiveUnit(course, e.version, unit.key),
+          )
+        )
+          return;
+        skipped.push({ version: version.version, unitKey: unit.key, lessonIndex });
+      });
+    return publicCourse(
+      asCourse(
+        await this.store.save(
+          scope,
+          { ...course, skippedLessons: skipped },
+          input.revision,
+          input.eventId,
+          current.fingerprint,
+        ),
+      ),
+    );
+  }
+  async lessonContext(
+    scope: ProfileScope,
+    id: string,
+    selection?: z.infer<typeof courseLessonSelectionSchema>,
+  ): Promise<CourseLessonContext> {
     const course = await this.course(scope, id);
-    const next = nextCourseLesson(course);
+    const version = course.versions.find((item) => item.version === course.activeVersion);
+    const unit = selection && version?.plan.units.find((item) => item.key === selection.unitKey);
+    if (
+      selection &&
+      (!unit || version?.version !== selection.version || !unit.lessons[selection.lessonIndex])
+    )
+      throw courseConflict();
+    const next =
+      selection && unit && version
+        ? {
+            version,
+            unit,
+            lessonIndex: selection.lessonIndex,
+            lesson: unit.lessons[selection.lessonIndex]!,
+          }
+        : nextCourseLesson(course);
     if (!next)
       throw new AppError(
         409,
@@ -1413,6 +1528,15 @@ export function publicCourse(course: CourseDocument) {
   );
   return {
     ...course,
+    skippedLessons: (course.skippedLessons ?? []).filter(
+      (choice) =>
+        courseLessonSkipped(course, choice.unitKey, choice.lessonIndex) &&
+        evidenceMatchesActiveUnit(course, choice.version, choice.unitKey) &&
+        !evidence.some(
+          (e) =>
+            e.unitKey === choice.unitKey && e.lessonIndex === choice.lessonIndex && e.independent,
+        ),
+    ),
     adminAssignment: undefined,
     intakeQuestions: undefined,
     intakeClosing: undefined,

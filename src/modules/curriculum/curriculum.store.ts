@@ -7,6 +7,7 @@ import { PROGRAM_ID, PROGRAM_VERSION, type Question, type Band } from './curricu
 import type { WordEvidence } from './curriculum.policy.js';
 
 export type CurriculumState = {
+  pathChoices?: { units: string[]; activities: string[] };
   minutes: number;
   timezone: string;
   literacy: 'starting' | 'developing' | 'independent';

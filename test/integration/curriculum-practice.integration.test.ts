@@ -73,8 +73,10 @@ test(
       await assert.rejects(
         practice.createSession(scope, key, { ...input, curriculumUnitId: 'P02' }),
       );
-      await assert.rejects(
-        practice.createSession(scope, randomUUID(), { ...input, curriculumUnitId: 'P02' }),
+      assert.equal(
+        (await practice.createSession(scope, randomUUID(), { ...input, curriculumUnitId: 'P02' }))
+          .session.curriculumUnitId,
+        'P02',
       );
       await assert.rejects(practice.getSession(other, String(created.session.id)));
       const cards = (await practice.studyCards(scope, String(created.session.id))).cards;

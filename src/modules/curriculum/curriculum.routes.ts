@@ -23,6 +23,19 @@ export function createCurriculumRoutes(
   });
   router.get('/catalog', async (_req, res) => res.json(await service.catalog()));
   router.get('/', async (req, res) => res.json(await service.get(req.gotitAuth!)));
+  router.post('/path-choices', requirePractice, async (req, res) =>
+    res.json(
+      await service.pathChoice(
+        req.gotitAuth!,
+        parseInput(
+          command
+            .extend({ unitId: pathId, activityId: activityId.optional(), skipped: z.boolean() })
+            .strict(),
+          req.body,
+        ),
+      ),
+    ),
+  );
   router.post('/enroll', requirePractice, async (req, res) =>
     res.json(
       await service.enroll(

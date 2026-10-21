@@ -1,5 +1,8 @@
 export const API_ROUTES = [
   ['GET', '/structured-english'],
+  ['POST', '/structured-english/path-choices'],
+  ['POST', '/courses/:id/path-choices'],
+  ['POST', '/private-lessons/units/:id/path-choices'],
   ['GET', '/structured-english/catalog'],
   ['POST', '/structured-english/enroll'],
   ['GET', '/structured-english/units/:id'],

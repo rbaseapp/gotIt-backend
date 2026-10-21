@@ -2,6 +2,7 @@ import {
   LessonActivityService as LegacyActivityService,
   type LessonActivityCommand as LegacyCommand,
 } from './private-lesson.legacy-activity.js';
+import type { unitPathChoiceSchema } from '../word-packs/unit-path-choices.js';
 import { adminRuntimeContext } from '../admin/admin.context.js';
 import type { CurriculumService } from '../curriculum/curriculum.service.js';
 import { buildRealtimeLessonContract } from './private-lesson.realtime.js';
@@ -238,7 +239,25 @@ export class PrivateLessonService {
       unit,
       lessons,
       assignments.filter((item) => item !== null),
+      await this.options.courses?.unitPathChoices(scope, id),
     );
+  }
+
+  async chooseUnitPath(
+    scope: ProfileScope,
+    id: string,
+    input: z.infer<typeof unitPathChoiceSchema>,
+  ) {
+    if (!this.options.courses)
+      throw new AppError(503, 'COURSE_AI_UNAVAILABLE', 'Learning choices are unavailable');
+    const path = await this.getLearningMap(scope, id);
+    await this.options.courses.saveUnitPathChoices(
+      scope,
+      id,
+      input,
+      path.steps.filter((step) => !step.complete).map((step) => step.key),
+    );
+    return this.getLearningMap(scope, id);
   }
 
   async getPreparedUnit(scope: ProfileScope, id: string) {
@@ -339,9 +358,7 @@ export class PrivateLessonService {
       unit.context.teacherStations = path.stations;
       const mapUnit = await this.options.mapWordPacks!.lessonUnit(scope, input.packId!);
       unit.context.material = mapUnit.materials?.[input.station!];
-      const words =
-        mapUnit.stageWordsByStation?.[input.station!]?.filter((word) => word.introduced) ??
-        mapUnit.words;
+      const words = mapUnit.stageWordsByStation?.[input.station!] ?? mapUnit.words;
       unit.context.words = words;
       unit.targets = words
         .filter((word) => word.learningItemId)
@@ -355,16 +372,8 @@ export class PrivateLessonService {
       const station = unit.context.teacherStations?.find(
         (step) => step.station === (input.station ?? 'supported'),
       );
-      if (!station?.available)
-        throw new AppError(
-          409,
-          'UNIT_WORDS_REQUIRED',
-          'Study the unit words before this teacher meeting',
-          {
-            requiredWords: station?.requiredWords ?? 10,
-            introducedWords: unit.context.introduced ?? 0,
-          },
-        );
+      if (!station)
+        throw new AppError(404, 'PRIVATE_LESSON_UNIT_UNAVAILABLE', 'Lesson station is unavailable');
       stationDurationMinutes = station.durationMinutes;
     }
     if (unit)
@@ -383,7 +392,7 @@ export class PrivateLessonService {
     if (input.courseId && !this.options.courses)
       throw new AppError(503, 'COURSE_AI_UNAVAILABLE', 'Courses are unavailable');
     const courseContext = input.courseId
-      ? await this.options.courses!.lessonContext(scope, input.courseId)
+      ? await this.options.courses!.lessonContext(scope, input.courseId, input.courseLesson)
       : null;
     if (courseContext)
       input = {
