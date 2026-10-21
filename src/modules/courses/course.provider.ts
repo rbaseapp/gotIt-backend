@@ -86,16 +86,16 @@ export class OpenAiCourseGenerator implements CourseGenerator {
           store: false,
           reasoning: {
             effort:
-              (budget?.reasoningEffort ??
-              [
+              budget?.reasoningEffort ??
+              ([
                 'course_plan',
                 'private_lesson_brief',
                 'private_lesson_plan',
                 'private_lesson_plan_review',
                 'lesson_homework',
-              ].includes(name))
+              ].includes(name)
                 ? 'medium'
-                : 'none',
+                : 'none'),
           },
           max_output_tokens:
             name === 'private_lesson_answer'
