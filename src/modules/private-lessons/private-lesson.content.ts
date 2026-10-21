@@ -70,7 +70,16 @@ export function privateLessonBriefInput(plan: PrivateLessonPlan) {
     lessonMode: plan.lessonMode,
     level: plan.level,
     learnerStartingLevel: plan.learnerStartingLevel ?? plan.level,
-    curriculum: plan.curriculum ?? null,
+    curriculum: plan.curriculum
+      ? {
+          ...plan.curriculum,
+          script: plan.curriculum.script.map((phase) => {
+            if (phase.phase !== 'teach_target') return phase;
+            const { say_he: _he, say_en: _en, ...target } = phase;
+            return target;
+          }),
+        }
+      : null,
     durationSeconds: plan.durationSeconds,
     topic: plan.topic,
     grammarFocus: plan.grammarFocus,

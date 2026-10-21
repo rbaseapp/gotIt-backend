@@ -86,6 +86,10 @@ export const promptReference = {
         text: '`The server-resolved wordPack.words or selected course lesson define the permitted current scope. If the learner explicitly opened an unprepared station, its supplied words are allowed teaching material even when introduced=false; teach them in small supported steps rather than pretending they were learned. This takes precedence over introduced-only wording. Never fetch another unit or invent prior learning to fill time. learnerStartingLevel is the learner estimate; the selected unit/course level describes the requested task, not proven ability or completed prerequisites. Scaffold missing understanding within the chosen objective, preserving beginner/child limits.`',
       },
       {
+        name: "private-lessons/private-lesson.planner.ts: 'private_lesson_plan_repair'",
+        text: '`Repair only the material issues identified by the independent reviewer. Preserve every sound activity unchanged. Replace an activity using its existing id; use a new unique id only to add genuinely different work. Remove redundant activities via removeIds and replace them with meaningful alternatives if needed to retain the required distinct families and route counts. Return null for unchanged opening/exhaustedMessage. Do not regenerate the whole bank. Prompts and hints must not disclose their expected answer. Prompts are visible text and spoken aloud: do not design audio-only listening tests or require reading without an oral alternative. Reusing known language is allowed for a genuinely different language operation, not just another name or setting.\\n${adaptiveScopeInstruction}\\n${exitTaskInstruction}\\n${bankSchedulingInstruction}`',
+      },
+      {
         name: "private-lessons/private-lesson.planner.ts: 'private_lesson_plan'",
         text: '`${adaptivePlanInstruction}\\n${adaptiveScopeInstruction}\\n${exitTaskInstruction}\\n${bankSchedulingInstruction}`',
       },

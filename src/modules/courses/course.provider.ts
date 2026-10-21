@@ -102,7 +102,7 @@ export class OpenAiCourseGenerator implements CourseGenerator {
               ? 1800
               : name === 'private_lesson_plan_review'
                 ? 3000
-                : name === 'private_lesson_plan'
+                : name === 'private_lesson_plan' || name === 'private_lesson_plan_repair'
                   ? 20000
                   : name === 'course_plan'
                     ? 30000

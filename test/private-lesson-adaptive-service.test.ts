@@ -263,10 +263,14 @@ test('adaptive setup failure releases the reservation and never opens a thin les
   let released = false,
     providerCalled = false;
   const generator: Pick<CourseGenerator, 'generate'> = {
-    async generate<T>(_s: unknown, schema: z.ZodType<T>) {
+    async generate<T>(_s: unknown, schema: z.ZodType<T>, name: string) {
       const draft = adaptiveCurriculum();
       draft.activities = draft.activities.slice(0, 3);
-      return schema.parse(draft);
+      return schema.parse(
+        name === 'private_lesson_plan_repair'
+          ? { opening: null, exhaustedMessage: null, replacements: draft.activities, removeIds: [] }
+          : draft,
+      );
     },
   };
   const store: LessonActivityStore = {

@@ -300,17 +300,56 @@ test('invalid material is bounded to two planning attempts and never accepted as
   let calls = 0;
   const plan = adaptiveLesson();
   const planner = new AdaptiveLessonPlanner({
-    async generate<T>(_scope: unknown, schema: z.ZodType<T>) {
+    async generate<T>(_scope: unknown, schema: z.ZodType<T>, name: string) {
       calls++;
       const candidate = adaptiveCurriculum(plan);
       candidate.activities = candidate.activities.slice(0, 3);
-      return schema.parse(candidate);
+      return schema.parse(
+        name === 'private_lesson_plan_repair'
+          ? {
+              opening: null,
+              exhaustedMessage: null,
+              replacements: candidate.activities,
+              removeIds: [],
+            }
+          : candidate,
+      );
     },
   });
   await assert.rejects(planner.prepare(scope, plan, 'guided'), {
     code: 'PRIVATE_LESSON_PLAN_INSUFFICIENT',
   });
   assert.equal(calls, 2);
+});
+
+test('semantic repair preserves approved task order and is independently reviewed again', async () => {
+  const plan = adaptiveLesson();
+  const bank = adaptiveCurriculum(plan);
+  bank.activities.forEach((activity) => {
+    activity.estimatedSeconds = 20;
+  });
+  assert.deepEqual(adaptivePlanIssues(plan, bank), []);
+  let reviews = 0;
+  const repaired = await new AdaptiveLessonPlanner({
+    async generate<T>(_s: unknown, schema: z.ZodType<T>, name: string) {
+      if (name === 'private_lesson_plan') return schema.parse(bank);
+      if (name === 'private_lesson_plan_review')
+        return schema.parse({
+          valid: ++reviews === 2,
+          feedback: 'Repair the first prompt while preserving sound tasks.',
+        });
+      assert.equal(name, 'private_lesson_plan_repair');
+      return schema.parse({
+        opening: null,
+        exhaustedMessage: null,
+        removeIds: [],
+        replacements: [{ ...bank.activities[0]!, prompt: 'A genuinely different first task.' }],
+      });
+    },
+  }).prepare(scope, plan, 'guided');
+  assert.equal(reviews, 2);
+  assert.equal(repaired.activities[0]!.prompt, 'A genuinely different first task.');
+  assert.deepEqual(repaired.activities.slice(1), bank.activities.slice(1));
 });
 
 test('adaptive turn contract retains active prompt but disables autonomous VAD for both configurations', () => {
