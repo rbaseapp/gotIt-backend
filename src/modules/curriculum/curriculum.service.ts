@@ -1,3 +1,9 @@
+import {
+  activitySkipped,
+  curriculumPathSteps,
+  nextPathUnit,
+  curriculumGraduationReady,
+} from './curriculum.path.js';
 import { curriculumUnitUnlocked, curriculumPlacedBelow } from './curriculum.practice.js';
 import { randomInt, randomUUID } from 'node:crypto';
 import { withTransaction } from '../../shared/database/transaction.js';
@@ -188,7 +194,8 @@ export class CurriculumService {
     const enrollment = await this.store.get(scope);
     if (!(await this.store.catalog()) && !enrollment) throw curriculumMissing();
     const state = enrollment?.state;
-    const currentUnit = unitById.get(state?.currentUnit ?? 'P01')!;
+    const currentUnit =
+      (state && nextPathUnit(state)) ?? unitById.get(state?.currentUnit ?? 'P01')!;
     const words = state ? Object.entries(state.words) : [];
     const due = words
       .filter(([, word]) => Date.parse(word.dueAt) <= +this.clock())
@@ -228,6 +235,8 @@ export class CurriculumService {
         ? { minutes: state.minutes, literacy: state.literacy, timezone: state.timezone }
         : null,
       currentUnit: currentUnit.id,
+      pathChoices: state?.pathChoices ?? { units: [], activities: [] },
+      navigationComplete: Boolean(state && !nextPathUnit(state)),
       completed: state?.completed ?? {},
       drafts: state?.drafts ?? {},
       cursors: state?.cursors ?? {},
@@ -239,7 +248,15 @@ export class CurriculumService {
         title: unit.title_he,
         goal: unit.goal_he,
         words: lexicon.targets.filter((target) => target.unit === unit.id).length,
-        unlocked: state ? this.unitUnlocked(state, unit.id) : unit.id === 'P01',
+        unlocked: Boolean(state),
+        skipped: Boolean(
+          state &&
+            (state.pathChoices?.units.includes(unit.id) ||
+              (!state.completed[`gate:${unit.id}`] &&
+                curriculumPathSteps(state, unit.id).every(
+                  (step) => step.complete || step.skipped,
+                ))),
+        ),
         waived: Boolean(state && this.placedBelow(state, unit.band)),
         lessons: content.lessons
           .filter((lesson) => lesson.unit === unit.id)
@@ -291,17 +308,10 @@ export class CurriculumService {
       articleJob: state?.articleJob ?? null,
       activeAttempts: state?.activeAttempts ?? {},
       graduation: {
-        ready: Boolean(
-          state &&
-            content.units.every(
-              (unit) => state.completed[`gate:${unit.id}`] || this.placedBelow(state, unit.band),
-            ) &&
-            content.unseen.every(
-              (test) => state.completed[`unseen:${test.id}`] || this.placedBelow(state, test.band),
-            ),
-        ),
+        ready: Boolean(state && curriculumGraduationReady(state)),
         complete: Boolean(
           state &&
+            curriculumGraduationReady(state) &&
             ['reading', 'listening', 'speaking', 'writing'].every(
               (skill) => state.completed[`exit:${skill}`]?.independent,
             ),
@@ -327,7 +337,9 @@ export class CurriculumService {
     game?: string;
     batch?: number;
   } {
-    const active = Object.entries(state.activeAttempts ?? {})[0];
+    const active = Object.entries(state.activeAttempts ?? {}).find(
+      ([activity]) => !activitySkipped(state, activity),
+    );
     if (active) return { kind: 'attempt', id: active[1] };
     const day = (at: string) =>
       new Intl.DateTimeFormat('en-CA', { timeZone: state.timezone }).format(new Date(at));
@@ -337,72 +349,70 @@ export class CurriculumService {
         day(state.completed['review:due']!.at) !== day(this.clock().toISOString()))
     )
       return { kind: 'practice', id: 'review:due' };
-    const id = state.currentUnit,
-      unit = unitById.get(id)!,
-      targets = lexicon.targets.filter((target) => target.unit === id);
-    const unseen = content.unseen.find((test) => test.proposed_unit_block.at(-1) === id);
-    if (state.completed[`gate:${id}`] && unseen && !state.completed[`unseen:${unseen.id}`])
-      return { kind: 'unseen', id: unseen.id };
-    for (const part of [1, 2]) {
-      const group = targets.filter((target) =>
-        unit.targets
-          .slice((part - 1) * 6, part * 6)
-          .some((item) => normalize(item.en) === normalize(target.en)),
-      );
-      const missing = group.find((target) => !state.words[target.id]);
-      if (missing) return { kind: 'words', id, batch: Math.floor(targets.indexOf(missing) / 6) };
-      for (const mode of ['recognition', 'recall'])
-        if (
-          group.some(
-            (target) =>
-              !(
-                state.words[target.id]?.practiceModes?.[mode] ??
-                (mode === 'recognition' ? state.words[target.id]?.practiceModes?.matching : 0) ??
-                0
-              ),
-          )
-        )
-          return { kind: 'words', id, game: mode };
-      if (!state.completed[`teacher:${id}-L${part}`])
-        return { kind: 'teacher', id: `${id}-L${part}` };
-      if (!state.completed[`post:${id}-L${part}`])
-        return { kind: 'practice', id: `post:${id}-L${part}` };
-      if (part === 1 && state.literacy !== 'independent' && !state.completed['phonics:F01'])
-        return { kind: 'phonics', id: 'F01' };
-    }
-    const missing = targets.find((target) => !state.words[target.id]);
-    if (missing) return { kind: 'words', id, batch: Math.floor(targets.indexOf(missing) / 6) };
-    for (const mode of ['recognition', 'recall', 'listening', 'context'])
-      if (
-        targets.some(
-          (target) =>
-            !(
-              state.words[target.id]?.practiceModes?.[mode] ??
-              (mode === 'recognition' ? state.words[target.id]?.practiceModes?.matching : 0) ??
-              0
-            ),
-        )
-      )
-        return { kind: 'words', id, game: mode };
-    const index = content.units.indexOf(unit),
-      required = index < 6 ? (index + 1) * 2 : index < 18 ? index + 7 : 0;
-    if (state.literacy !== 'independent' && required && !state.placement.decoding?.independent) {
-      const next = content.phonics
-        .slice(0, required)
-        .find((session) => !state.completed[`phonics:${session.id}`]);
-      if (next) return { kind: 'phonics', id: next.id };
-    }
-    if (!state.completed[`gate:${id}`]) return { kind: 'practice', id: `gate:${id}` };
-    const final = ['reading', 'listening', 'speaking', 'writing'].find(
-      (skill) => !state.completed[`exit:${skill}`],
+    const unit = nextPathUnit(state);
+    if (!unit) return { kind: 'complete', id: state.currentUnit };
+    const step = curriculumPathSteps(state, unit.id).find(
+      (item) => !item.complete && !item.skipped,
     );
-    return final ? { kind: 'practice', id: `exit:${final}` } : { kind: 'complete', id };
+    if (!step) return { kind: 'complete', id: unit.id };
+    const [kind, id, mode] = step.id.split(':');
+    if (kind === 'introduce') return { kind: 'words', id: unit.id, batch: step.batch ?? 0 };
+    if (kind === 'words') return { kind: 'words', id: unit.id, game: mode };
+    if (['teacher', 'phonics', 'unseen', 'text'].includes(kind!)) return { kind: kind!, id: id! };
+    // Authored postlesson exercises retain their real lesson-source dependency.
+    if (!step.available) return { kind: 'teacher', id: id! };
+    return { kind: 'practice', id: step.id };
   }
   private phonicsUnlocked(state: CurriculumState, id: string) {
-    const index = content.phonics.findIndex((session) => session.id === id);
-    return (
-      index === 0 ||
-      (index > 0 && Boolean(state.completed[`phonics:${content.phonics[index - 1]!.id}`]))
+    return content.phonics.some((session) => session.id === id);
+  }
+  async pathChoice(
+    scope: ProfileScope,
+    input: {
+      eventId: string;
+      revision: number;
+      unitId: string;
+      activityId?: string;
+      skipped: boolean;
+    },
+  ) {
+    return this.store.command(
+      scope,
+      input.eventId,
+      ['path-choice', input],
+      input.revision,
+      async (enrollment) => {
+        const state = requireEnrollment(enrollment).state;
+        const unit = unitById.get(input.unitId);
+        if (!unit) throw curriculumMissing();
+        const steps = curriculumPathSteps(state, unit.id);
+        const selected = input.activityId
+          ? steps.find((step) => step.id === input.activityId)
+          : undefined;
+        if (input.activityId && !selected) throw curriculumMissing();
+        state.pathChoices ??= { units: [], activities: [] };
+        const choices = state.pathChoices;
+        if (input.activityId) {
+          if (choices.units.includes(unit.id)) {
+            choices.activities = [
+              ...new Set([
+                ...choices.activities,
+                ...steps.filter((step) => !step.complete).map((step) => step.id),
+              ]),
+            ];
+            choices.units = choices.units.filter((id) => id !== unit.id);
+          }
+          choices.activities = choices.activities.filter((id) => id !== input.activityId);
+          if (input.skipped && !selected!.complete) choices.activities.push(input.activityId);
+        } else {
+          choices.units = choices.units.filter((id) => id !== unit.id);
+          choices.activities = choices.activities.filter(
+            (id) => !steps.some((step) => step.id === id),
+          );
+          if (input.skipped && steps.some((step) => !step.complete)) choices.units.push(unit.id);
+        }
+        return { state, response: { saved: true } };
+      },
     );
   }
   async unit(scope: ProfileScope, id: string) {
@@ -410,6 +420,7 @@ export class CurriculumService {
     const unit = unitById.get(id);
     if (!unit || !this.unitUnlocked(state, id)) throw curriculumMissing();
     return {
+      pathSteps: curriculumPathSteps(state, id),
       unit: {
         id,
         band: unit.band,
@@ -424,24 +435,14 @@ export class CurriculumService {
         passage: unit.passage_en,
         writingPrompt: unit.writing_prompt_he,
         roleplayPrompt: unit.roleplay_prompt_he,
-        games: ['recognition', 'matching', 'recall', 'listening', 'context'].map(
-          (mode, index, sequence) => ({
-            mode,
-            practised: allTargets.filter(
-              (target) =>
-                target.unit === id && (state.words[target.id]?.practiceModes?.[mode] ?? 0) > 0,
-            ).length,
-            eligible: allTargets.filter(
-              (target) =>
-                target.unit === id &&
-                state.words[target.id] &&
-                (index < 2 ||
-                  (state.words[target.id]!.practiceModes?.[sequence[index - 1]!] ?? 0) > 0 ||
-                  (mode === 'recall' &&
-                    (state.words[target.id]!.practiceModes?.recognition ?? 0) > 0)),
-            ).length,
-          }),
-        ),
+        games: ['recognition', 'matching', 'recall', 'listening', 'context'].map((mode) => ({
+          mode,
+          practised: allTargets.filter(
+            (target) =>
+              target.unit === id && (state.words[target.id]?.practiceModes?.[mode] ?? 0) > 0,
+          ).length,
+          eligible: allTargets.filter((target) => target.unit === id).length,
+        })),
         lessons: content.lessons
           .filter((lesson) => lesson.unit === id)
           .map((lesson) => ({
@@ -506,19 +507,6 @@ export class CurriculumService {
   private questions(state: CurriculumState, activityId: string): Question[] {
     const [kind, id, mode] = activityId.split(':');
     if (kind === 'exit') {
-      if (
-        !content.units.every(
-          (unit) => state.completed[`gate:${unit.id}`] || this.placedBelow(state, unit.band),
-        ) ||
-        !content.unseen.every(
-          (test) => state.completed[`unseen:${test.id}`] || this.placedBelow(state, test.band),
-        )
-      )
-        throw new AppError(
-          409,
-          'CURRICULUM_EXIT_LOCKED',
-          'Complete the path and transfer checkpoints before the final assessment',
-        );
       if (id === 'reading')
         return exitAssessment.reading.questions.map((question) => ({
           ...question,
@@ -645,8 +633,7 @@ export class CurriculumService {
     }
     if (kind === 'unseen') {
       const form = content.unseen.find((item) => item.id === id);
-      if (!form || !form.proposed_unit_block.every((unit) => state.completed[`gate:${unit}`]))
-        throw curriculumMissing();
+      if (!form) throw curriculumMissing();
       const position = ['in', 'on', 'under'][randomInt(3)]!;
       return [
         ...form.questions.map((question) => ({
@@ -719,25 +706,17 @@ export class CurriculumService {
       const sequence = ['recognition', 'matching', 'recall', 'listening', 'context'];
       const position = sequence.indexOf(mode ?? 'recognition');
       if (position < 0) throw curriculumMissing();
-      const targets = allTargets.filter(
-        (target) =>
-          target.unit === id &&
-          state.words[target.id] &&
-          (position < 2 ||
-            (state.words[target.id]!.practiceModes?.[sequence[position - 1]!] ?? 0) > 0 ||
-            (mode === 'recall' && (state.words[target.id]!.practiceModes?.recognition ?? 0) > 0)),
+      const introduced = allTargets.filter(
+        (target) => target.unit === id && state.words[target.id],
       );
-      if (position > 0 && !targets.length)
-        throw new AppError(
-          409,
-          'CURRICULUM_GAME_ORDER',
-          'Complete the previous word activity before this step',
-        );
+      const targets = introduced.length
+        ? introduced
+        : allTargets.filter((target) => target.unit === id);
       const selected = shuffle(targets)
         .sort(
           (a, b) =>
-            (state.words[a.id]!.practiceModes?.[mode!] ?? 0) -
-            (state.words[b.id]!.practiceModes?.[mode!] ?? 0),
+            (state.words[a.id]?.practiceModes?.[mode!] ?? 0) -
+            (state.words[b.id]?.practiceModes?.[mode!] ?? 0),
         )
         .slice(0, 6);
       return selected.map((target) => this.wordQuestion(target, mode ?? 'recognition'));
@@ -748,47 +727,7 @@ export class CurriculumService {
         passage_en: unit.passage_en,
       }));
     if (kind === 'gate') {
-      if (
-        !['L1', 'L2'].every(
-          (part) =>
-            state.completed[`teacher:${id}-${part}`] && state.completed[`post:${id}-${part}`],
-        )
-      )
-        throw new AppError(
-          409,
-          'CURRICULUM_UNIT_INCOMPLETE',
-          'Complete both teacher lessons and their practice first',
-        );
-      const targets = lexicon.targets.filter(
-        (target) => target.unit === id && state.words[target.id],
-      );
-      const allTargets = lexicon.targets.filter((target) => target.unit === id);
-      if (targets.length < 8 || allTargets.length !== targets.length)
-        throw new AppError(
-          409,
-          'CURRICULUM_WORDS_REQUIRED',
-          'Introduce all unit words before this checkpoint; weak introduced items continue in review',
-        );
-      const unitIndex = content.units.findIndex((item) => item.id === id);
-      const requiredPhonics =
-        unitIndex < 6
-          ? content.phonics[(unitIndex + 1) * 2 - 1]
-          : unitIndex < 18
-            ? content.phonics[unitIndex + 6]
-            : null;
-      const placedDecoding =
-        state.placement.decoding?.independent && state.placement.decoding.score >= 0.75;
-      if (
-        state.literacy !== 'independent' &&
-        requiredPhonics &&
-        !state.completed[`phonics:${requiredPhonics.id}`] &&
-        !placedDecoding
-      )
-        throw new AppError(
-          409,
-          'CURRICULUM_PHONICS_REQUIRED',
-          `Practise reading through ${requiredPhonics.id} before this checkpoint`,
-        );
+      const targets = lexicon.targets.filter((target) => target.unit === id);
       return [
         ...shuffle(targets)
           .slice(0, 8)
@@ -1481,28 +1420,6 @@ export class CurriculumService {
     const state = requireEnrollment(await this.store.get(scope)).state,
       lesson = lessonById.get(id);
     if (!lesson || !this.unitUnlocked(state, lesson.unit)) throw curriculumMissing();
-    if (
-      id.endsWith('L2') &&
-      (!state.completed[`teacher:${lesson.unit}-L1`] || !state.completed[`post:${lesson.unit}-L1`])
-    )
-      throw new AppError(
-        409,
-        'CURRICULUM_PREVIOUS_LESSON_REQUIRED',
-        'Complete the first lesson and its practice before lesson two',
-      );
-    const introduced = lexicon.targets.filter(
-      (target) => target.unit === lesson.unit && state.words[target.id],
-    );
-    if (
-      !lesson.targets.every((target) =>
-        introduced.some((item) => normalize(item.en) === normalize(target.en)),
-      )
-    )
-      throw new AppError(
-        409,
-        'CURRICULUM_WORDS_REQUIRED',
-        'Listen to and introduce this lesson’s six target words first',
-      );
     const unit = unitById.get(lesson.unit)!;
     return {
       band: lesson.band,
