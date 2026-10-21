@@ -115,8 +115,8 @@ test(
       assert.equal(initial.units.length, 84);
       assert.equal(initial.phonics.length, 24);
       assert.equal(initial.review.introduced, 0);
-      assert.equal(initial.units.filter((unit) => unit.unlocked).length, 1);
-      await assert.rejects(service.unit(scope, 'C118'));
+      assert.equal(initial.units.filter((unit) => unit.unlocked).length, 84);
+      assert.equal((await service.unit(scope, 'C118')).unit.id, 'C118');
       const ids = lexicon.targets
         .filter((target) => target.unit === 'P01')
         .slice(0, 6)
@@ -133,8 +133,14 @@ test(
       await service.heartbeat(scope, { eventId: randomUUID(), activityId: 'unit:P01' });
       assert.equal((await service.get(scope)).revision, revision);
       assert.equal((await store.get(scope))!.state.activeSeconds, 20);
-      await assert.rejects(
-        service.start(scope, { eventId: randomUUID(), revision, activityId: 'words:P01:recall' }),
+      assert.ok(
+        (
+          await service.start(scope, {
+            eventId: randomUUID(),
+            revision,
+            activityId: 'words:P01:recall',
+          })
+        ).id,
       );
       for (const game of ['recognition', 'matching']) {
         const round = await service.start(scope, {
@@ -214,12 +220,14 @@ test(
       });
       assert.ok(!JSON.stringify(phonics.question).includes('answer'));
       assert.ok(!JSON.stringify(phonics.question).includes('audio:'));
-      await assert.rejects(
-        service.start(scope, {
-          eventId: randomUUID(),
-          revision: (await service.get(scope)).revision,
-          activityId: 'phonics:F24',
-        }),
+      assert.ok(
+        (
+          await service.start(scope, {
+            eventId: randomUUID(),
+            revision: (await service.get(scope)).revision,
+            activityId: 'phonics:F24',
+          })
+        ).id,
       );
       await service.saveWork(scope, {
         eventId: randomUUID(),
@@ -290,13 +298,16 @@ test(
       migration.down({ sql: (sql: string) => statements.push(sql) });
       await assert.rejects(db.adminPool.query(statements.join('\n')), /rollback is protected/u);
       assert.equal((await service.get(scope)).review.introduced, 6);
-      await assert.rejects(
-        service.start(scope, {
-          eventId: randomUUID(),
-          revision: (await service.get(scope)).revision,
-          activityId: 'exit:reading',
-        }),
+      assert.ok(
+        (
+          await service.start(scope, {
+            eventId: randomUUID(),
+            revision: (await service.get(scope)).revision,
+            activityId: 'exit:reading',
+          })
+        ).id,
       );
+      assert.equal((await service.get(scope)).graduation.complete, false);
     } finally {
       await db.dispose();
     }
