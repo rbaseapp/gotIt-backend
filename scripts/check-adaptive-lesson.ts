@@ -76,7 +76,9 @@ const plan: PrivateLessonPlan = {
 };
 const lessonId = process.env.GOTIT_CHECK_ADAPTIVE_LESSON_ID;
 if (lessonId) {
-  const data = JSON.parse(await readFile(new URL('../assets/english-zero-c1/curriculum.json', import.meta.url), 'utf8'));
+  const data = JSON.parse(
+    await readFile(new URL('../assets/english-zero-c1/curriculum.json', import.meta.url), 'utf8'),
+  );
   const lesson = data.lessons.find((value: { id: string }) => value.id === lessonId);
   if (!lesson) throw new Error('Choose an existing authored lesson');
   const unit = data.units.find((value: { id: string }) => value.id === lesson.unit);
@@ -85,7 +87,14 @@ if (lessonId) {
   plan.grammarFocus = unit.grammar_he;
   plan.level = lesson.band === 'Pre-A1' ? 'A1' : lesson.band;
   plan.lessonMode = ['Pre-A1', 'A1'].includes(lesson.band) ? 'absolute_beginner' : 'standard';
-  plan.curriculum = { lessonId, version: 'provider-check', cursor: 0, title: lesson.title_he, script: lesson.teacher_script, branches: lesson.branches };
+  plan.curriculum = {
+    lessonId,
+    version: 'provider-check',
+    cursor: 0,
+    title: lesson.title_he,
+    script: lesson.teacher_script,
+    branches: lesson.branches,
+  };
 }
 const started = Date.now();
 const model = process.env.OPENAI_PRIVATE_LESSON_MODEL ?? 'gpt-6-sol';

@@ -14,7 +14,7 @@ export interface CourseGenerator {
     name: string,
     instruction: string,
     data: unknown,
-    budget?: { deadlineMs: number },
+    budget?: { deadlineMs: number; reasoningEffort?: 'low' | 'medium' },
   ): Promise<T>;
   transcribe(
     scope: ProfileScope,
@@ -41,7 +41,7 @@ export class OpenAiCourseGenerator implements CourseGenerator {
     name: string,
     instruction: string,
     data: unknown,
-    budget?: { deadlineMs: number },
+    budget?: { deadlineMs: number; reasoningEffort?: 'low' | 'medium' },
   ): Promise<T> {
     await this.dailyQuota?.consume(
       scope,
@@ -63,7 +63,12 @@ export class OpenAiCourseGenerator implements CourseGenerator {
           : ['course_plan', 'lesson_homework', 'private_lesson_plan'].includes(name)
             ? 100_000
             : 65_000;
-    const signal = AbortSignal.timeout(Math.max(1, Math.min(operationTimeout, budget ? budget.deadlineMs - Date.now() : operationTimeout)));
+    const signal = AbortSignal.timeout(
+      Math.max(
+        1,
+        Math.min(operationTimeout, budget ? budget.deadlineMs - Date.now() : operationTimeout),
+      ),
+    );
     const startedAt = Date.now();
     let stage: 'schema' | 'request' | 'response' = 'schema';
     let providerRequestId: string | null = null;
@@ -80,15 +85,17 @@ export class OpenAiCourseGenerator implements CourseGenerator {
           model: this.model,
           store: false,
           reasoning: {
-            effort: [
-                      'course_plan',
-                      'private_lesson_brief',
-                    'private_lesson_plan',
-                      'private_lesson_plan_review',
-                      'lesson_homework',
-                    ].includes(name)
-                  ? 'medium'
-                  : 'none',
+            effort:
+              (budget?.reasoningEffort ??
+              [
+                'course_plan',
+                'private_lesson_brief',
+                'private_lesson_plan',
+                'private_lesson_plan_review',
+                'lesson_homework',
+              ].includes(name))
+                ? 'medium'
+                : 'none',
           },
           max_output_tokens:
             name === 'private_lesson_answer'
