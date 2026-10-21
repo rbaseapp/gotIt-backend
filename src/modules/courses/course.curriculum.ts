@@ -257,6 +257,7 @@ export function nextCourseLesson(course: CourseDocument) {
   if (!version) return null;
   for (const unit of version.plan.units) {
     for (let lessonIndex = 0; lessonIndex < unit.lessons.length; lessonIndex++) {
+      if (courseLessonSkipped(course, unit.key, lessonIndex)) continue;
       if (
         !course.evidence.some(
           (e) =>
@@ -270,6 +271,16 @@ export function nextCourseLesson(course: CourseDocument) {
     }
   }
   return null;
+}
+export function courseLessonSkipped(course: CourseDocument, unitKey: string, lessonIndex: number) {
+  return Boolean(
+    course.skippedLessons?.some(
+      (choice) =>
+        choice.unitKey === unitKey &&
+        choice.lessonIndex === lessonIndex &&
+        evidenceMatchesActiveUnit(course, choice.version, unitKey),
+    ),
+  );
 }
 export function evidenceMatchesActiveUnit(
   course: CourseDocument,

@@ -102,7 +102,7 @@ test('unit and approved-course contexts cannot be forged or combined', () => {
     );
 });
 
-test('teacher stations require actual word progress before provider calls or minute reservations', async () => {
+test('free station selection still enforces authenticated minute reservations before provider calls', async () => {
   let effects = 0;
   for (const [station, introduced] of [
     ['supported', 0],
@@ -141,9 +141,7 @@ test('teacher stations require actual word progress before provider calls or min
     await assert.rejects(
       service.createSession(scope, { targetLanguageCode: 'ja', packId: unit.packId, station }),
       (error) =>
-        error instanceof AppError &&
-        error.code === 'UNIT_WORDS_REQUIRED' &&
-        error.statusCode === 409,
+        error instanceof AppError && error.code === 'UNAUTHORIZED' && error.statusCode === 401,
     );
   }
   assert.equal(effects, 0);

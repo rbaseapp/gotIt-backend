@@ -25,7 +25,11 @@ export function curriculumPlacedBelow(state: CurriculumState, band: Band) {
   });
 }
 export function curriculumUnitUnlocked(state: CurriculumState, id: string): boolean {
-  if (id === 'C1E') return curriculumUnitUnlocked(state, 'C101');
+  // Curriculum order is guidance. Evidence/assessment rules remain separate.
+  return id === 'C1E' || unitById.has(id);
+}
+export function curriculumUnitRecommended(state: CurriculumState, id: string): boolean {
+  if (id === 'C1E') return curriculumUnitRecommended(state, 'C101');
   const index = content.units.findIndex((unit) => unit.id === id);
   if (index < 0) return false;
   const previous = content.units[index - 1];

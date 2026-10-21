@@ -69,8 +69,8 @@ test('authored thresholds drive actual word batches and station availability whi
   unit.teacherStations = teacherStations(50, 50, settings);
   const path = buildUnitLearningPath(unit, [], []);
   assert.equal(path.stations[0]!.available, true);
-  assert.equal(path.stations[1]!.available, false);
-  assert.equal(path.stations[1]!.lockReason, 'previous_preparation');
+  assert.equal(path.stations[1]!.available, true);
+  assert.equal(path.stations[1]!.recommendationReason, 'previous_preparation');
 });
 
 test('station authoring rejects reversed thresholds, incomplete final scope, invalid duration and client authority', () => {

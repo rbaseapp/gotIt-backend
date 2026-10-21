@@ -1,3 +1,4 @@
+import { courseLessonSelectionSchema } from '../courses/course.schemas.js';
 import { z } from 'zod';
 import { languageSchema, sameBaseLanguage, textSchema } from '../capture/capture.validation.js';
 import { CEFR_LEVELS } from '../profile/profile.types.js';
@@ -43,6 +44,7 @@ export const privateLessonInputSchema = z
       .regex(/^(?:P\d{2}|A[12]\d{2}|B[12]\d{2}|C1\d{2})-L[12]$/u)
       .optional(),
     courseId: z.uuid().optional(),
+    courseLesson: courseLessonSelectionSchema.optional(),
     packId: z.uuid().optional(),
     station: z.enum(['supported', 'midpoint', 'review']).optional(),
     interactionMode: z.enum(['guided', 'conversation']).optional(),
@@ -70,6 +72,12 @@ export const privateLessonInputSchema = z
   })
   .strict()
   .superRefine((value, context) => {
+    if (value.courseLesson && !value.courseId)
+      context.addIssue({
+        code: 'custom',
+        path: ['courseLesson'],
+        message: 'A selected lesson requires a course',
+      });
     if (
       value.interactionMode === 'conversation' &&
       (value.courseId || value.packId || value.curriculumLessonId)
