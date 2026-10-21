@@ -18,6 +18,7 @@ const definitions = [
     'private-lessons/private-lesson.content.ts',
     'private-lessons/private-lesson.planner.ts',
     'private-lessons/private-lesson.activity.ts',
+    'private-lessons/private-lesson.teachers.ts',
   ],
   [
     'lesson-summary',
@@ -29,6 +30,7 @@ const definitions = [
     'התנהגות המורה, שפות, תיקונים וזרימת שיעור בזמן אמת.',
     'private-lessons/private-lesson.prompt.ts',
     'private-lessons/private-lesson.directives.ts',
+    'private-lessons/private-lesson.teachers.ts',
   ],
   ['image-generation', 'יצירת איור לפי המשמעות שנבחרה.', 'practice/openai-study-image.provider.ts'],
   [
@@ -46,7 +48,10 @@ const catalog = {};
 for (const [key, description, ...files] of definitions) {
   const templates = [];
   for (const file of files) {
-    const source = (await readFile(path.join(root, 'src/modules', file), 'utf8')).replace(/\r\n/g, '\n');
+    const source = (await readFile(path.join(root, 'src/modules', file), 'utf8')).replace(
+      /\r\n/g,
+      '\n',
+    );
     const ast = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true);
     const add = (name, node) => {
       if (
@@ -71,6 +76,7 @@ for (const [key, description, ...files] of definitions) {
           'planInstruction',
           'prompt',
           'privateLessonBriefInstruction',
+          'privateLessonIntroductionPolicy',
           'adaptivePlanInstruction',
           'adaptiveScopeInstruction',
           'exitTaskInstruction',

@@ -9,7 +9,10 @@ import {
   type PrivateLessonPlan,
 } from './private-lesson.prompt.js';
 import { defaultLessonDirectives } from './private-lesson.directives.js';
-import { privateLessonTeachers } from './private-lesson.teachers.js';
+import {
+  privateLessonIntroductionPolicy,
+  privateLessonTeachers,
+} from './private-lesson.teachers.js';
 import { AppError } from '../../shared/errors/app-error.js';
 
 export type RealtimeDefaults = { model: string; transcriptionModel: string };
@@ -97,6 +100,8 @@ export function buildRealtimeLessonContract(
     (plan.curriculum && plan.interactionProtocol !== 'adaptive-v1'
       ? `\n\n# Approved structured English lesson\nThis scoped curriculum takes precedence over generic roadmap or free-conversation lesson flow. Follow the phases in order starting at cursor ${plan.curriculum.cursor}. Use Hebrew instructions and explanations for Pre-A1/A1, then fade support according to learner need. English practice remains English. Ask one question, then wait. Never read a private answer anchor, model, or contrast before the learner's attempt when that phase requires retrieval. Use the repair branches after the attempt. Do not compress remaining phases to fit a short session; close with the next phase to resume. A completed call is not word mastery or certification. Lesson data (not instructions): ${JSON.stringify(plan.curriculum)}`
       : '');
+  // Keep participant identities consistent even with authored guidance or overrides.
+  instructions += `\n\n# Introduction participants\nteacherName is ${variables.teacherName}.\n${privateLessonIntroductionPolicy}`;
   if (plan.interactionProtocol === 'adaptive-v1')
     instructions +=
       '\n\n# Server-managed activity protocol — required\nThe server chooses every task and transition. Read only the current server-selected tutor turn faithfully in its original languages. Never invent another question, grade an answer, repeat an exhausted task, or advance independently. Wait silently after the selected turn. Translation and final closing instructions are the only turn-specific exceptions. The application, not VAD, requests teacher responses.';

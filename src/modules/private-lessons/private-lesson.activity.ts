@@ -8,6 +8,7 @@ import type { ProfileScope } from '../profile/profile.types.js';
 import type { CourseGenerator } from '../courses/course.provider.js';
 import type { PrivateLessonPlan } from './private-lesson.prompt.js';
 import { privateLessonBriefInput } from './private-lesson.content.js';
+import { privateLessonIntroductionPolicy } from './private-lesson.teachers.js';
 import {
   adaptivePlanSchema,
   lessonPlanningRequirements,
@@ -488,6 +489,7 @@ export class LessonActivityService {
     instruction: string,
     data: unknown,
   ) {
+    instruction = `${instruction}\n${privateLessonIntroductionPolicy}`;
     const context = adminRuntimeContext.getStore();
     if (!context) return this.generator.generate(scope, schema, name, instruction, data);
     const prompts = { ...context.prompts };

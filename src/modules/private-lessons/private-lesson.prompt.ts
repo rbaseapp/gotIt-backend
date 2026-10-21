@@ -3,7 +3,10 @@ import type { CourseLessonContext } from '../courses/course.schemas.js';
 import type { PrivateLessonBrief } from './private-lesson.content.js';
 import type { LessonUnit } from '../word-packs/teacher-stations.js';
 import type { PromptContent } from '../admin/admin.prompt-config.js';
-import { privateLessonTeachers } from './private-lesson.teachers.js';
+import {
+  privateLessonIntroductionPolicy,
+  privateLessonTeachers,
+} from './private-lesson.teachers.js';
 import type {
   privateLessonCorrectionModes,
   privateLessonFocusAreas,
@@ -230,6 +233,7 @@ ${standardSupportLanguagePolicy}`;
       correctionMode: plan.correctionMode,
       vocabularyMode: plan.vocabularyMode,
       teacherVoice: plan.teacherVoice,
+      teacherName: privateLessonTeachers[plan.teacherVoice].name,
       speechRate: plan.speechRate,
       learnerInterests: plan.interests,
       targetVocabulary: plan.targets.map((target) => ({
@@ -264,6 +268,7 @@ ${lessonData}
 ${languagePolicy}
 
 # Teaching policy
+${privateLessonIntroductionPolicy}
 ${plan.wordPack ? '- The server-resolved wordPack.words define this lesson scope. Use those words in short, level-appropriate sentences. The introduced flags distinguish preparation from new material; a direct station choice does not prove prior knowledge. Teach unfamiliar words in small supported steps before expecting independent use. For the review station, check actual independent use and teach gaps; for supported and midpoint stations, guide meaningful use. Do not substitute unrelated roadmap or future-unit material.' : ''}
 - Keep conversational feedback to one or two short spoken sentences. When teaching something new, use up to six short sentences for its purpose, rule or pattern, two meaningful examples and one comprehension check. Do not skip the explanation to satisfy a brevity limit; break a larger explanation into understandable steps.
 - Ask exactly one question at a time.
