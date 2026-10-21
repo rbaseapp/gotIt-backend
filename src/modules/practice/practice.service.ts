@@ -1,4 +1,10 @@
 import { randomUUID, randomInt } from 'node:crypto';
+import {
+  prepareCurriculumPractice,
+  lockCurriculumPractice,
+  recordCurriculumPractice,
+  type CurriculumPracticeSelection,
+} from '../curriculum/curriculum.practice.js';
 import type { Pool } from 'pg';
 import { sessionReceiptSchema, attemptReceiptSchema } from './practice.receipts.js';
 import { withTransaction, type DatabaseTransaction } from '../../shared/database/transaction.js';
@@ -389,6 +395,12 @@ export class PracticeService {
       algorithmVersion: row.algorithm_version,
       curriculumOrder: selection.curriculumOrder === true,
       scope: selection.scope ?? null,
+      ...(selection.curriculum
+        ? {
+            curriculumUnitId: selection.curriculum.unitId,
+            curriculumTitle: selection.curriculum.title,
+          }
+        : {}),
     };
   }
   private async session(tx: DatabaseTransaction, scope: ProfileScope, id: string) {
@@ -422,6 +434,12 @@ export class PracticeService {
         return { session: parsed.data.data, replayed: true };
       }
       let ids = input.learningItemIds;
+      let curriculum: CurriculumPracticeSelection | undefined;
+      if (input.curriculumUnitId) {
+        const prepared = await prepareCurriculumPractice(tx, scope, input.curriculumUnitId);
+        ids = prepared.ids;
+        curriculum = prepared.selection;
+      }
       let scopeSnapshot: { type: string; id: string; title: string } | null = null;
       if (input.readingId) {
         const content = await tx.query(
@@ -468,7 +486,7 @@ export class PracticeService {
           input.count,
           input.includeNewItems ?? true,
         );
-      else if (!ids || input.includeNewItems !== undefined)
+      else if (!input.curriculumUnitId && (!ids || input.includeNewItems !== undefined))
         ids = (
           await this.queueRows(
             tx,
@@ -481,7 +499,7 @@ export class PracticeService {
             input.scope?.type === 'pack' ? input.scope.id : undefined,
           )
         ).map((r) => r.id);
-      if (!ids.length) throw new AppError(409, 'NO_ELIGIBLE_ITEMS', 'No eligible learning items');
+      if (!ids?.length) throw new AppError(409, 'NO_ELIGIBLE_ITEMS', 'No eligible learning items');
       const items = (
         await tx.query(
           `SELECT id,source_language_code,${practiceLanguagePredicate()} AS language_matches FROM product_gotit.learning_items li WHERE application_id=$1 AND application_user_id=$2 AND id=ANY($3::uuid[]) AND user_status='active' AND deleted_at IS NULL FOR SHARE`,
@@ -527,6 +545,7 @@ export class PracticeService {
               readingId: input.readingId ?? null,
               scope: scopeSnapshot,
               curriculumOrder,
+              ...(curriculum ? { curriculum } : {}),
             }),
           ],
         )
@@ -1403,6 +1422,7 @@ export class PracticeService {
       ).rows[0];
       if (!initial) throw new AppError(404, 'NOT_FOUND', 'Exercise not found');
       const session = await this.session(tx, scope, initial.practice_session_id);
+      if (session.selection?.curriculum) await lockCurriculumPractice(tx, scope);
       if (session.status !== 'active')
         throw new AppError(409, 'SESSION_CLOSED', 'Session is closed');
       if (session.algorithm_version !== this.version)
@@ -1489,6 +1509,21 @@ export class PracticeService {
         ],
       );
       const enabled = this.availableSkills(profile, item.source_language_code);
+      if (session.selection?.curriculum)
+        await recordCurriculumPractice(
+          tx,
+          scope,
+          session.selection.curriculum as CurriculumPracticeSelection,
+          {
+            itemId: String(item.id),
+            type: String(exercise.exercise_type),
+            correct: scored.result === 'correct' && scored.score >= 85,
+            assisted: input.hintsUsed > 0 || input.selfRating !== undefined,
+            cued: spec.kind !== 'typed',
+            skipped: input.skipped,
+            now,
+          },
+        );
       if (!input.skipped && !spec.skills.some((e) => enabled.includes(e.skill)))
         throw new AppError(409, 'SKILL_CHANGED', 'Exercise skill is no longer enabled');
       if (!input.skipped)
