@@ -29,12 +29,12 @@ test('words alone never skip the first teacher meeting', () => {
   const path = buildUnitLearningPath(unitFixture(), [], []);
   assert.deepEqual(
     path.stations.map((s) => s.available),
-    [true, false, false],
+    [true, true, true],
   );
   assert.equal(path.nextAction.station, 'supported');
-  assert.equal(path.stations[1]!.lockReason, 'previous_preparation');
+  assert.equal(path.stations[1]!.recommendationReason, 'previous_preparation');
 });
-test('requesting a future meeting directly is denied before a teacher call starts', async () => {
+test('future meetings can be selected without forging earlier completion', async () => {
   let calls = 0;
   const fixture = unitHistoryFixture([]);
   const service = new PrivateLessonService({
@@ -45,6 +45,12 @@ test('requesting a future meeting directly is denied before a teacher call start
     profiles,
     vocabulary: { learned: async () => ({ items: [] }) },
     mapWordPacks: { lessonUnit: async () => unitFixture() },
+    wordPacks: {
+      context: async (_scope, _id, station) => ({
+        context: { ...unitFixture(), station },
+        targets: [],
+      }),
+    },
     journal: fixture.journal,
     courses: fixture.courses,
     fetchImpl: async () => {
@@ -52,35 +58,39 @@ test('requesting a future meeting directly is denied before a teacher call start
       return Response.json({ value: 'fixture' });
     },
   });
-  await assert.rejects(
-    service.createSession(
-      scope,
-      privateLessonInputSchema.parse({
-        packId: unitFixture().packId,
-        targetLanguageCode: 'en',
-        station: 'review',
-      }),
-    ),
-    { code: 'PRIVATE_LESSON_STATION_LOCKED' },
+  const result = await service.createSession(
+    scope,
+    privateLessonInputSchema.parse({
+      packId: unitFixture().packId,
+      targetLanguageCode: 'en',
+      station: 'review',
+    }),
   );
-  assert.equal(calls, 0);
+  assert.equal(calls, 1);
+  assert.equal(result.lesson.wordPack?.station, 'review');
+  assert.equal(
+    (await service.getLearningMap(scope, unitFixture().packId)).stations.some(
+      (station) => station.meetingCompleted,
+    ),
+    false,
+  );
 });
 test('meeting completion and its preparation are separate checkpoints', () => {
   const lesson = unitLesson(),
     assignment = unitAssignment(lesson);
   let path = buildUnitLearningPath(unitFixture(), [lesson], [assignment]);
   assert.equal(path.stations[0]!.meetingCompleted, true);
-  assert.equal(path.stations[1]!.available, false);
+  assert.equal(path.stations[1]!.available, true);
   assert.equal(path.nextAction.kind, 'homework');
   assignment.progress.forEach((p) => {
     p.done = true;
   });
   path = buildUnitLearningPath(unitFixture(20), [lesson], [assignment]);
   assert.equal(path.nextAction.kind, 'words');
-  assert.equal(path.stations[1]!.lockReason, 'words');
+  assert.equal(path.stations[1]!.recommendationReason, 'words');
   path = buildUnitLearningPath(unitFixture(), [lesson], [assignment]);
   assert.equal(path.nextAction.station, 'midpoint');
-  assert.equal(path.stations[2]!.available, false);
+  assert.equal(path.stations[2]!.available, true);
 });
 test('an interrupted or insufficient-evidence meeting does not count', () => {
   const lesson = unitLesson();
