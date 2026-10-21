@@ -2637,6 +2637,71 @@ test(
             await call('get', `/learning-items?${query}`).expect(400);
         },
       );
+      await t.test(
+        'cloze exercise contexts hide complete words and phrases, never parts of names',
+        async () => {
+          const items = [
+            {
+              sourceText: 'no',
+              translation: 'לא',
+              sentence: 'Hello my name is Noa. No, thanks.',
+              expected: 'Hello my name is Noa. _____, thanks.',
+            },
+            {
+              sourceText: 'take it easy',
+              translation: 'קח את זה בקלות',
+              sentence: 'Take it easy today.',
+              expected: '_____ today.',
+            },
+          ];
+          const ids: string[] = [];
+          for (const item of items) {
+            const capture = await call('post', '/captures', {
+              item: {
+                sourceText: item.sourceText,
+                sourceLanguageCode: 'en',
+                translationLanguageCode: 'he',
+                itemType: item.sourceText.includes(' ') ? 'phrase' : 'word',
+              },
+              translation: { text: item.translation },
+              context: { selectedText: item.sourceText, sentenceText: item.sentence },
+              senseDecision: { mode: 'auto' },
+            }).expect(201);
+            ids.push(capture.body.capture.learningItemId);
+          }
+          const session = (
+            await call('post', '/practice/sessions', {
+              sessionType: 'recall',
+              learningItemIds: ids,
+            }).expect(201)
+          ).body.session;
+          const exercises = (
+            await call('post', `/practice/sessions/${session.id}/exercises`, {
+              count: 2,
+              learningItemIds: ids,
+              exerciseType: 'recall',
+              kind: 'multiple_choice',
+              direction: 'translation_to_source',
+            }).expect(201)
+          ).body.exercises;
+          for (const [index, id] of ids.entries()) {
+            const exercise = exercises.find(
+              (entry: { learningItemId: string }) => entry.learningItemId === id,
+            );
+            assert.equal(exercise.prompt.context, items[index]!.expected);
+            const choice = exercise.prompt.choices.find(
+              (entry: { text: string }) => entry.text === items[index]!.sourceText,
+            );
+            const receipt = (
+              await call('post', '/practice/attempts', {
+                exerciseId: exercise.id,
+                choiceId: choice.id,
+              }).expect(201)
+            ).body;
+            assert.equal(receipt.attempt.result, 'correct');
+          }
+        },
+      );
     } finally {
       await db.dispose();
     }
