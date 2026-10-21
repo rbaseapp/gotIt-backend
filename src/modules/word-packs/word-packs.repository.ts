@@ -57,6 +57,7 @@ export class WordPackRepository {
           Number(row.word_count) > 0 &&
           Number(row.completed_count) === Number(row.word_count) &&
           Number(row.prepared_meetings) === 3,
+        pathSkipped: row.path_skipped === true,
         due: Number(row.due_count),
       },
       teacherStations: supportsTeacherStations(
@@ -87,6 +88,9 @@ export class WordPackRepository {
           tp.id topic_id,tp.slug topic_slug,tp.title topic_title,tp.sort_order topic_sort_order,
           (SELECT c.content->'stationSettings' FROM product_gotit.admin_unit_content c WHERE c.application_id=$1 AND c.pack_id=p.id AND (c.application_user_id=$2 OR c.application_user_id IS NULL) ORDER BY c.application_user_id NULLS LAST LIMIT 1) AS station_settings,
           up.status installed_status,up.installed_version,
+          COALESCE((SELECT d.document->>'unitSkipped'='true' OR jsonb_array_length(d.document->'skippedSteps')=9
+            FROM product_gotit.learning_documents d WHERE d.application_id=$1 AND d.application_user_id=$2
+            AND d.kind='unit_path' AND d.document->>'packId'=p.id::text LIMIT 1),false) AS path_skipped,
           count(DISTINCT e.id)::integer word_count,
           count(DISTINCT link.learning_item_id) FILTER(WHERE up.status='active' AND link.excluded_at IS NULL)::integer linked_count,
           count(DISTINCT li.id) FILTER(WHERE up.status='active' AND link.excluded_at IS NULL AND li.learning_status='new')::integer new_count,
