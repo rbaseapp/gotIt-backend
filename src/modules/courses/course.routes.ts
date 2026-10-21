@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { parseInput, uuidSchema } from '../capture/capture.validation.js';
 import {
   commandSchema,
+  coursePathChoiceSchema,
   coursePreferencesSchema,
   courseTurnSchema,
   homeworkActionSchema,
@@ -38,15 +39,13 @@ export function createCourseRoutes(
   }
   router.get('/', async (req, res) => res.json(await service.list(req.gotitAuth!)));
   router.post('/templates/:id/use', async (req, res) =>
-    res
-      .status(201)
-      .json({
-        course: await service.useTemplate(
-          req.gotitAuth!,
-          parseInput(uuidSchema, req.params.id),
-          parseInput(z.object({ eventId: z.uuid() }).strict(), req.body).eventId,
-        ),
-      }),
+    res.status(201).json({
+      course: await service.useTemplate(
+        req.gotitAuth!,
+        parseInput(uuidSchema, req.params.id),
+        parseInput(z.object({ eventId: z.uuid() }).strict(), req.body).eventId,
+      ),
+    }),
   );
   router.post('/intake', async (req, res) =>
     res.status(201).json({
@@ -106,6 +105,15 @@ export function createCourseRoutes(
         ),
       ),
     ),
+  );
+  router.post('/:id/path-choices', async (req, res) =>
+    res.json({
+      course: await service.pathChoice(
+        req.gotitAuth!,
+        parseInput(uuidSchema, req.params.id),
+        parseInput(coursePathChoiceSchema, req.body),
+      ),
+    }),
   );
   router.delete('/:id', async (req, res) => {
     await service.deleteCourse(req.gotitAuth!, parseInput(uuidSchema, req.params.id));

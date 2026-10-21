@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { languageSchema } from '../capture/capture.validation.js';
 import { CEFR_LEVELS } from '../profile/profile.types.js';
 import { lessonMaterialSchema, type LessonMaterial } from './lesson-material.schema.js';
+import type { UnitPathChoices } from '../word-packs/unit-path-choices.js';
 
 const text = (max = 500) => z.string().trim().min(1).max(max);
 export const coursePreferencesSchema = z
@@ -115,6 +116,7 @@ export type CourseEvidence = {
   recordedAt: string;
 };
 export type CourseDocument = {
+  skippedLessons?: Array<{ version: number; unitKey: string; lessonIndex: number }>;
   templateSource?: { id: string };
   adminAssignment?: { templateId: string; templateVersion: number; actorId: string };
   kind: 'course';
@@ -221,10 +223,23 @@ export type HomeworkDocument = {
   qualityVersion?: number;
   progress: Array<{ attempts: HomeworkAttempt[]; hintUsed: boolean; done: boolean; draft: string }>;
 };
-export type LearningDocument = CourseDocument | HomeworkDocument;
+export type LearningDocument = CourseDocument | HomeworkDocument | UnitPathChoices;
 export const commandSchema = z
   .object({ revision: z.number().int().min(0), eventId: z.uuid() })
   .strict();
+export const courseLessonSelectionSchema = z
+  .object({
+    version: z.number().int().positive(),
+    unitKey: text(70),
+    lessonIndex: z.number().int().min(0).max(9),
+  })
+  .strict();
+export const coursePathChoiceSchema = commandSchema.extend({
+  version: z.number().int().positive(),
+  unitKey: text(70),
+  lessonIndex: z.number().int().min(0).max(9).optional(),
+  skipped: z.boolean(),
+});
 export const intakeStartSchema = z
   .object({
     eventId: z.uuid(),
