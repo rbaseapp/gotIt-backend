@@ -73,6 +73,8 @@ for (const [key, description, ...files] of definitions) {
           'privateLessonBriefInstruction',
           'adaptivePlanInstruction',
           'adaptiveScopeInstruction',
+          'exitTaskInstruction',
+          'bankSchedulingInstruction',
         ].includes(node.name.getText(ast))
       )
         add(`${file}: ${node.name.getText(ast)}`, node.initializer);
