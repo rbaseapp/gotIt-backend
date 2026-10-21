@@ -30,11 +30,19 @@ import { adaptiveLesson, adaptiveCurriculum } from './helpers/adaptive-lesson-fi
 import { unitFixture } from './helpers/unit-path-fixtures.js';
 
 test('existing packs, authored courses and standalone future lessons all enter the common adaptive pipeline', async () => {
-  for (const entry of ['pack', 'course', 'standalone', 'curriculum'] as const) {
+  for (const entry of [
+    'pack',
+    'course',
+    'standalone',
+    'curriculum',
+    'curriculum-finished',
+  ] as const) {
+    const curriculumEntry = entry.startsWith('curriculum');
     const records = new Map<string, ActivityRecord>(),
       lessons = new Map<string, StoredPrivateLesson>();
     let reportedTurns: PrivateLessonTurn[] = [],
       providerSession: Record<string, unknown> | undefined;
+    let recordedCurriculum: { outcomes: unknown; finished: boolean | undefined } | undefined;
     const generator: Pick<CourseGenerator, 'generate'> = {
       async generate<T>(
         _scope: unknown,
@@ -153,34 +161,44 @@ test('existing packs, authored courses and standalone future lessons all enter t
       activities: new LessonActivityService(store, generator),
       lessonContentGenerator: generator,
       courses: entry === 'course' ? courses : undefined,
-      curriculum:
-        entry === 'curriculum'
-          ? ({
-              async prepareLesson() {
-                return {
-                  band: 'Pre-A1',
+      curriculum: curriculumEntry
+        ? ({
+            async prepareLesson() {
+              return {
+                band: 'Pre-A1',
+                title: 'Authored greetings',
+                minutes: 10,
+                grammar: 'Greeting and introducing yourself',
+                context: {
+                  lessonId: 'P01-L1',
+                  version: 'test-version',
+                  cursor: 0,
                   title: 'Authored greetings',
-                  minutes: 10,
-                  grammar: 'Greeting and introducing yourself',
-                  context: {
-                    lessonId: 'P01-L1',
-                    version: 'test-version',
-                    cursor: 0,
-                    title: 'Authored greetings',
-                    script: [
-                      {
-                        phase: 'greeting',
-                        task_he: 'A greeting in a new context',
-                        private_answer_anchor: 'Never read this private anchor',
-                      },
-                    ],
-                    branches: {},
-                  },
-                };
-              },
-              async recordLesson() {},
-            } as unknown as import('../src/modules/curriculum/curriculum.service.js').CurriculumService)
-          : undefined,
+                  script: [
+                    {
+                      phase: 'greeting',
+                      task_he: 'A greeting in a new context',
+                      private_answer_anchor: 'Never read this private anchor',
+                    },
+                  ],
+                  branches: {},
+                },
+              };
+            },
+            async recordLesson(
+              _scope: unknown,
+              plan: StoredPrivateLesson,
+              _report: unknown,
+              _turns: unknown,
+              completion?: { adaptiveFinished: boolean },
+            ) {
+              recordedCurriculum = {
+                outcomes: plan.learningEvidence,
+                finished: completion?.adaptiveFinished,
+              };
+            },
+          } as unknown as import('../src/modules/curriculum/curriculum.service.js').CurriculumService)
+        : undefined,
       wordPacks: {
         async context(_scope, _id, station) {
           return { context: { ...unitFixture(), station }, targets: [] };
@@ -209,7 +227,7 @@ test('existing packs, authored courses and standalone future lessons all enter t
       requestedDurationMinutes: 10,
       ...(entry === 'pack'
         ? { packId: unitFixture().packId, station: 'supported' as const }
-        : entry === 'curriculum'
+        : curriculumEntry
           ? { curriculumLessonId: 'P01-L1' }
           : entry === 'course'
             ? { courseId: course.id }
@@ -248,6 +266,7 @@ test('existing packs, authored courses and standalone future lessons all enter t
       rate: 'slow',
     });
     assert.equal(replay.revision, next.activity.revision);
+    if (entry === 'curriculum-finished') records.get(created.lesson.id)!.remainingSeconds = 0;
     const completed = await service.completeSession(scope, created.lesson.id, {
       actualDurationSeconds: 30,
       completionReason: 'stopped',
@@ -257,6 +276,13 @@ test('existing packs, authored courses and standalone future lessons all enter t
     assert.ok(!reportedTurns.some((turn) => turn.text.includes('Injected client')));
     assert.equal(completed.report?.activitySummary?.assisted, 1);
     assert.equal(completed.report?.activitySummary?.independent, 0);
+    if (curriculumEntry) {
+      assert.equal(recordedCurriculum?.finished, entry === 'curriculum-finished');
+      assert.deepEqual(
+        recordedCurriculum?.outcomes,
+        records.get(created.lesson.id)!.state.outcomes,
+      );
+    }
   }
 });
 

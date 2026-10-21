@@ -1572,36 +1572,59 @@ export class CurriculumService {
     plan: PrivateLessonPlan & { actualDurationSeconds?: number | null; startedAt?: string },
     report: PrivateLessonReport,
     turns: Array<{ role: string; text: string }>,
+    completion?: { adaptiveFinished: boolean },
   ) {
     if (!plan.curriculum || plan.curriculum.version !== PROGRAM_VERSION || !this.generator) return;
-    if (report.assessment.lessonPerformance.evidenceQuality === 'insufficient') return;
     const context = plan.curriculum,
       learnerTurns = turns.filter((turn) => turn.role === 'learner');
     if (!learnerTurns.length) return;
-    const evaluated = await this.generator.generate(
-      scope,
-      strictObject({
-        completedThrough: z
-          .number()
-          .int()
-          .min(-1)
-          .max(context.script.length - 1),
-        learnerQuote: z.string().max(600),
-        nextStep: z.string().max(500),
-      }),
-      'curriculum_lesson_progress',
-      'Identify the last consecutively completed authored lesson phase from the supplied transcript, starting at the saved cursor. Completion requires observed engagement with the phase task, not merely elapsed time or a tutor model. Return -1 if no phase was completed. Quote exact learner text supporting the observation. Never infer completion of phases not reached. Do not assess global CEFR.',
-      { context, turns },
-    );
+    // Short beginner answers can demonstrate participation without enough text
+    // for a CEFR assessment. Only server-recorded, attempted activities count.
+    const participated =
+      plan.interactionProtocol === 'adaptive-v1' &&
+      plan.learningEvidence?.some(
+        (outcome) =>
+          outcome.outcome !== 'skipped' &&
+          outcome.attempts > 0 &&
+          Boolean(outcome.learnerAnswer?.trim()) &&
+          learnerTurns.some((turn) => normalize(turn.text) === normalize(outcome.learnerAnswer!)),
+      );
+    if (!participated && report.assessment.lessonPerformance.evidenceQuality === 'insufficient')
+      return;
+    // A completed adaptive session replaces the old authored phase sequence.
+    // Its reserve bank intentionally includes activities that are never reached.
+    const adaptiveComplete = participated && completion?.adaptiveFinished;
+    const evaluated = adaptiveComplete
+      ? null
+      : await this.generator.generate(
+          scope,
+          strictObject({
+            completedThrough: z
+              .number()
+              .int()
+              .min(-1)
+              .max(context.script.length - 1),
+            learnerQuote: z.string().max(600),
+            nextStep: z.string().max(500),
+          }),
+          'curriculum_lesson_progress',
+          'Identify the last consecutively completed authored lesson phase from the supplied transcript, starting at the saved cursor. Completion requires observed engagement with the phase task, not merely elapsed time or a tutor model. Return -1 if no phase was completed. Quote exact learner text supporting the observation. Never infer completion of phases not reached. Do not assess global CEFR.',
+          { context, turns, learningEvidence: plan.learningEvidence },
+        );
     if (
-      !evaluated.learnerQuote ||
-      !learnerTurns.some((turn) => normalize(turn.text).includes(normalize(evaluated.learnerQuote)))
+      evaluated &&
+      (!evaluated.learnerQuote ||
+        !learnerTurns.some((turn) =>
+          normalize(turn.text).includes(normalize(evaluated.learnerQuote)),
+        ))
     )
       return;
-    const next = Math.max(
-      context.cursor,
-      Math.min(evaluated.completedThrough + 1, context.cursor + learnerTurns.length * 3),
-    );
+    const next = adaptiveComplete
+      ? context.script.length
+      : Math.max(
+          context.cursor,
+          Math.min(evaluated!.completedThrough + 1, context.cursor + learnerTurns.length * 3),
+        );
     await this.store.command(
       scope,
       createCompletionId(plan.id),
