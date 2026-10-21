@@ -754,7 +754,14 @@ export class PrivateLessonService {
       }
       if (!claimed.curriculum)
         await this.options.courses?.recordLesson(scope, claimed, report, actualTurns);
-      await this.options.curriculum?.recordLesson(scope, claimed, report, actualTurns);
+      await this.options.curriculum?.recordLesson(scope, evidencePlan, report, actualTurns, {
+        adaptiveFinished: Boolean(
+          activity &&
+            (activity.state.view.status !== 'active' ||
+              activity.remainingSeconds <=
+                lessonPlanningRequirements(claimed).closingReserveSeconds),
+        ),
+      });
       const completed = await journal.complete(scope, id, report);
       await this.options.roadmaps?.recordEvidence(scope, claimed, report).catch(() => undefined);
       if (this.options.proficiency)
