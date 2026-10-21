@@ -288,7 +288,11 @@ test('all authored and generated inputs use one planner and an independent seman
         return schema.parse(adaptiveCurriculum(plan));
       }
       reviewed++;
-      return schema.parse({ valid: true, feedback: 'Distinct, grounded language operations' });
+      return schema.parse({
+        valid: true,
+        excludeIds: [],
+        feedback: 'Distinct, grounded language operations',
+      });
     },
   });
   await planner.prepare(scope, plan, 'guided');
@@ -336,6 +340,7 @@ test('semantic repair preserves approved task order and is independently reviewe
       if (name === 'private_lesson_plan_review')
         return schema.parse({
           valid: ++reviews === 3,
+          excludeIds: [],
           feedback: 'Repair the first prompt while preserving sound tasks.',
         });
       assert.equal(name, 'private_lesson_plan_repair');
@@ -350,6 +355,48 @@ test('semantic repair preserves approved task order and is independently reviewe
   assert.equal(reviews, 3);
   assert.equal(repaired.activities[0]!.prompt, 'A genuinely different first task.');
   assert.deepEqual(repaired.activities.slice(1), bank.activities.slice(1));
+});
+
+test('review exclusions remove bad optional tasks but cannot approve an under-covered remaining bank', async () => {
+  const plan = adaptiveLesson();
+  const bank = adaptiveCurriculum(adaptiveLesson(1200));
+  for (const thin of [false, true]) {
+    const planner = new AdaptiveLessonPlanner({
+      async generate<T>(
+        _s: unknown,
+        schema: z.ZodType<T>,
+        name: string,
+        _instruction: string,
+        data: unknown,
+      ) {
+        if (name === 'private_lesson_plan') return schema.parse(bank);
+        if (name === 'private_lesson_plan_review')
+          return schema.parse({
+            valid: true,
+            feedback: 'Remove these unsuitable alternatives; assess the remainder.',
+            excludeIds: thin
+              ? bank.activities.slice(3).map((activity) => activity.id)
+              : [bank.activities[0]!.id],
+          });
+        const current = (data as { candidate: typeof bank }).candidate;
+        return schema.parse({
+          opening: null,
+          exhaustedMessage: null,
+          removeIds: [],
+          replacements: [current.activities[0]],
+        });
+      },
+    });
+    if (thin)
+      await assert.rejects(planner.prepare(scope, plan, 'guided'), {
+        code: 'PRIVATE_LESSON_PLAN_INSUFFICIENT',
+      });
+    else {
+      const approved = await planner.prepare(scope, plan, 'guided');
+      assert.ok(!approved.activities.some((activity) => activity.id === bank.activities[0]!.id));
+      assert.deepEqual(adaptivePlanIssues(plan, approved), []);
+    }
+  }
 });
 
 test('adaptive turn contract retains active prompt but disables autonomous VAD for both configurations', () => {

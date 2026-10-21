@@ -58,6 +58,7 @@ test('existing packs, authored courses and standalone future lessons all enter t
         if (name === 'private_lesson_plan_review')
           return schema.parse({
             valid: true,
+            excludeIds: [],
             feedback: 'Reviewed independent scope and diversity',
           });
         return schema.parse({
