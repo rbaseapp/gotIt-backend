@@ -119,6 +119,8 @@ test(
           const first = await get('test-user-a').expect(200);
           assert.deepEqual(first.body.profile, {
             ...PROFILE_DEFAULTS,
+            displayName: null,
+            avatarData: null,
             languages: [],
             interests: [],
           });

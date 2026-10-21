@@ -33,6 +33,8 @@ export type ProfileLanguage = {
 };
 
 export type GotItProfile = {
+  displayName?: string | null;
+  avatarData?: string | null;
   learningPreferences?: LearningPreferences;
   /** Null means that the translation provider must detect the source language. */
   defaultSourceLanguage: string | null;
@@ -49,6 +51,8 @@ export type GotItProfile = {
 };
 
 export type ProfilePatchInput = {
+  displayName?: string | null;
+  avatarData?: string | null;
   learningPreferences?: LearningPreferences;
   defaultSourceLanguage?: string | null;
   defaultTranslationLanguage?: string | null;
@@ -72,6 +76,8 @@ export type LearningPreferences = {
   textScale?: 'normal' | 'large';
   reducedMotion?: boolean;
   sounds?: boolean;
+  textDirection?: 'rtl' | 'ltr';
+  highContrast?: boolean;
 };
 
 export type ProfileDefaults = Pick<

@@ -66,6 +66,10 @@ services:
         sync: false
       - key: NOTIFICATION_SMTP_HOST
         sync: false
+      - key: NOTIFICATION_RESEND_API_KEY
+        sync: false
+      - key: NOTIFICATION_APP_URL
+        sync: false
       - key: NOTIFICATION_SMTP_PORT
         sync: false
       - key: NOTIFICATION_SMTP_USER

@@ -52,6 +52,8 @@ const envSchema = z
       .optional(),
     AZURE_SPEECH_LANGUAGES_JSON: z.string().min(1).max(16000).optional(),
     NOTIFICATION_SMTP_HOST: z.string().min(1).max(255).optional(),
+    NOTIFICATION_RESEND_API_KEY: z.string().min(1).optional(),
+    NOTIFICATION_APP_URL: z.string().url().optional(),
     NOTIFICATION_SMTP_PORT: z.coerce.number().int().min(1).max(65535).optional(),
     NOTIFICATION_SMTP_USER: z.string().min(1).optional(),
     NOTIFICATION_SMTP_PASSWORD: z.string().min(1).optional(),
@@ -81,7 +83,7 @@ const envSchema = z
   })
   .superRefine((v, ctx) => {
     const smtp = [v.NOTIFICATION_SMTP_HOST, v.NOTIFICATION_SMTP_PORT, v.NOTIFICATION_EMAIL_FROM];
-    if (smtp.some(Boolean) && !smtp.every(Boolean))
+    if ((v.NOTIFICATION_SMTP_HOST || v.NOTIFICATION_SMTP_PORT) && !smtp.every(Boolean))
       ctx.addIssue({
         code: 'custom',
         path: ['NOTIFICATION_SMTP_HOST'],

@@ -153,6 +153,8 @@ const notificationService = new NotificationService(
   createNotificationSender(
     {
       smtpHost: env.NOTIFICATION_SMTP_HOST,
+      resendApiKey: env.NOTIFICATION_RESEND_API_KEY,
+      appUrl: env.NOTIFICATION_APP_URL,
       smtpPort: env.NOTIFICATION_SMTP_PORT,
       smtpUser: env.NOTIFICATION_SMTP_USER,
       smtpPassword: env.NOTIFICATION_SMTP_PASSWORD,
