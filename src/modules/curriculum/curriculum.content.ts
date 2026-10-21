@@ -102,6 +102,21 @@ export const lexicon = JSON.parse(
   academic_elective: unknown[];
 };
 export const unitById = new Map(content.units.map((unit) => [unit.id, unit]));
+// Forward presentation correction; preserve the published import and learner identities.
+const introductionUpdate = JSON.parse(
+  readFileSync(resolve('assets/english-zero-c1/introduction-update.json'), 'utf8'),
+) as { units: Unit[]; lessons: Lesson[] };
+for (const unit of introductionUpdate.units) {
+  const index = content.units.findIndex((item) => item.id === unit.id);
+  if (index < 0) throw new Error('Unknown introduction unit');
+  content.units[index] = unit;
+  unitById.set(unit.id, unit);
+}
+for (const lesson of introductionUpdate.lessons) {
+  const index = content.lessons.findIndex((item) => item.id === lesson.id);
+  if (index < 0) throw new Error('Unknown introduction lesson');
+  content.lessons[index] = lesson;
+}
 export const lessonById = new Map(content.lessons.map((lesson) => [lesson.id, lesson]));
 export const electiveTargets: Target[] = lexicon.academic_elective.map((raw, index) => {
   const item = raw as { en: string; definition_en: string };

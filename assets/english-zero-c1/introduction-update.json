@@ -1,0 +1,2127 @@
+{
+  "revision": "introduction-participants-v1",
+  "units": [
+    {
+      "id": "P01",
+      "band": "Pre-A1",
+      "title_he": "שלום, מציגים את עצמנו",
+      "goal_he": "לברך, לומר שם ולזהות שם שנאמר באיטיות.",
+      "grammar_he": "תבניות קבועות I am ו־my name is; שאלת שם ללא ניתוח דקדוקי.",
+      "targets": [
+        {
+          "en": "hello",
+          "he": "שלום"
+        },
+        {
+          "en": "hi",
+          "he": "היי"
+        },
+        {
+          "en": "goodbye",
+          "he": "להתראות"
+        },
+        {
+          "en": "I",
+          "he": "אני"
+        },
+        {
+          "en": "you",
+          "he": "אתה או את"
+        },
+        {
+          "en": "am",
+          "he": "צורת הווה של להיות אחרי I"
+        },
+        {
+          "en": "my",
+          "he": "שלי"
+        },
+        {
+          "en": "name",
+          "he": "שם"
+        },
+        {
+          "en": "yes",
+          "he": "כן"
+        },
+        {
+          "en": "no",
+          "he": "לא"
+        },
+        {
+          "en": "thank you",
+          "he": "תודה"
+        },
+        {
+          "en": "please",
+          "he": "בבקשה"
+        }
+      ],
+      "support_words": ["is", "your", "what", "a", "and"],
+      "dialogue": [
+        {
+          "speaker": "teacher",
+          "text_en": "Hello. My name is {{teacherName}}.",
+          "text_he": "שלום. השם שלי {{teacherNameHe}}."
+        },
+        {
+          "speaker": "model",
+          "text_en": "Hi, {{teacherName}}.",
+          "text_he": "היי, {{teacherNameHe}}."
+        },
+        {
+          "speaker": "teacher",
+          "text_en": "Is my name {{teacherName}}?",
+          "text_he": "האם השם שלי {{teacherNameHe}}?"
+        },
+        {
+          "speaker": "model",
+          "text_en": "Yes.",
+          "text_he": "כן."
+        },
+        {
+          "speaker": "teacher",
+          "text_en": "Say goodbye, please.",
+          "text_he": "אמרו להתראות, בבקשה."
+        },
+        {
+          "speaker": "model",
+          "text_en": "Goodbye, {{teacherName}}.",
+          "text_he": "להתראות, {{teacherNameHe}}."
+        },
+        {
+          "speaker": "teacher",
+          "text_en": "Thank you. Goodbye.",
+          "text_he": "תודה. להתראות."
+        },
+        {
+          "speaker": "model",
+          "text_en": "Goodbye.",
+          "text_he": "להתראות."
+        }
+      ],
+      "passage_en": "Hello. My name is {{teacherName}}. I am {{teacherName}}. Please say hello. Hi. Thank you. Goodbye.",
+      "passage_questions": [
+        {
+          "question_he": "לפי הקטע, מה שם המורה?",
+          "question_en": "What is the teacher's name?",
+          "answer_en": "{{teacherName}}.",
+          "type": "detail"
+        },
+        {
+          "question_he": "באיזו ברכה המורה מתחיל את הקטע?",
+          "question_en": "What greeting starts the passage?",
+          "answer_en": "Hello.",
+          "type": "detail"
+        },
+        {
+          "question_he": "לפי הקטע, האם שם המורה הוא {{teacherNameHe}}?",
+          "question_en": "Is the teacher's name {{teacherName}}?",
+          "answer_en": "Yes.",
+          "type": "detail"
+        },
+        {
+          "question_he": "לפי הקטע, האם Goodbye הוא שם המורה?",
+          "question_en": "Is Goodbye the teacher's name?",
+          "answer_en": "No.",
+          "type": "detail"
+        },
+        {
+          "question_he": "מה המורה אומר לפני הפרידה בקטע?",
+          "question_en": "What does the teacher say before goodbye?",
+          "answer_en": "Thank you.",
+          "type": "detail"
+        },
+        {
+          "question_he": "ברכו את {{teacherNameHe}} באנגלית.",
+          "question_en": "Say hello to {{teacherName}}.",
+          "answer_en": "Hello, {{teacherName}}.",
+          "type": "transfer"
+        }
+      ],
+      "roleplay_prompt_he": "פגשתם את {{teacherNameHe}} לראשונה. ברכו את המורה בשמו, הציגו את עצמכם בשם שלכם והיפרדו.",
+      "model_response_en": "Hello. My name is {{teacherName}}. Goodbye.",
+      "writing_prompt_he": "השלימו את המשפט My name is ___ בשם שלכם. לפני כתיבה אפשר לומר את המשפט בקול; אין צורך לבחור זהות של דמות.",
+      "coverage_targets": [],
+      "support_glossary": [
+        {
+          "en": "be",
+          "he": "להיות",
+          "definition_en": "To exist; to be alive; used to give information about someone or something",
+          "status": "support_only_not_independent_mastery"
+        },
+        {
+          "en": "say",
+          "he": "לומר",
+          "definition_en": "to use words to tell a message",
+          "status": "support_only_not_independent_mastery"
+        },
+        {
+          "en": "thank",
+          "he": "להודות (על דבר)",
+          "definition_en": "to tell someone you are grateful to them",
+          "status": "support_only_not_independent_mastery"
+        }
+      ],
+      "language_focus": {
+        "unit": "P01",
+        "rule_he": "כדי להציג את עצמנו אומרים I am ואז את השם שלנו. אפשר לומר אותו פרט גם בעזרת My name is. המורה מדגים בשמו {{teacherNameHe}}, ואתם משתמשים בשם שלכם.",
+        "example_en": "I am {{teacherName}}.",
+        "contrast_en": "My name is {{teacherName}}.",
+        "prompt_he": "הציגו את עצמכם באנגלית בשם שלכם והתחילו ב־I am.",
+        "answer_en": "I am {{teacherName}}.",
+        "feedback_he": "I am פותח הצגה עצמית. המורה משתמש בשמו ואתם בשם שלכם; שם שונה מהדוגמה אינו טעות."
+      },
+      "input_readiness_he": "לפני הטקסט בודקים מה המשתמש כבר מבין. תמיכות חדשות נחלקות לחבילות של עד 6 לפני המפגש או לטקסט קצר יותר. אין להניח שמילת תמיכה כבר ידועה, ואין לדחוס את כל רשימת הגלוסות לדקות המורה. זו קריאה מונחית; קריאה עצמאית דורשת בדיקת כיסוי אישית.",
+      "prerequisite_he": "מיומנות תקשורת מן היחידה הקודמת, או מיון שמראה יכולת מקבילה. קריאה נבדקת בנפרד; אין חסימת שיחה בגלל פענוח.",
+      "prior_unit": null,
+      "content_status": "original_authored_proposal_not_level_or_lexically_validated"
+    },
+    {
+      "id": "A101",
+      "band": "A1",
+      "title_he": "מכירים אנשים",
+      "goal_he": "להציג שם, מקום מגורים ושפות ולשאול בן שיח על עצמו.",
+      "grammar_he": "be בהווה: חיוב, שלילה ושאלות קצרות; כינויי גוף I/you/he/she/we.",
+      "targets": [
+        {
+          "en": "from",
+          "he": "מ־ לציון מוצא"
+        },
+        {
+          "en": "live",
+          "he": "לגור"
+        },
+        {
+          "en": "city",
+          "he": "עיר"
+        },
+        {
+          "en": "country",
+          "he": "מדינה"
+        },
+        {
+          "en": "English",
+          "he": "אנגלית"
+        },
+        {
+          "en": "Hebrew",
+          "he": "עברית"
+        },
+        {
+          "en": "speak",
+          "he": "לדבר"
+        },
+        {
+          "en": "student",
+          "he": "תלמיד או סטודנט"
+        },
+        {
+          "en": "teacher",
+          "he": "מורה"
+        },
+        {
+          "en": "work",
+          "he": "לעבוד"
+        },
+        {
+          "en": "nice to meet you",
+          "he": "נעים להכיר"
+        },
+        {
+          "en": "where",
+          "he": "איפה"
+        }
+      ],
+      "support_words": [
+        "I",
+        "you",
+        "he",
+        "she",
+        "we",
+        "am",
+        "is",
+        "are",
+        "not",
+        "in",
+        "a",
+        "and",
+        "my",
+        "your",
+        "name",
+        "do",
+        "but",
+        "with"
+      ],
+      "dialogue": [
+        {
+          "speaker": "teacher",
+          "text_en": "Hello. I am Maya. What is your name?",
+          "text_he": "שלום. אני מאיה. מה שמך?"
+        },
+        {
+          "speaker": "model",
+          "text_en": "My name is Tom. Nice to meet you.",
+          "text_he": "שמי תום. נעים להכיר."
+        },
+        {
+          "speaker": "teacher",
+          "text_en": "Nice to meet you. Where are you from?",
+          "text_he": "נעים להכיר. מאיפה אתה?"
+        },
+        {
+          "speaker": "model",
+          "text_en": "I am from Israel. I live in Haifa.",
+          "text_he": "אני מישראל. אני גר בחיפה."
+        },
+        {
+          "speaker": "teacher",
+          "text_en": "Are you a student?",
+          "text_he": "האם אתה תלמיד?"
+        },
+        {
+          "speaker": "model",
+          "text_en": "Yes. I am a student. I speak Hebrew.",
+          "text_he": "כן. אני תלמיד. אני מדבר עברית."
+        },
+        {
+          "speaker": "teacher",
+          "text_en": "Do you speak English?",
+          "text_he": "האם אתה מדבר אנגלית?"
+        },
+        {
+          "speaker": "model",
+          "text_en": "A little. You are my English teacher.",
+          "text_he": "קצת. את המורה שלי לאנגלית."
+        }
+      ],
+      "passage_en": "My name is Tom. I am from Israel, and I live in Haifa. Haifa is a city. I am a student. My friend Maya is a teacher. She is from Israel too. We speak Hebrew. I speak a little English, but Maya speaks English at work. We meet in a small class. My book is blue, and her book is red. Maya says, \"Hello, Tom. Nice to meet you.\" I say, \"Hello, Maya. I am ready.\"",
+      "passage_questions": [
+        {
+          "question_he": "באיזו עיר תום גר?",
+          "question_en": "Where does Tom live?",
+          "answer_en": "He lives in Haifa.",
+          "type": "detail"
+        },
+        {
+          "question_he": "מה העבודה של מאיה?",
+          "question_en": "What is Maya?",
+          "answer_en": "She is a teacher.",
+          "type": "detail"
+        },
+        {
+          "question_he": "איזו שפה שניהם מדברים?",
+          "question_en": "What language do they both speak?",
+          "answer_en": "Hebrew.",
+          "type": "detail"
+        },
+        {
+          "question_he": "למי מתייחסת She במשפט על מאיה?",
+          "question_en": "Who is she in the sentence about Maya?",
+          "answer_en": "Maya.",
+          "type": "reference"
+        },
+        {
+          "question_he": "מה מטרת הטקסט?",
+          "question_en": "What is the text mainly about?",
+          "answer_en": "Tom introduces himself and Maya.",
+          "type": "gist"
+        },
+        {
+          "question_he": "הציגו את תום בשני פרטים מן הטקסט.",
+          "question_en": "Introduce Tom with two facts.",
+          "answer_en": "His name is Tom. He lives in Haifa.",
+          "type": "transfer"
+        }
+      ],
+      "roleplay_prompt_he": "פגשו את {{teacherNameHe}} בקבוצת לימוד. הציגו את עצמכם בשמכם, ציינו את עיר המגורים והשפות שלכם ושאלו את המורה מה שמו ומאיפה הוא.",
+      "model_response_en": "Hello. My name is {{teacherName}}. I speak English. What is your name?",
+      "writing_prompt_he": "כתבו פרופיל שלכם בן 4 משפטים: השם שלכם, מקום מגורים, תפקיד ושפות.",
+      "coverage_targets": [
+        {
+          "id": "NGSL-0001",
+          "en": "the",
+          "he": "ה־ (יידוע)",
+          "definition_en": "used to refer to something already mentioned",
+          "unit": "A101",
+          "band": "A1",
+          "track": "frequency_coverage",
+          "source": "NGSL 1.2",
+          "source_rank": 1,
+          "status": "default_sense_draft_requires_card_review",
+          "license": "CC BY-SA 4.0",
+          "sense_warning": "A frequency headword is not a validated sense, CEFR level or mastery unit.",
+          "first_text_encounter_unit": "P06",
+          "exposure_note_he": "חשיפה נתמכת מוקדמת אינה רכישה עצמאית. מועד ההוראה הפעילה מופיע בשדה היחידה; כל גלוסה דורשת בדיקת משמעות בהקשר.",
+          "display_unit": "A101 · תמיכה מוקדמת: P06"
+        },
+        {
+          "id": "NGSL-0002",
+          "en": "be",
+          "he": "להיות",
+          "definition_en": "To exist; to be alive; used to give information about someone or something",
+          "unit": "A101",
+          "band": "A1",
+          "track": "frequency_coverage",
+          "source": "NGSL 1.2",
+          "source_rank": 2,
+          "status": "default_sense_draft_requires_card_review",
+          "license": "CC BY-SA 4.0",
+          "sense_warning": "A frequency headword is not a validated sense, CEFR level or mastery unit.",
+          "first_text_encounter_unit": "P01",
+          "exposure_note_he": "חשיפה נתמכת מוקדמת אינה רכישה עצמאית. מועד ההוראה הפעילה מופיע בשדה היחידה; כל גלוסה דורשת בדיקת משמעות בהקשר.",
+          "display_unit": "A101 · תמיכה מוקדמת: P01"
+        },
+        {
+          "id": "NGSL-0003",
+          "en": "and",
+          "he": "ו־",
+          "definition_en": "used to refer to two or more things",
+          "unit": "A101",
+          "band": "A1",
+          "track": "frequency_coverage",
+          "source": "NGSL 1.2",
+          "source_rank": 3,
+          "status": "default_sense_draft_requires_card_review",
+          "license": "CC BY-SA 4.0",
+          "sense_warning": "A frequency headword is not a validated sense, CEFR level or mastery unit.",
+          "first_text_encounter_unit": "P03",
+          "exposure_note_he": "חשיפה נתמכת מוקדמת אינה רכישה עצמאית. מועד ההוראה הפעילה מופיע בשדה היחידה; כל גלוסה דורשת בדיקת משמעות בהקשר.",
+          "display_unit": "A101 · תמיכה מוקדמת: P03"
+        },
+        {
+          "id": "NGSL-0004",
+          "en": "of",
+          "he": "של",
+          "definition_en": "belonging to or connected with something",
+          "unit": "A101",
+          "band": "A1",
+          "track": "frequency_coverage",
+          "source": "NGSL 1.2",
+          "source_rank": 4,
+          "status": "default_sense_draft_requires_card_review",
+          "license": "CC BY-SA 4.0",
+          "sense_warning": "A frequency headword is not a validated sense, CEFR level or mastery unit.",
+          "first_text_encounter_unit": "A205",
+          "exposure_note_he": "חשיפה נתמכת מוקדמת אינה רכישה עצמאית. מועד ההוראה הפעילה מופיע בשדה היחידה; כל גלוסה דורשת בדיקת משמעות בהקשר.",
+          "display_unit": "A101"
+        },
+        {
+          "id": "NGSL-0005",
+          "en": "to",
+          "he": "אל",
+          "definition_en": "move towards; in the direction of",
+          "unit": "A101",
+          "band": "A1",
+          "track": "frequency_coverage",
+          "source": "NGSL 1.2",
+          "source_rank": 5,
+          "status": "default_sense_draft_requires_card_review",
+          "license": "CC BY-SA 4.0",
+          "sense_warning": "A frequency headword is not a validated sense, CEFR level or mastery unit.",
+          "first_text_encounter_unit": "A101",
+          "exposure_note_he": "חשיפה נתמכת מוקדמת אינה רכישה עצמאית. מועד ההוראה הפעילה מופיע בשדה היחידה; כל גלוסה דורשת בדיקת משמעות בהקשר.",
+          "display_unit": "A101"
+        },
+        {
+          "id": "NGSL-0006",
+          "en": "a",
+          "he": "תווית לשם עצם יחיד לא מיודע",
+          "definition_en": "one (of something)",
+          "unit": "A101",
+          "band": "A1",
+          "track": "frequency_coverage",
+          "source": "NGSL 1.2",
+          "source_rank": 6,
+          "status": "default_sense_draft_requires_card_review",
+          "license": "CC BY-SA 4.0",
+          "sense_warning": "A frequency headword is not a validated sense, CEFR level or mastery unit.",
+          "first_text_encounter_unit": "P02",
+          "exposure_note_he": "חשיפה נתמכת מוקדמת אינה רכישה עצמאית. מועד ההוראה הפעילה מופיע בשדה היחידה; כל גלוסה דורשת בדיקת משמעות בהקשר.",
+          "display_unit": "A101 · תמיכה מוקדמת: P02"
+        },
+        {
+          "id": "NGSL-0007",
+          "en": "in",
+          "he": "ב־ (בתוך)",
+          "definition_en": "being inside something",
+          "unit": "A101",
+          "band": "A1",
+          "track": "frequency_coverage",
+          "source": "NGSL 1.2",
+          "source_rank": 7,
+          "status": "default_sense_draft_requires_card_review",
+          "license": "CC BY-SA 4.0",
+          "sense_warning": "A frequency headword is not a validated sense, CEFR level or mastery unit.",
+          "first_text_encounter_unit": "P04",
+          "exposure_note_he": "חשיפה נתמכת מוקדמת אינה רכישה עצמאית. מועד ההוראה הפעילה מופיע בשדה היחידה; כל גלוסה דורשת בדיקת משמעות בהקשר.",
+          "display_unit": "A101 · תמיכה מוקדמת: P04"
+        },
+        {
+          "id": "NGSL-0009",
+          "en": "it",
+          "he": "זה (דבר או בעל חיים)",
+          "definition_en": "a thing that has been previously mentioned",
+          "unit": "A101",
+          "band": "A1",
+          "track": "frequency_coverage",
+          "source": "NGSL 1.2",
+          "source_rank": 9,
+          "status": "default_sense_draft_requires_card_review",
+          "license": "CC BY-SA 4.0",
+          "sense_warning": "A frequency headword is not a validated sense, CEFR level or mastery unit.",
+          "first_text_encounter_unit": "P03",
+          "exposure_note_he": "חשיפה נתמכת מוקדמת אינה רכישה עצמאית. מועד ההוראה הפעילה מופיע בשדה היחידה; כל גלוסה דורשת בדיקת משמעות בהקשר.",
+          "display_unit": "A101 · תמיכה מוקדמת: P03"
+        },
+        {
+          "id": "NGSL-0012",
+          "en": "for",
+          "he": "בשביל",
+          "definition_en": "used to show the purpose, or need of something",
+          "unit": "A101",
+          "band": "A1",
+          "track": "frequency_coverage",
+          "source": "NGSL 1.2",
+          "source_rank": 12,
+          "status": "default_sense_draft_requires_card_review",
+          "license": "CC BY-SA 4.0",
+          "sense_warning": "A frequency headword is not a validated sense, CEFR level or mastery unit.",
+          "first_text_encounter_unit": "A105",
+          "exposure_note_he": "חשיפה נתמכת מוקדמת אינה רכישה עצמאית. מועד ההוראה הפעילה מופיע בשדה היחידה; כל גלוסה דורשת בדיקת משמעות בהקשר.",
+          "display_unit": "A101"
+        },
+        {
+          "id": "NGSL-0013",
+          "en": "they",
+          "he": "הם / הן",
+          "definition_en": "used to refer to two or more people, animals, or things",
+          "unit": "A101",
+          "band": "A1",
+          "track": "frequency_coverage",
+          "source": "NGSL 1.2",
+          "source_rank": 13,
+          "status": "default_sense_draft_requires_card_review",
+          "license": "CC BY-SA 4.0",
+          "sense_warning": "A frequency headword is not a validated sense, CEFR level or mastery unit.",
+          "first_text_encounter_unit": "A105",
+          "exposure_note_he": "חשיפה נתמכת מוקדמת אינה רכישה עצמאית. מועד ההוראה הפעילה מופיע בשדה היחידה; כל גלוסה דורשת בדיקת משמעות בהקשר.",
+          "display_unit": "A101"
+        },
+        {
+          "id": "NGSL-0014",
+          "en": "not",
+          "he": "לא (שלילה)",
+          "definition_en": "word indicating the negative of verbs, adjectives, etc.",
+          "unit": "A101",
+          "band": "A1",
+          "track": "frequency_coverage",
+          "source": "NGSL 1.2",
+          "source_rank": 14,
+          "status": "default_sense_draft_requires_card_review",
+          "license": "CC BY-SA 4.0",
+          "sense_warning": "A frequency headword is not a validated sense, CEFR level or mastery unit.",
+          "first_text_encounter_unit": "A104",
+          "exposure_note_he": "חשיפה נתמכת מוקדמת אינה רכישה עצמאית. מועד ההוראה הפעילה מופיע בשדה היחידה; כל גלוסה דורשת בדיקת משמעות בהקשר.",
+          "display_unit": "A101"
+        },
+        {
+          "id": "NGSL-0015",
+          "en": "that",
+          "he": "ההוא / ההיא",
+          "definition_en": "used to show which person or thing we are talking about",
+          "unit": "A101",
+          "band": "A1",
+          "track": "frequency_coverage",
+          "source": "NGSL 1.2",
+          "source_rank": 15,
+          "status": "default_sense_draft_requires_card_review",
+          "license": "CC BY-SA 4.0",
+          "sense_warning": "A frequency headword is not a validated sense, CEFR level or mastery unit.",
+          "first_text_encounter_unit": "P04",
+          "exposure_note_he": "חשיפה נתמכת מוקדמת אינה רכישה עצמאית. מועד ההוראה הפעילה מופיע בשדה היחידה; כל גלוסה דורשת בדיקת משמעות בהקשר.",
+          "display_unit": "A101 · תמיכה מוקדמת: P04"
+        },
+        {
+          "id": "NGSL-0016",
+          "en": "we",
+          "he": "אנחנו",
+          "definition_en": "used to refer to the speaker and other people together",
+          "unit": "A101",
+          "band": "A1",
+          "track": "frequency_coverage",
+          "source": "NGSL 1.2",
+          "source_rank": 16,
+          "status": "default_sense_draft_requires_card_review",
+          "license": "CC BY-SA 4.0",
+          "sense_warning": "A frequency headword is not a validated sense, CEFR level or mastery unit.",
+          "first_text_encounter_unit": "P05",
+          "exposure_note_he": "חשיפה נתמכת מוקדמת אינה רכישה עצמאית. מועד ההוראה הפעילה מופיע בשדה היחידה; כל גלוסה דורשת בדיקת משמעות בהקשר.",
+          "display_unit": "A101 · תמיכה מוקדמת: P05"
+        },
+        {
+          "id": "NGSL-0018",
+          "en": "with",
+          "he": "עם",
+          "definition_en": "used to express that people or things are together",
+          "unit": "A101",
+          "band": "A1",
+          "track": "frequency_coverage",
+          "source": "NGSL 1.2",
+          "source_rank": 18,
+          "status": "default_sense_draft_requires_card_review",
+          "license": "CC BY-SA 4.0",
+          "sense_warning": "A frequency headword is not a validated sense, CEFR level or mastery unit.",
+          "first_text_encounter_unit": "P02",
+          "exposure_note_he": "חשיפה נתמכת מוקדמת אינה רכישה עצמאית. מועד ההוראה הפעילה מופיע בשדה היחידה; כל גלוסה דורשת בדיקת משמעות בהקשר.",
+          "display_unit": "A101 · תמיכה מוקדמת: P02"
+        },
+        {
+          "id": "NGSL-0021",
+          "en": "do",
+          "he": "לעשות",
+          "definition_en": "to act; to perform actions",
+          "unit": "A101",
+          "band": "A1",
+          "track": "frequency_coverage",
+          "source": "NGSL 1.2",
+          "source_rank": 21,
+          "status": "default_sense_draft_requires_card_review",
+          "license": "CC BY-SA 4.0",
+          "sense_warning": "A frequency headword is not a validated sense, CEFR level or mastery unit.",
+          "first_text_encounter_unit": "P04",
+          "exposure_note_he": "חשיפה נתמכת מוקדמת אינה רכישה עצמאית. מועד ההוראה הפעילה מופיע בשדה היחידה; כל גלוסה דורשת בדיקת משמעות בהקשר.",
+          "display_unit": "A101 · תמיכה מוקדמת: P04"
+        },
+        {
+          "id": "NGSL-0022",
+          "en": "as",
+          "he": "כמו",
+          "definition_en": "a word used to compare two equal things",
+          "unit": "A101",
+          "band": "A1",
+          "track": "frequency_coverage",
+          "source": "NGSL 1.2",
+          "source_rank": 22,
+          "status": "default_sense_draft_requires_card_review",
+          "license": "CC BY-SA 4.0",
+          "sense_warning": "A frequency headword is not a validated sense, CEFR level or mastery unit.",
+          "first_text_encounter_unit": "B104",
+          "exposure_note_he": "חשיפה נתמכת מוקדמת אינה רכישה עצמאית. מועד ההוראה הפעילה מופיע בשדה היחידה; כל גלוסה דורשת בדיקת משמעות בהקשר.",
+          "display_unit": "A101"
+        },
+        {
+          "id": "NGSL-0023",
+          "en": "at",
+          "he": "ב־ (מקום או נקודה בזמן)",
+          "definition_en": "in the place where something is",
+          "unit": "A101",
+          "band": "A1",
+          "track": "frequency_coverage",
+          "source": "NGSL 1.2",
+          "source_rank": 23,
+          "status": "default_sense_draft_requires_card_review",
+          "license": "CC BY-SA 4.0",
+          "sense_warning": "A frequency headword is not a validated sense, CEFR level or mastery unit.",
+          "first_text_encounter_unit": "A101",
+          "exposure_note_he": "חשיפה נתמכת מוקדמת אינה רכישה עצמאית. מועד ההוראה הפעילה מופיע בשדה היחידה; כל גלוסה דורשת בדיקת משמעות בהקשר.",
+          "display_unit": "A101"
+        },
+        {
+          "id": "NGSL-0025",
+          "en": "but",
+          "he": "אבל",
+          "definition_en": "used before you say something different, opposite",
+          "unit": "A101",
+          "band": "A1",
+          "track": "frequency_coverage",
+          "source": "NGSL 1.2",
+          "source_rank": 25,
+          "status": "default_sense_draft_requires_card_review",
+          "license": "CC BY-SA 4.0",
+          "sense_warning": "A frequency headword is not a validated sense, CEFR level or mastery unit.",
+          "first_text_encounter_unit": "A101",
+          "exposure_note_he": "חשיפה נתמכת מוקדמת אינה רכישה עצמאית. מועד ההוראה הפעילה מופיע בשדה היחידה; כל גלוסה דורשת בדיקת משמעות בהקשר.",
+          "display_unit": "A101"
+        },
+        {
+          "id": "NGSL-0027",
+          "en": "by",
+          "he": "ליד",
+          "definition_en": "near; with",
+          "unit": "A101",
+          "band": "A1",
+          "track": "frequency_coverage",
+          "source": "NGSL 1.2",
+          "source_rank": 27,
+          "status": "default_sense_draft_requires_card_review",
+          "license": "CC BY-SA 4.0",
+          "sense_warning": "A frequency headword is not a validated sense, CEFR level or mastery unit.",
+          "first_text_encounter_unit": "A203",
+          "exposure_note_he": "חשיפה נתמכת מוקדמת אינה רכישה עצמאית. מועד ההוראה הפעילה מופיע בשדה היחידה; כל גלוסה דורשת בדיקת משמעות בהקשר.",
+          "display_unit": "A101"
+        },
+        {
+          "id": "NGSL-0029",
+          "en": "or",
+          "he": "או",
+          "definition_en": "used to link alternatives, to introduce another choice",
+          "unit": "A101",
+          "band": "A1",
+          "track": "frequency_coverage",
+          "source": "NGSL 1.2",
+          "source_rank": 29,
+          "status": "default_sense_draft_requires_card_review",
+          "license": "CC BY-SA 4.0",
+          "sense_warning": "A frequency headword is not a validated sense, CEFR level or mastery unit.",
+          "first_text_encounter_unit": "P03",
+          "exposure_note_he": "חשיפה נתמכת מוקדמת אינה רכישה עצמאית. מועד ההוראה הפעילה מופיע בשדה היחידה; כל גלוסה דורשת בדיקת משמעות בהקשר.",
+          "display_unit": "A101 · תמיכה מוקדמת: P03"
+        },
+        {
+          "id": "NGSL-0032",
+          "en": "so",
+          "he": "לכן",
+          "definition_en": "for that reason",
+          "unit": "A101",
+          "band": "A1",
+          "track": "frequency_coverage",
+          "source": "NGSL 1.2",
+          "source_rank": 32,
+          "status": "default_sense_draft_requires_card_review",
+          "license": "CC BY-SA 4.0",
+          "sense_warning": "A frequency headword is not a validated sense, CEFR level or mastery unit.",
+          "first_text_encounter_unit": "A201",
+          "exposure_note_he": "חשיפה נתמכת מוקדמת אינה רכישה עצמאית. מועד ההוראה הפעילה מופיע בשדה היחידה; כל גלוסה דורשת בדיקת משמעות בהקשר.",
+          "display_unit": "A101"
+        },
+        {
+          "id": "NGSL-0036",
+          "en": "would",
+          "he": "היה עושה (תנאי)",
+          "definition_en": "modal verb used to indicate possibility, request, etc.",
+          "unit": "A101",
+          "band": "A1",
+          "track": "frequency_coverage",
+          "source": "NGSL 1.2",
+          "source_rank": 36,
+          "status": "default_sense_draft_requires_card_review",
+          "license": "CC BY-SA 4.0",
+          "sense_warning": "A frequency headword is not a validated sense, CEFR level or mastery unit.",
+          "first_text_encounter_unit": "A104",
+          "exposure_note_he": "חשיפה נתמכת מוקדמת אינה רכישה עצמאית. מועד ההוראה הפעילה מופיע בשדה היחידה; כל גלוסה דורשת בדיקת משמעות בהקשר.",
+          "display_unit": "A101"
+        },
+        {
+          "id": "NGSL-0037",
+          "en": "about",
+          "he": "על אודות",
+          "definition_en": "of (a subject); concerning",
+          "unit": "A101",
+          "band": "A1",
+          "track": "frequency_coverage",
+          "source": "NGSL 1.2",
+          "source_rank": 37,
+          "status": "default_sense_draft_requires_card_review",
+          "license": "CC BY-SA 4.0",
+          "sense_warning": "A frequency headword is not a validated sense, CEFR level or mastery unit.",
+          "first_text_encounter_unit": "A103",
+          "exposure_note_he": "חשיפה נתמכת מוקדמת אינה רכישה עצמאית. מועד ההוראה הפעילה מופיע בשדה היחידה; כל גלוסה דורשת בדיקת משמעות בהקשר.",
+          "display_unit": "A101"
+        },
+        {
+          "id": "NGSL-0039",
+          "en": "which",
+          "he": "איזה / איזו",
+          "definition_en": "question word to ask about a person's choice",
+          "unit": "A101",
+          "band": "A1",
+          "track": "frequency_coverage",
+          "source": "NGSL 1.2",
+          "source_rank": 39,
+          "status": "default_sense_draft_requires_card_review",
+          "license": "CC BY-SA 4.0",
+          "sense_warning": "A frequency headword is not a validated sense, CEFR level or mastery unit.",
+          "first_text_encounter_unit": "A205",
+          "exposure_note_he": "חשיפה נתמכת מוקדמת אינה רכישה עצמאית. מועד ההוראה הפעילה מופיע בשדה היחידה; כל גלוסה דורשת בדיקת משמעות בהקשר.",
+          "display_unit": "A101"
+        },
+        {
+          "id": "NGSL-0040",
+          "en": "there",
+          "he": "שם (במקום ההוא)",
+          "definition_en": "in that place or position, at that location",
+          "unit": "A101",
+          "band": "A1",
+          "track": "frequency_coverage",
+          "source": "NGSL 1.2",
+          "source_rank": 40,
+          "status": "default_sense_draft_requires_card_review",
+          "license": "CC BY-SA 4.0",
+          "sense_warning": "A frequency headword is not a validated sense, CEFR level or mastery unit.",
+          "first_text_encounter_unit": "A102",
+          "exposure_note_he": "חשיפה נתמכת מוקדמת אינה רכישה עצמאית. מועד ההוראה הפעילה מופיע בשדה היחידה; כל גלוסה דורשת בדיקת משמעות בהקשר.",
+          "display_unit": "A101"
+        }
+      ],
+      "support_glossary": [
+        {
+          "en": "at",
+          "he": "ב־ (מקום או נקודה בזמן)",
+          "definition_en": "in the place where something is",
+          "status": "support_only_not_independent_mastery"
+        },
+        {
+          "en": "but",
+          "he": "אבל",
+          "definition_en": "used before you say something different, opposite",
+          "status": "support_only_not_independent_mastery"
+        },
+        {
+          "en": "class",
+          "he": "מעמד חברתי",
+          "definition_en": "rank or level in society, ranked from high (rich professional people) to low (ordinary people)",
+          "status": "support_only_not_independent_mastery"
+        },
+        {
+          "en": "little",
+          "he": "מעט",
+          "definition_en": "not great in size, amount, or degree; small",
+          "status": "support_only_not_independent_mastery"
+        },
+        {
+          "en": "meet",
+          "he": "להיפגש",
+          "definition_en": "to come together at a certain time or place",
+          "status": "support_only_not_independent_mastery"
+        },
+        {
+          "en": "nice",
+          "he": "נחמד",
+          "definition_en": "good or enjoyable",
+          "status": "support_only_not_independent_mastery"
+        },
+        {
+          "en": "to",
+          "he": "אל",
+          "definition_en": "move towards; in the direction of",
+          "status": "support_only_not_independent_mastery"
+        },
+        {
+          "en": "too",
+          "he": "מדי",
+          "definition_en": "say that something is more than you want",
+          "status": "support_only_not_independent_mastery"
+        },
+        {
+          "en": "what",
+          "he": "מה",
+          "definition_en": "asking for information about someone or something",
+          "status": "support_only_not_independent_mastery"
+        }
+      ],
+      "language_focus": {
+        "unit": "A101",
+        "rule_he": "באמירות על זהות משתמשים ב־am אחרי I וב־is אחרי he או she. בשאלה מעבירים את am/is/are להתחלה, ולכן You are a student הופך ל־Are you a student. בתשובה קצרה שומרים את אותה צורה, למשל Yes, I am.",
+        "example_en": "You are a student.",
+        "contrast_en": "Are you a student?",
+        "prompt_he": "אתם רוצים לברר אם בת השיח מורה. שאלו באנגלית שאלה מלאה עם Are you.",
+        "answer_en": "Are you a teacher?",
+        "feedback_he": "בשאלה Are בא לפני you. אין צורך להוסיף do לשאלת זהות הזאת; תשובה אפשרית של בת השיח היא Yes, I am."
+      },
+      "input_readiness_he": "לפני הטקסט בודקים מה המשתמש כבר מבין. תמיכות חדשות נחלקות לחבילות של עד 6 לפני המפגש או לטקסט קצר יותר. אין להניח שמילת תמיכה כבר ידועה, ואין לדחוס את כל רשימת הגלוסות לדקות המורה. זו קריאה מונחית; קריאה עצמאית דורשת בדיקת כיסוי אישית.",
+      "prerequisite_he": "מיומנות תקשורת מן היחידה הקודמת, או מיון שמראה יכולת מקבילה. קריאה נבדקת בנפרד; אין חסימת שיחה בגלל פענוח.",
+      "prior_unit": "P06",
+      "content_status": "original_authored_proposal_not_level_or_lexically_validated"
+    }
+  ],
+  "lessons": [
+    {
+      "id": "P01-L1",
+      "unit": "P01",
+      "band": "Pre-A1",
+      "title_he": "שלום, מציגים את עצמנו — רכישה ושיחה נתמכת",
+      "planned_minutes": 10,
+      "targets": [
+        {
+          "en": "hello",
+          "he": "שלום"
+        },
+        {
+          "en": "hi",
+          "he": "היי"
+        },
+        {
+          "en": "goodbye",
+          "he": "להתראות"
+        },
+        {
+          "en": "I",
+          "he": "אני"
+        },
+        {
+          "en": "you",
+          "he": "אתה או את"
+        },
+        {
+          "en": "am",
+          "he": "צורת הווה של להיות אחרי I"
+        }
+      ],
+      "teacher_script": [
+        {
+          "phase": "opening",
+          "say_he": "היום נעבוד על: שלום, מציגים את עצמנו. המטרה היא לברך, לומר שם ולזהות שם שנאמר באיטיות. אפשר לבקש הסבר קצר בעברית או לחלק את המפגש.",
+          "say_en": "We will practise a useful task step by step. You can ask me to repeat or explain. At the end, you will try a new version without the model."
+        },
+        {
+          "phase": "teach_target",
+          "say_he": "הקשב: hello. במשמעות של היום: שלום. אמור את הצורה, ואז הסבר את המשמעות או בחר את המצב שמתאים לה.",
+          "say_en": "Listen: hello. We are learning this expression with a specific meaning. Say it, then explain when you would use it.",
+          "target_en": "hello",
+          "meaning_he": "שלום",
+          "correct_response_en": "hello",
+          "note_he": "חזרה אחרי דגם היא תרגול נתמך. אם אין עדיין יכולת קריאה, לא דורשים הקלדה."
+        },
+        {
+          "phase": "teach_target",
+          "say_he": "הקשב: hi. במשמעות של היום: היי. אמור את הצורה, ואז הסבר את המשמעות או בחר את המצב שמתאים לה.",
+          "say_en": "Listen: hi. We are learning this expression with a specific meaning. Say it, then explain when you would use it.",
+          "target_en": "hi",
+          "meaning_he": "היי",
+          "correct_response_en": "hi",
+          "note_he": "חזרה אחרי דגם היא תרגול נתמך. אם אין עדיין יכולת קריאה, לא דורשים הקלדה."
+        },
+        {
+          "phase": "teach_target",
+          "say_he": "הקשב: goodbye. במשמעות של היום: להתראות. אמור את הצורה, ואז הסבר את המשמעות או בחר את המצב שמתאים לה.",
+          "say_en": "Listen: goodbye. We are learning this expression with a specific meaning. Say it, then explain when you would use it.",
+          "target_en": "goodbye",
+          "meaning_he": "להתראות",
+          "correct_response_en": "goodbye",
+          "note_he": "חזרה אחרי דגם היא תרגול נתמך. אם אין עדיין יכולת קריאה, לא דורשים הקלדה."
+        },
+        {
+          "phase": "teach_target",
+          "say_he": "הקשב: I. במשמעות של היום: אני. אמור את הצורה, ואז הסבר את המשמעות או בחר את המצב שמתאים לה.",
+          "say_en": "Listen: I. We are learning this expression with a specific meaning. Say it, then explain when you would use it.",
+          "target_en": "I",
+          "meaning_he": "אני",
+          "correct_response_en": "I",
+          "note_he": "חזרה אחרי דגם היא תרגול נתמך. אם אין עדיין יכולת קריאה, לא דורשים הקלדה."
+        },
+        {
+          "phase": "teach_target",
+          "say_he": "הקשב: you. במשמעות של היום: אתה או את. אמור את הצורה, ואז הסבר את המשמעות או בחר את המצב שמתאים לה.",
+          "say_en": "Listen: you. We are learning this expression with a specific meaning. Say it, then explain when you would use it.",
+          "target_en": "you",
+          "meaning_he": "אתה או את",
+          "correct_response_en": "you",
+          "note_he": "חזרה אחרי דגם היא תרגול נתמך. אם אין עדיין יכולת קריאה, לא דורשים הקלדה."
+        },
+        {
+          "phase": "teach_target",
+          "say_he": "הקשב: am. במשמעות של היום: צורת הווה של להיות אחרי I. אמור את הצורה, ואז הסבר את המשמעות או בחר את המצב שמתאים לה.",
+          "say_en": "Listen: am. We are learning this expression with a specific meaning. Say it, then explain when you would use it.",
+          "target_en": "am",
+          "meaning_he": "צורת הווה של להיות אחרי I",
+          "correct_response_en": "am",
+          "note_he": "חזרה אחרי דגם היא תרגול נתמך. אם אין עדיין יכולת קריאה, לא דורשים הקלדה."
+        },
+        {
+          "phase": "language_focus",
+          "say_he": "כדי להציג את עצמנו אומרים I am ואז את השם שלנו. אפשר לומר אותו פרט גם בעזרת My name is. המורה מדגים בשמו {{teacherNameHe}}, ואתם משתמשים בשם שלכם.",
+          "text_en": "I am {{teacherName}}.",
+          "contrast_en": "My name is {{teacherName}}.",
+          "task_he": "הציגו את עצמכם באנגלית בשם שלכם והתחילו ב־I am.",
+          "answer_anchor_en": "I am {{teacherName}}.",
+          "note_he": "I am פותח הצגה עצמית. המורה משתמש בשמו ואתם בשם שלכם; שם שונה מהדוגמה אינו טעות."
+        },
+        {
+          "phase": "support_bridge",
+          "say_he": "לפני הדגם נוודא שהמילים הדרושות להבנה מוכרות. נלמד רק את התמיכות החסרות בחבילות קצרות; אם הן רבות, נעצור ונמשיך במפגש נוסף. אפשר להבין בעזרת שמע ותרגום.",
+          "support_script_lines_he": [
+            "הקשב: be. כאן נספק את המשמעות: להיות. נשתמש במילה כדי להבין את המצב, ולא נספור זאת כשליפה עצמאית.",
+            "הקשב: say. כאן נספק את המשמעות: לומר. נשתמש במילה כדי להבין את המצב, ולא נספור זאת כשליפה עצמאית.",
+            "הקשב: thank. כאן נספק את המשמעות: להודות (על דבר). נשתמש במילה כדי להבין את המצב, ולא נספור זאת כשליפה עצמאית.",
+            "ביטוי תמיכה לדגם: my, במשמעות שלי. נלמד להפיק אותו בהמשך; עכשיו אפשר להיעזר בדגם.",
+            "ביטוי תמיכה לדגם: name, במשמעות שם. נלמד להפיק אותו בהמשך; עכשיו אפשר להיעזר בדגם.",
+            "ביטוי תמיכה לדגם: yes, במשמעות כן. נלמד להפיק אותו בהמשך; עכשיו אפשר להיעזר בדגם.",
+            "ביטוי תמיכה לדגם: no, במשמעות לא. נלמד להפיק אותו בהמשך; עכשיו אפשר להיעזר בדגם.",
+            "ביטוי תמיכה לדגם: thank you, במשמעות תודה. נלמד להפיק אותו בהמשך; עכשיו אפשר להיעזר בדגם.",
+            "ביטוי תמיכה לדגם: please, במשמעות בבקשה. נלמד להפיק אותו בהמשך; עכשיו אפשר להיעזר בדגם."
+          ],
+          "note_he": "לפני הטקסט בודקים מה המשתמש כבר מבין. תמיכות חדשות נחלקות לחבילות של עד 6 לפני המפגש או לטקסט קצר יותר. אין להניח שמילת תמיכה כבר ידועה, ואין לדחוס את כל רשימת הגלוסות לדקות המורה. זו קריאה מונחית; קריאה עצמאית דורשת בדיקת כיסוי אישית."
+        },
+        {
+          "phase": "model_dialogue",
+          "say_he": "הקשיבו למורה המציג את עצמו בשמו. כעת ברכו את המורה והציגו את עצמכם בשם שלכם.",
+          "turns": [
+            {
+              "speaker": "teacher",
+              "text_en": "Hello. My name is {{teacherName}}.",
+              "text_he": "שלום. השם שלי {{teacherNameHe}}."
+            },
+            {
+              "speaker": "model",
+              "text_en": "Hi, {{teacherName}}.",
+              "text_he": "היי, {{teacherNameHe}}."
+            },
+            {
+              "speaker": "teacher",
+              "text_en": "Is my name {{teacherName}}?",
+              "text_he": "האם השם שלי {{teacherNameHe}}?"
+            },
+            {
+              "speaker": "model",
+              "text_en": "Yes.",
+              "text_he": "כן."
+            }
+          ]
+        },
+        {
+          "phase": "guided_production",
+          "say_he": "פגשתם את {{teacherNameHe}} לראשונה. ברכו את המורה בשמו, הציגו את עצמכם בשם שלכם והיפרדו.",
+          "task_he": "פגשתם את {{teacherNameHe}} לראשונה. ברכו את המורה בשמו, הציגו את עצמכם בשם שלכם והיפרדו.",
+          "model_en": "Hello. My name is {{teacherName}}. Goodbye.",
+          "model_visibility_he": "זהו דגם של המורה המציג את עצמו. הלומד משתמש בשמו שלו; אין לדרוש את שם המורה או שם דמיוני בתשובת הלומד."
+        },
+        {
+          "phase": "closing",
+          "say_he": "נבדוק מה עשית בלי עזרה ומה עדיין צריך תמיכה. בחר ביטוי אחד שתוכל להשתמש בו מחוץ לשיעור. בפעם הבאה ננסה מצב חדש.",
+          "report_fields": [
+            "actual_target_use",
+            "assistance",
+            "communication_success",
+            "one_or_two_corrections",
+            "next_step"
+          ]
+        }
+      ],
+      "branches": {
+        "correct_he": "המשמעות עברה. כעת ננסה להשתמש בזה במצב מעט שונה. אמור את אותה כוונה עם פרט אחר משלך.",
+        "partial_he": "הבנתי חלק מהכוונה. נתקן נקודה אחת מן היעד שלמדנו. הקשב לדגם הקצר, ואז נסה שוב עם הפרט שלך.",
+        "incorrect_he": "נבדוק את המשמעות שוב. הנה שתי אפשרויות מן החומר שלמדנו. בחר אחת, הקשב לדגם ונסה להשתמש בו. הניסיון הזה נתמך.",
+        "silence_he": "אפשר לענות במילה אחת, לבחור בין שתי אפשרויות או לבקש לשמוע שוב. נתחיל בצעד קטן.",
+        "asr_uncertain_he": "לא שמעתי בבירור. נסה שוב או הקלד. אין בכך קביעה שהתשובה הלשונית שגויה.",
+        "unexpected_valid_he": "הניסוח שלך מתאים לכוונה. עכשיו ננסה גם את הביטוי המסוים שלמדנו, כדי שאוכל לבדוק אותו.",
+        "fade_support_he": "הפעם הדגם מוסתר. אותה מטרה, מצב חדש. אפשר לעצור ולבקש עזרה; אסמן אם השתמשנו בתמיכה."
+      },
+      "postlesson": [
+        {
+          "number": 1,
+          "kind": "meaning_to_english",
+          "prompt_he": "אמור באנגלית ואז, אם הקריאה כבר מתאימה, הקלד: שלום. השתמש במשמעות שנלמדה.",
+          "answer_en": "hello",
+          "accepted_note_he": "זו תשובת היעד. תשובה טבעית אחרת יכולה למלא את המשימה אך אינה ראיה לפריט היעד; יש לבקש גם שימוש ביעד. הקלדה אינה חובה לפני ביסוס פענוח.",
+          "hint_he": "הצורה מתחילה ב־h. חשיפת הרמז מסמנת ניסיון נתמך.",
+          "feedback_he": "יעד השיעור הוא hello במשמעות שלום. אחרי תיקון ננסה שוב במצב חדש, ולא נספור את התיקון כשליפה עצמאית."
+        },
+        {
+          "number": 2,
+          "kind": "meaning_to_english",
+          "prompt_he": "אמור באנגלית ואז, אם הקריאה כבר מתאימה, הקלד: היי. השתמש במשמעות שנלמדה.",
+          "answer_en": "hi",
+          "accepted_note_he": "זו תשובת היעד. תשובה טבעית אחרת יכולה למלא את המשימה אך אינה ראיה לפריט היעד; יש לבקש גם שימוש ביעד. הקלדה אינה חובה לפני ביסוס פענוח.",
+          "hint_he": "הצורה מתחילה ב־h. חשיפת הרמז מסמנת ניסיון נתמך.",
+          "feedback_he": "יעד השיעור הוא hi במשמעות היי. אחרי תיקון ננסה שוב במצב חדש, ולא נספור את התיקון כשליפה עצמאית."
+        },
+        {
+          "number": 3,
+          "kind": "meaning_to_english",
+          "prompt_he": "אמור באנגלית ואז, אם הקריאה כבר מתאימה, הקלד: להתראות. השתמש במשמעות שנלמדה.",
+          "answer_en": "goodbye",
+          "accepted_note_he": "זו תשובת היעד. תשובה טבעית אחרת יכולה למלא את המשימה אך אינה ראיה לפריט היעד; יש לבקש גם שימוש ביעד. הקלדה אינה חובה לפני ביסוס פענוח.",
+          "hint_he": "הצורה מתחילה ב־g. חשיפת הרמז מסמנת ניסיון נתמך.",
+          "feedback_he": "יעד השיעור הוא goodbye במשמעות להתראות. אחרי תיקון ננסה שוב במצב חדש, ולא נספור את התיקון כשליפה עצמאית."
+        },
+        {
+          "number": 4,
+          "kind": "meaning_to_english",
+          "prompt_he": "אמור באנגלית ואז, אם הקריאה כבר מתאימה, הקלד: אני. השתמש במשמעות שנלמדה.",
+          "answer_en": "I",
+          "accepted_note_he": "זו תשובת היעד. תשובה טבעית אחרת יכולה למלא את המשימה אך אינה ראיה לפריט היעד; יש לבקש גם שימוש ביעד. הקלדה אינה חובה לפני ביסוס פענוח.",
+          "hint_he": "הצורה מתחילה ב־I. חשיפת הרמז מסמנת ניסיון נתמך.",
+          "feedback_he": "יעד השיעור הוא I במשמעות אני. אחרי תיקון ננסה שוב במצב חדש, ולא נספור את התיקון כשליפה עצמאית."
+        },
+        {
+          "number": 5,
+          "kind": "meaning_to_english",
+          "prompt_he": "אמור באנגלית ואז, אם הקריאה כבר מתאימה, הקלד: אתה או את. השתמש במשמעות שנלמדה.",
+          "answer_en": "you",
+          "accepted_note_he": "זו תשובת היעד. תשובה טבעית אחרת יכולה למלא את המשימה אך אינה ראיה לפריט היעד; יש לבקש גם שימוש ביעד. הקלדה אינה חובה לפני ביסוס פענוח.",
+          "hint_he": "הצורה מתחילה ב־y. חשיפת הרמז מסמנת ניסיון נתמך.",
+          "feedback_he": "יעד השיעור הוא you במשמעות אתה או את. אחרי תיקון ננסה שוב במצב חדש, ולא נספור את התיקון כשליפה עצמאית."
+        },
+        {
+          "number": 6,
+          "kind": "meaning_to_english",
+          "prompt_he": "אמור באנגלית ואז, אם הקריאה כבר מתאימה, הקלד: צורת הווה של להיות אחרי I. השתמש במשמעות שנלמדה.",
+          "answer_en": "am",
+          "accepted_note_he": "זו תשובת היעד. תשובה טבעית אחרת יכולה למלא את המשימה אך אינה ראיה לפריט היעד; יש לבקש גם שימוש ביעד. הקלדה אינה חובה לפני ביסוס פענוח.",
+          "hint_he": "הצורה מתחילה ב־a. חשיפת הרמז מסמנת ניסיון נתמך.",
+          "feedback_he": "יעד השיעור הוא am במשמעות צורת הווה של להיות אחרי I. אחרי תיקון ננסה שוב במצב חדש, ולא נספור את התיקון כשליפה עצמאית."
+        },
+        {
+          "number": 7,
+          "kind": "meaning_and_context",
+          "prompt_he": "מה המשמעות של hello כאן? הסבר בעברית או באנגלית, ואז אמור תור קצר שבו הכוונה הזו שימושית.",
+          "answer_he": "שלום",
+          "answer_anchor_en": "hello",
+          "rubric_he": "משמעות מתאימה ליעד + תור קצר שממלא כוונה; במתחיל מותר להיעזר במסגרת הדגם. זו אינה שאלת הבנה של טקסט היחידה שטרם נלמד.",
+          "hint_he": "חזור למשמעות העברית בדגם; שימוש בה הוא תמיכה.",
+          "feedback_he": "בדוק שהכוונה נשמרה. תרגום נכון לבדו אינו מוכיח יכולת הפקה בהקשר."
+        },
+        {
+          "number": 8,
+          "kind": "meaning_and_context",
+          "prompt_he": "מה המשמעות של hi כאן? הסבר בעברית או באנגלית, ואז אמור תור קצר שבו הכוונה הזו שימושית.",
+          "answer_he": "היי",
+          "answer_anchor_en": "hi",
+          "rubric_he": "משמעות מתאימה ליעד + תור קצר שממלא כוונה; במתחיל מותר להיעזר במסגרת הדגם. זו אינה שאלת הבנה של טקסט היחידה שטרם נלמד.",
+          "hint_he": "חזור למשמעות העברית בדגם; שימוש בה הוא תמיכה.",
+          "feedback_he": "בדוק שהכוונה נשמרה. תרגום נכון לבדו אינו מוכיח יכולת הפקה בהקשר."
+        },
+        {
+          "number": 9,
+          "kind": "meaning_and_context",
+          "prompt_he": "מה המשמעות של goodbye כאן? הסבר בעברית או באנגלית, ואז אמור תור קצר שבו הכוונה הזו שימושית.",
+          "answer_he": "להתראות",
+          "answer_anchor_en": "goodbye",
+          "rubric_he": "משמעות מתאימה ליעד + תור קצר שממלא כוונה; במתחיל מותר להיעזר במסגרת הדגם. זו אינה שאלת הבנה של טקסט היחידה שטרם נלמד.",
+          "hint_he": "חזור למשמעות העברית בדגם; שימוש בה הוא תמיכה.",
+          "feedback_he": "בדוק שהכוונה נשמרה. תרגום נכון לבדו אינו מוכיח יכולת הפקה בהקשר."
+        },
+        {
+          "number": 10,
+          "kind": "listening_spelling_or_oral",
+          "prompt_he": "הקשב לפריט המושמע כאשר הכתיב מוסתר. אמור את המשמעות; אם דפוסי הכתב כבר נלמדו, כתוב את מה ששמעת.",
+          "audio_script_en": "hello",
+          "answer_en": "hello",
+          "answer_he": "שלום",
+          "answer_visibility": "author_reviewer_only; audio script must not be visible during learner attempt",
+          "hint_he": "השמע שוב; חשיפת הכתב היא תמיכה. לפני קריאה מספקת אפשר לענות בקול או לבחור משמעות.",
+          "feedback_he": "איות, משמעות וזיהוי שמע הם ראיות שונות; כשל באחד אינו מוחק את האחרים."
+        },
+        {
+          "number": 11,
+          "kind": "roleplay_rehearsal",
+          "prompt_he": "פגשתם את {{teacherNameHe}} לראשונה. ברכו את המורה בשמו, הציגו את עצמכם בשם שלכם והיפרדו.",
+          "answer_anchor_en": "Hello. My name is {{teacherName}}. Goodbye.",
+          "rubric_he": "מילוי הכוונה, מובנות, התאמה למצב, שימוש עצמאי לפחות באחד מיעדי הפגישה. תשובה אחרת נכונה מתקבלת. זו משימה מתורגלת, לא הוכחת העברה לנושא חדש. יש לקבל כל שם שבו הלומד מציג את עצמו. בדקו ברכה, הצגה עצמית מובנת ושפה המתאימה ליעד; אין לדרוש שם או פרטים זהים לדגם של המורה.",
+          "hint_he": "בחר משפט פתיחה מדגם השיחה; לאחר מכן נסה ללא הדגם.",
+          "feedback_he": "בחר נקודת יעד אחת לתיקון והפק שוב. בדיקת העברה נפרדת משתמשת בטופס חדש אחרי שלוש יחידות.",
+          "anchor_note_he": "זהו דגם של המורה המציג את עצמו. הלומד משתמש בשמו שלו; אין לדרוש את שם המורה או שם דמיוני בתשובת הלומד."
+        },
+        {
+          "number": 12,
+          "kind": "writing_plan",
+          "prompt_he": "תכנן את המשימה הבאה; בשלב הזה כתוב רק פתיחה ושני פרטים, או אמור אותם בקול: השלימו את המשפט My name is ___ בשם שלכם. לפני כתיבה אפשר לומר את המשפט בקול; אין צורך לבחור זהות של דמות.",
+          "rubric_he": "מילוי הכוונה, מובנות, התאמה למצב, שימוש עצמאי לפחות באחד מיעדי הפגישה. תשובה אחרת נכונה מתקבלת. זו משימה מתורגלת, לא הוכחת העברה לנושא חדש. יש לקבל כל שם שבו הלומד מציג את עצמו. בדקו ברכה, הצגה עצמית מובנת ושפה המתאימה ליעד; אין לדרוש שם או פרטים זהים לדגם של המורה.",
+          "answer_anchor_en": "Hello. My name is {{teacherName}}. Goodbye.",
+          "anchor_note_he": "זהו דגם של המורה המציג את עצמו. הלומד משתמש בשמו שלו; אין לדרוש את שם המורה או שם דמיוני בתשובת הלומד.",
+          "planned_minutes": "3–5",
+          "hint_he": "תכנן כוונה, שני פרטים וסיום. במתחיל גם משפט אחד או אמירה בעל פה יכולים להיות שלב לימוד.",
+          "feedback_he": "ראשית בדוק שהמסר עובר; בחר עד שתי נקודות לתיקון וכתוב או הקלט גרסה שנייה."
+        }
+      ],
+      "postlesson_minutes": "פריטים 1–11: כ־8–20 דקות לפי רמה; פריט 12 הוא תכנון קצר בפגישה א׳ ופרויקט נפרד בפגישה ב׳: 3–8 דקות נוספות. לפצל למקטעים לפי התקציב.",
+      "completion_he": "הוראה שבוצעה + לפחות ניסיון הפקה עצמאי אחד. השלמת פגישה אינה השלמת מילה או הסמכת רמה."
+    },
+    {
+      "id": "P01-L2",
+      "unit": "P01",
+      "band": "Pre-A1",
+      "title_he": "שלום, מציגים את עצמנו — שימוש, הבנה והפקה עצמאית",
+      "planned_minutes": 10,
+      "targets": [
+        {
+          "en": "my",
+          "he": "שלי"
+        },
+        {
+          "en": "name",
+          "he": "שם"
+        },
+        {
+          "en": "yes",
+          "he": "כן"
+        },
+        {
+          "en": "no",
+          "he": "לא"
+        },
+        {
+          "en": "thank you",
+          "he": "תודה"
+        },
+        {
+          "en": "please",
+          "he": "בבקשה"
+        }
+      ],
+      "teacher_script": [
+        {
+          "phase": "opening",
+          "say_he": "היום נעבוד על: שלום, מציגים את עצמנו. המטרה היא לברך, לומר שם ולזהות שם שנאמר באיטיות. אפשר לבקש הסבר קצר בעברית או לחלק את המפגש.",
+          "say_en": "We will practise a useful task step by step. You can ask me to repeat or explain. At the end, you will try a new version without the model."
+        },
+        {
+          "phase": "retrieval",
+          "say_he": "לפני הדגם, נסה לומר באנגלית שתי כוונות שכבר פגשנו: שלום; היי.",
+          "expected_en": ["hello", "hi"],
+          "note_he": "רק אם הפריטים אכן נלמדו קודם; לאחר דילוג בעקבות מיון בוחרים מן הראיות האישיות."
+        },
+        {
+          "phase": "teach_target",
+          "say_he": "הקשב: my. במשמעות של היום: שלי. אמור את הצורה, ואז הסבר את המשמעות או בחר את המצב שמתאים לה.",
+          "say_en": "Listen: my. We are learning this expression with a specific meaning. Say it, then explain when you would use it.",
+          "target_en": "my",
+          "meaning_he": "שלי",
+          "correct_response_en": "my",
+          "note_he": "חזרה אחרי דגם היא תרגול נתמך. אם אין עדיין יכולת קריאה, לא דורשים הקלדה."
+        },
+        {
+          "phase": "teach_target",
+          "say_he": "הקשב: name. במשמעות של היום: שם. אמור את הצורה, ואז הסבר את המשמעות או בחר את המצב שמתאים לה.",
+          "say_en": "Listen: name. We are learning this expression with a specific meaning. Say it, then explain when you would use it.",
+          "target_en": "name",
+          "meaning_he": "שם",
+          "correct_response_en": "name",
+          "note_he": "חזרה אחרי דגם היא תרגול נתמך. אם אין עדיין יכולת קריאה, לא דורשים הקלדה."
+        },
+        {
+          "phase": "teach_target",
+          "say_he": "הקשב: yes. במשמעות של היום: כן. אמור את הצורה, ואז הסבר את המשמעות או בחר את המצב שמתאים לה.",
+          "say_en": "Listen: yes. We are learning this expression with a specific meaning. Say it, then explain when you would use it.",
+          "target_en": "yes",
+          "meaning_he": "כן",
+          "correct_response_en": "yes",
+          "note_he": "חזרה אחרי דגם היא תרגול נתמך. אם אין עדיין יכולת קריאה, לא דורשים הקלדה."
+        },
+        {
+          "phase": "teach_target",
+          "say_he": "הקשב: no. במשמעות של היום: לא. אמור את הצורה, ואז הסבר את המשמעות או בחר את המצב שמתאים לה.",
+          "say_en": "Listen: no. We are learning this expression with a specific meaning. Say it, then explain when you would use it.",
+          "target_en": "no",
+          "meaning_he": "לא",
+          "correct_response_en": "no",
+          "note_he": "חזרה אחרי דגם היא תרגול נתמך. אם אין עדיין יכולת קריאה, לא דורשים הקלדה."
+        },
+        {
+          "phase": "teach_target",
+          "say_he": "הקשב: thank you. במשמעות של היום: תודה. אמור את הצורה, ואז הסבר את המשמעות או בחר את המצב שמתאים לה.",
+          "say_en": "Listen: thank you. We are learning this expression with a specific meaning. Say it, then explain when you would use it.",
+          "target_en": "thank you",
+          "meaning_he": "תודה",
+          "correct_response_en": "thank you",
+          "note_he": "חזרה אחרי דגם היא תרגול נתמך. אם אין עדיין יכולת קריאה, לא דורשים הקלדה."
+        },
+        {
+          "phase": "teach_target",
+          "say_he": "הקשב: please. במשמעות של היום: בבקשה. אמור את הצורה, ואז הסבר את המשמעות או בחר את המצב שמתאים לה.",
+          "say_en": "Listen: please. We are learning this expression with a specific meaning. Say it, then explain when you would use it.",
+          "target_en": "please",
+          "meaning_he": "בבקשה",
+          "correct_response_en": "please",
+          "note_he": "חזרה אחרי דגם היא תרגול נתמך. אם אין עדיין יכולת קריאה, לא דורשים הקלדה."
+        },
+        {
+          "phase": "language_focus_retrieval",
+          "say_he": "ננסה את תבנית השימוש מהפגישה הקודמת לפני הצגת הדגם. הציגו את עצמכם באנגלית בשם שלכם והתחילו ב־I am.",
+          "text_en": "",
+          "contrast_en": "My name is {{teacherName}}.",
+          "task_he": "הציגו את עצמכם באנגלית בשם שלכם והתחילו ב־I am.",
+          "answer_anchor_en": "I am {{teacherName}}.",
+          "note_he": "I am פותח הצגה עצמית. המורה משתמש בשמו ואתם בשם שלכם; שם שונה מהדוגמה אינו טעות."
+        },
+        {
+          "phase": "support_bridge",
+          "say_he": "לפני הדגם נוודא שהמילים הדרושות להבנה מוכרות. נלמד רק את התמיכות החסרות בחבילות קצרות; אם הן רבות, נעצור ונמשיך במפגש נוסף. אפשר להבין בעזרת שמע ותרגום.",
+          "support_script_lines_he": [
+            "הקשב: be. כאן נספק את המשמעות: להיות. נשתמש במילה כדי להבין את המצב, ולא נספור זאת כשליפה עצמאית.",
+            "הקשב: say. כאן נספק את המשמעות: לומר. נשתמש במילה כדי להבין את המצב, ולא נספור זאת כשליפה עצמאית.",
+            "הקשב: thank. כאן נספק את המשמעות: להודות (על דבר). נשתמש במילה כדי להבין את המצב, ולא נספור זאת כשליפה עצמאית."
+          ],
+          "note_he": "לפני הטקסט בודקים מה המשתמש כבר מבין. תמיכות חדשות נחלקות לחבילות של עד 6 לפני המפגש או לטקסט קצר יותר. אין להניח שמילת תמיכה כבר ידועה, ואין לדחוס את כל רשימת הגלוסות לדקות המורה. זו קריאה מונחית; קריאה עצמאית דורשת בדיקת כיסוי אישית."
+        },
+        {
+          "phase": "model_dialogue",
+          "say_he": "הקשיבו למורה המציג את עצמו בשמו. כעת ברכו את המורה והציגו את עצמכם בשם שלכם.",
+          "turns": [
+            {
+              "speaker": "teacher",
+              "text_en": "Hello. My name is {{teacherName}}.",
+              "text_he": "שלום. השם שלי {{teacherNameHe}}."
+            },
+            {
+              "speaker": "model",
+              "text_en": "Hi, {{teacherName}}.",
+              "text_he": "היי, {{teacherNameHe}}."
+            },
+            {
+              "speaker": "teacher",
+              "text_en": "Is my name {{teacherName}}?",
+              "text_he": "האם השם שלי {{teacherNameHe}}?"
+            },
+            {
+              "speaker": "model",
+              "text_en": "Yes.",
+              "text_he": "כן."
+            },
+            {
+              "speaker": "teacher",
+              "text_en": "Say goodbye, please.",
+              "text_he": "אמרו להתראות, בבקשה."
+            },
+            {
+              "speaker": "model",
+              "text_en": "Goodbye, {{teacherName}}.",
+              "text_he": "להתראות, {{teacherNameHe}}."
+            },
+            {
+              "speaker": "teacher",
+              "text_en": "Thank you. Goodbye.",
+              "text_he": "תודה. להתראות."
+            },
+            {
+              "speaker": "model",
+              "text_en": "Goodbye.",
+              "text_he": "להתראות."
+            }
+          ]
+        },
+        {
+          "phase": "input",
+          "say_he": "כעת נקשיב לקטע. נסה לזהות את המצב המרכזי. אפשר לשמוע שוב. במצב קריאה נפתח את הכתב; אם בודקים האזנה עצמאית משאירים תמלול סגור בניסיון הראשון.",
+          "text_en": "Hello. My name is {{teacherName}}. I am {{teacherName}}. Please say hello. Hi. Thank you. Goodbye.",
+          "note_he": "זהו חומר הוראה מוכר, לא unseen לאחר הצגתו."
+        },
+        {
+          "phase": "comprehension",
+          "say_he": "לפי הקטע, מה שם המורה?",
+          "say_en": "What is the teacher's name?",
+          "answer_anchor_en": "{{teacherName}}.",
+          "accept_he": "יש לקבל פרפרזה נכונה, תשובה קצרה מתאימה ופרטים תומכים מן הטקסט. לא חייבים להעתיק את הדגם."
+        },
+        {
+          "phase": "comprehension",
+          "say_he": "באיזו ברכה המורה מתחיל את הקטע?",
+          "say_en": "What greeting starts the passage?",
+          "answer_anchor_en": "Hello.",
+          "accept_he": "יש לקבל פרפרזה נכונה, תשובה קצרה מתאימה ופרטים תומכים מן הטקסט. לא חייבים להעתיק את הדגם."
+        },
+        {
+          "phase": "comprehension",
+          "say_he": "לפי הקטע, האם שם המורה הוא {{teacherNameHe}}?",
+          "say_en": "Is the teacher's name {{teacherName}}?",
+          "answer_anchor_en": "Yes.",
+          "accept_he": "יש לקבל פרפרזה נכונה, תשובה קצרה מתאימה ופרטים תומכים מן הטקסט. לא חייבים להעתיק את הדגם."
+        },
+        {
+          "phase": "independent_reconstruction",
+          "say_he": "פגשתם את {{teacherNameHe}} לראשונה. ברכו את המורה בשמו, הציגו את עצמכם בשם שלכם והיפרדו.",
+          "say_en": "Try the practised task without reading the model. Explain your choice or ask for clarification when needed.",
+          "model_en": "Hello. My name is {{teacherName}}. Goodbye.",
+          "model_visibility_he": "זהו דגם של המורה המציג את עצמו. הלומד משתמש בשמו שלו; אין לדרוש את שם המורה או שם דמיוני בתשובת הלומד."
+        },
+        {
+          "phase": "writing_project_brief",
+          "say_he": "השלימו את המשפט My name is ___ בשם שלכם. לפני כתיבה אפשר לומר את המשפט בקול; אין צורך לבחור זהות של דמות.",
+          "note_he": "הכתיבה המלאה אינה נכללת בדקות המורה. לפי אוריינות אפשר לתרגל בקול, אך במבחן כתיבה עצמאי אין להחליף אוטומטית בדיבור."
+        },
+        {
+          "phase": "closing",
+          "say_he": "נבדוק מה עשית בלי עזרה ומה עדיין צריך תמיכה. בחר ביטוי אחד שתוכל להשתמש בו מחוץ לשיעור. בפעם הבאה ננסה מצב חדש.",
+          "report_fields": [
+            "actual_target_use",
+            "assistance",
+            "communication_success",
+            "one_or_two_corrections",
+            "next_step"
+          ]
+        }
+      ],
+      "branches": {
+        "correct_he": "המשמעות עברה. כעת ננסה להשתמש בזה במצב מעט שונה. אמור את אותה כוונה עם פרט אחר משלך.",
+        "partial_he": "הבנתי חלק מהכוונה. נתקן נקודה אחת מן היעד שלמדנו. הקשב לדגם הקצר, ואז נסה שוב עם הפרט שלך.",
+        "incorrect_he": "נבדוק את המשמעות שוב. הנה שתי אפשרויות מן החומר שלמדנו. בחר אחת, הקשב לדגם ונסה להשתמש בו. הניסיון הזה נתמך.",
+        "silence_he": "אפשר לענות במילה אחת, לבחור בין שתי אפשרויות או לבקש לשמוע שוב. נתחיל בצעד קטן.",
+        "asr_uncertain_he": "לא שמעתי בבירור. נסה שוב או הקלד. אין בכך קביעה שהתשובה הלשונית שגויה.",
+        "unexpected_valid_he": "הניסוח שלך מתאים לכוונה. עכשיו ננסה גם את הביטוי המסוים שלמדנו, כדי שאוכל לבדוק אותו.",
+        "fade_support_he": "הפעם הדגם מוסתר. אותה מטרה, מצב חדש. אפשר לעצור ולבקש עזרה; אסמן אם השתמשנו בתמיכה."
+      },
+      "postlesson": [
+        {
+          "number": 1,
+          "kind": "meaning_to_english",
+          "prompt_he": "אמור באנגלית ואז, אם הקריאה כבר מתאימה, הקלד: שלי. השתמש במשמעות שנלמדה.",
+          "answer_en": "my",
+          "accepted_note_he": "זו תשובת היעד. תשובה טבעית אחרת יכולה למלא את המשימה אך אינה ראיה לפריט היעד; יש לבקש גם שימוש ביעד. הקלדה אינה חובה לפני ביסוס פענוח.",
+          "hint_he": "הצורה מתחילה ב־m. חשיפת הרמז מסמנת ניסיון נתמך.",
+          "feedback_he": "יעד השיעור הוא my במשמעות שלי. אחרי תיקון ננסה שוב במצב חדש, ולא נספור את התיקון כשליפה עצמאית."
+        },
+        {
+          "number": 2,
+          "kind": "meaning_to_english",
+          "prompt_he": "אמור באנגלית ואז, אם הקריאה כבר מתאימה, הקלד: שם. השתמש במשמעות שנלמדה.",
+          "answer_en": "name",
+          "accepted_note_he": "זו תשובת היעד. תשובה טבעית אחרת יכולה למלא את המשימה אך אינה ראיה לפריט היעד; יש לבקש גם שימוש ביעד. הקלדה אינה חובה לפני ביסוס פענוח.",
+          "hint_he": "הצורה מתחילה ב־n. חשיפת הרמז מסמנת ניסיון נתמך.",
+          "feedback_he": "יעד השיעור הוא name במשמעות שם. אחרי תיקון ננסה שוב במצב חדש, ולא נספור את התיקון כשליפה עצמאית."
+        },
+        {
+          "number": 3,
+          "kind": "meaning_to_english",
+          "prompt_he": "אמור באנגלית ואז, אם הקריאה כבר מתאימה, הקלד: כן. השתמש במשמעות שנלמדה.",
+          "answer_en": "yes",
+          "accepted_note_he": "זו תשובת היעד. תשובה טבעית אחרת יכולה למלא את המשימה אך אינה ראיה לפריט היעד; יש לבקש גם שימוש ביעד. הקלדה אינה חובה לפני ביסוס פענוח.",
+          "hint_he": "הצורה מתחילה ב־y. חשיפת הרמז מסמנת ניסיון נתמך.",
+          "feedback_he": "יעד השיעור הוא yes במשמעות כן. אחרי תיקון ננסה שוב במצב חדש, ולא נספור את התיקון כשליפה עצמאית."
+        },
+        {
+          "number": 4,
+          "kind": "meaning_to_english",
+          "prompt_he": "אמור באנגלית ואז, אם הקריאה כבר מתאימה, הקלד: לא. השתמש במשמעות שנלמדה.",
+          "answer_en": "no",
+          "accepted_note_he": "זו תשובת היעד. תשובה טבעית אחרת יכולה למלא את המשימה אך אינה ראיה לפריט היעד; יש לבקש גם שימוש ביעד. הקלדה אינה חובה לפני ביסוס פענוח.",
+          "hint_he": "הצורה מתחילה ב־n. חשיפת הרמז מסמנת ניסיון נתמך.",
+          "feedback_he": "יעד השיעור הוא no במשמעות לא. אחרי תיקון ננסה שוב במצב חדש, ולא נספור את התיקון כשליפה עצמאית."
+        },
+        {
+          "number": 5,
+          "kind": "meaning_to_english",
+          "prompt_he": "אמור באנגלית ואז, אם הקריאה כבר מתאימה, הקלד: תודה. השתמש במשמעות שנלמדה.",
+          "answer_en": "thank you",
+          "accepted_note_he": "זו תשובת היעד. תשובה טבעית אחרת יכולה למלא את המשימה אך אינה ראיה לפריט היעד; יש לבקש גם שימוש ביעד. הקלדה אינה חובה לפני ביסוס פענוח.",
+          "hint_he": "הצורה מתחילה ב־t. חשיפת הרמז מסמנת ניסיון נתמך.",
+          "feedback_he": "יעד השיעור הוא thank you במשמעות תודה. אחרי תיקון ננסה שוב במצב חדש, ולא נספור את התיקון כשליפה עצמאית."
+        },
+        {
+          "number": 6,
+          "kind": "meaning_to_english",
+          "prompt_he": "אמור באנגלית ואז, אם הקריאה כבר מתאימה, הקלד: בבקשה. השתמש במשמעות שנלמדה.",
+          "answer_en": "please",
+          "accepted_note_he": "זו תשובת היעד. תשובה טבעית אחרת יכולה למלא את המשימה אך אינה ראיה לפריט היעד; יש לבקש גם שימוש ביעד. הקלדה אינה חובה לפני ביסוס פענוח.",
+          "hint_he": "הצורה מתחילה ב־p. חשיפת הרמז מסמנת ניסיון נתמך.",
+          "feedback_he": "יעד השיעור הוא please במשמעות בבקשה. אחרי תיקון ננסה שוב במצב חדש, ולא נספור את התיקון כשליפה עצמאית."
+        },
+        {
+          "number": 7,
+          "kind": "reading_or_listening_comprehension",
+          "prompt_he": "לפי הקטע, האם Goodbye הוא שם המורה?",
+          "prompt_en": "Is Goodbye the teacher's name?",
+          "answer_en": "No.",
+          "hint_he": "מצא או שמע את החלק הרלוונטי בקטע. שימוש חוזר בקטע הוא תרגול הבנה, לא מבחן זכירה ללא תמיכה.",
+          "feedback_he": "השווה את תשובתך למידע בקטע. פרפרזה נכונה מתקבלת; ידע חיצוני שאינו מופיע בקטע אינו נדרש.",
+          "passage_en": "Hello. My name is {{teacherName}}. I am {{teacherName}}. Please say hello. Hi. Thank you. Goodbye."
+        },
+        {
+          "number": 8,
+          "kind": "reading_or_listening_comprehension",
+          "prompt_he": "מה המורה אומר לפני הפרידה בקטע?",
+          "prompt_en": "What does the teacher say before goodbye?",
+          "answer_en": "Thank you.",
+          "hint_he": "מצא או שמע את החלק הרלוונטי בקטע. שימוש חוזר בקטע הוא תרגול הבנה, לא מבחן זכירה ללא תמיכה.",
+          "feedback_he": "השווה את תשובתך למידע בקטע. פרפרזה נכונה מתקבלת; ידע חיצוני שאינו מופיע בקטע אינו נדרש.",
+          "passage_en": "Hello. My name is {{teacherName}}. I am {{teacherName}}. Please say hello. Hi. Thank you. Goodbye."
+        },
+        {
+          "number": 9,
+          "kind": "reading_or_listening_comprehension",
+          "prompt_he": "ברכו את {{teacherNameHe}} באנגלית.",
+          "prompt_en": "Say hello to {{teacherName}}.",
+          "answer_en": "Hello, {{teacherName}}.",
+          "hint_he": "מצא או שמע את החלק הרלוונטי בקטע. שימוש חוזר בקטע הוא תרגול הבנה, לא מבחן זכירה ללא תמיכה.",
+          "feedback_he": "השווה את תשובתך למידע בקטע. פרפרזה נכונה מתקבלת; ידע חיצוני שאינו מופיע בקטע אינו נדרש.",
+          "passage_en": "Hello. My name is {{teacherName}}. I am {{teacherName}}. Please say hello. Hi. Thank you. Goodbye."
+        },
+        {
+          "number": 10,
+          "kind": "listening_spelling_or_oral",
+          "prompt_he": "הקשב לפריט המושמע כאשר הכתיב מוסתר. אמור את המשמעות; אם דפוסי הכתב כבר נלמדו, כתוב את מה ששמעת.",
+          "audio_script_en": "my",
+          "answer_en": "my",
+          "answer_he": "שלי",
+          "answer_visibility": "author_reviewer_only; audio script must not be visible during learner attempt",
+          "hint_he": "השמע שוב; חשיפת הכתב היא תמיכה. לפני קריאה מספקת אפשר לענות בקול או לבחור משמעות.",
+          "feedback_he": "איות, משמעות וזיהוי שמע הם ראיות שונות; כשל באחד אינו מוחק את האחרים."
+        },
+        {
+          "number": 11,
+          "kind": "roleplay_rehearsal",
+          "prompt_he": "פגשתם את {{teacherNameHe}} לראשונה. ברכו את המורה בשמו, הציגו את עצמכם בשם שלכם והיפרדו.",
+          "answer_anchor_en": "Hello. My name is {{teacherName}}. Goodbye.",
+          "rubric_he": "מילוי הכוונה, מובנות, התאמה למצב, שימוש עצמאי לפחות באחד מיעדי הפגישה. תשובה אחרת נכונה מתקבלת. זו משימה מתורגלת, לא הוכחת העברה לנושא חדש. יש לקבל כל שם שבו הלומד מציג את עצמו. בדקו ברכה, הצגה עצמית מובנת ושפה המתאימה ליעד; אין לדרוש שם או פרטים זהים לדגם של המורה.",
+          "hint_he": "בחר משפט פתיחה מדגם השיחה; לאחר מכן נסה ללא הדגם.",
+          "feedback_he": "בחר נקודת יעד אחת לתיקון והפק שוב. בדיקת העברה נפרדת משתמשת בטופס חדש אחרי שלוש יחידות.",
+          "anchor_note_he": "זהו דגם של המורה המציג את עצמו. הלומד משתמש בשמו שלו; אין לדרוש את שם המורה או שם דמיוני בתשובת הלומד."
+        },
+        {
+          "number": 12,
+          "kind": "writing_or_recording_project",
+          "prompt_he": "השלימו את המשפט My name is ___ בשם שלכם. לפני כתיבה אפשר לומר את המשפט בקול; אין צורך לבחור זהות של דמות.",
+          "rubric_he": "מילוי משימה, מסר ברור, סדר מתאים לרמה ודיוק ביעדים שנלמדו; אין תשובה יחידה. יש לקבל כל שם שבו הלומד מציג את עצמו. בדקו ברכה, הצגה עצמית מובנת ושפה המתאימה ליעד; אין לדרוש שם או פרטים זהים לדגם של המורה.",
+          "answer_anchor_en": "Hello. My name is {{teacherName}}. Goodbye.",
+          "anchor_note_he": "זהו דגם של המורה המציג את עצמו. הלומד משתמש בשמו שלו; אין לדרוש את שם המורה או שם דמיוני בתשובת הלומד.",
+          "planned_minutes": "3–8",
+          "hint_he": "תכנן כוונה, שני פרטים וסיום. במתחיל גם משפט אחד או אמירה בעל פה יכולים להיות שלב לימוד.",
+          "feedback_he": "ראשית בדוק שהמסר עובר; בחר עד שתי נקודות לתיקון וכתוב או הקלט גרסה שנייה."
+        }
+      ],
+      "postlesson_minutes": "פריטים 1–11: כ־8–20 דקות לפי רמה; פריט 12 הוא תכנון קצר בפגישה א׳ ופרויקט נפרד בפגישה ב׳: 3–8 דקות נוספות. לפצל למקטעים לפי התקציב.",
+      "completion_he": "הוראה שבוצעה + לפחות ניסיון הפקה עצמאי אחד. השלמת פגישה אינה השלמת מילה או הסמכת רמה."
+    },
+    {
+      "id": "A101-L1",
+      "unit": "A101",
+      "band": "A1",
+      "title_he": "מכירים אנשים — רכישה ושיחה נתמכת",
+      "planned_minutes": 15,
+      "targets": [
+        {
+          "en": "from",
+          "he": "מ־ לציון מוצא"
+        },
+        {
+          "en": "live",
+          "he": "לגור"
+        },
+        {
+          "en": "city",
+          "he": "עיר"
+        },
+        {
+          "en": "country",
+          "he": "מדינה"
+        },
+        {
+          "en": "English",
+          "he": "אנגלית"
+        },
+        {
+          "en": "Hebrew",
+          "he": "עברית"
+        }
+      ],
+      "teacher_script": [
+        {
+          "phase": "opening",
+          "say_he": "היום נעבוד על: מכירים אנשים. המטרה היא להציג שם, מקום מגורים ושפות ולשאול בן שיח על עצמו. אפשר לבקש הסבר קצר בעברית או לחלק את המפגש.",
+          "say_en": "We will practise a useful task step by step. You can ask me to repeat or explain. At the end, you will try a new version without the model."
+        },
+        {
+          "phase": "retrieval",
+          "say_he": "לפני הדגם, נסה לומר באנגלית שתי כוונות שכבר פגשנו: יכול או יכולה; לא יכול או לא יכולה.",
+          "expected_en": ["can", "cannot"],
+          "note_he": "רק אם הפריטים אכן נלמדו קודם; לאחר דילוג בעקבות מיון בוחרים מן הראיות האישיות."
+        },
+        {
+          "phase": "teach_target",
+          "say_he": "הקשב: from. במשמעות של היום: מ־ לציון מוצא. אמור את הצורה, ואז הסבר את המשמעות או בחר את המצב שמתאים לה.",
+          "say_en": "Listen: from. We are learning this expression with a specific meaning. Say it, then explain when you would use it.",
+          "target_en": "from",
+          "meaning_he": "מ־ לציון מוצא",
+          "correct_response_en": "from",
+          "note_he": "חזרה אחרי דגם היא תרגול נתמך. אם אין עדיין יכולת קריאה, לא דורשים הקלדה."
+        },
+        {
+          "phase": "teach_target",
+          "say_he": "הקשב: live. במשמעות של היום: לגור. אמור את הצורה, ואז הסבר את המשמעות או בחר את המצב שמתאים לה.",
+          "say_en": "Listen: live. We are learning this expression with a specific meaning. Say it, then explain when you would use it.",
+          "target_en": "live",
+          "meaning_he": "לגור",
+          "correct_response_en": "live",
+          "note_he": "חזרה אחרי דגם היא תרגול נתמך. אם אין עדיין יכולת קריאה, לא דורשים הקלדה."
+        },
+        {
+          "phase": "teach_target",
+          "say_he": "הקשב: city. במשמעות של היום: עיר. אמור את הצורה, ואז הסבר את המשמעות או בחר את המצב שמתאים לה.",
+          "say_en": "Listen: city. We are learning this expression with a specific meaning. Say it, then explain when you would use it.",
+          "target_en": "city",
+          "meaning_he": "עיר",
+          "correct_response_en": "city",
+          "note_he": "חזרה אחרי דגם היא תרגול נתמך. אם אין עדיין יכולת קריאה, לא דורשים הקלדה."
+        },
+        {
+          "phase": "teach_target",
+          "say_he": "הקשב: country. במשמעות של היום: מדינה. אמור את הצורה, ואז הסבר את המשמעות או בחר את המצב שמתאים לה.",
+          "say_en": "Listen: country. We are learning this expression with a specific meaning. Say it, then explain when you would use it.",
+          "target_en": "country",
+          "meaning_he": "מדינה",
+          "correct_response_en": "country",
+          "note_he": "חזרה אחרי דגם היא תרגול נתמך. אם אין עדיין יכולת קריאה, לא דורשים הקלדה."
+        },
+        {
+          "phase": "teach_target",
+          "say_he": "הקשב: English. במשמעות של היום: אנגלית. אמור את הצורה, ואז הסבר את המשמעות או בחר את המצב שמתאים לה.",
+          "say_en": "Listen: English. We are learning this expression with a specific meaning. Say it, then explain when you would use it.",
+          "target_en": "English",
+          "meaning_he": "אנגלית",
+          "correct_response_en": "English",
+          "note_he": "חזרה אחרי דגם היא תרגול נתמך. אם אין עדיין יכולת קריאה, לא דורשים הקלדה."
+        },
+        {
+          "phase": "teach_target",
+          "say_he": "הקשב: Hebrew. במשמעות של היום: עברית. אמור את הצורה, ואז הסבר את המשמעות או בחר את המצב שמתאים לה.",
+          "say_en": "Listen: Hebrew. We are learning this expression with a specific meaning. Say it, then explain when you would use it.",
+          "target_en": "Hebrew",
+          "meaning_he": "עברית",
+          "correct_response_en": "Hebrew",
+          "note_he": "חזרה אחרי דגם היא תרגול נתמך. אם אין עדיין יכולת קריאה, לא דורשים הקלדה."
+        },
+        {
+          "phase": "language_focus",
+          "say_he": "באמירות על זהות משתמשים ב־am אחרי I וב־is אחרי he או she. בשאלה מעבירים את am/is/are להתחלה, ולכן You are a student הופך ל־Are you a student. בתשובה קצרה שומרים את אותה צורה, למשל Yes, I am.",
+          "text_en": "You are a student.",
+          "contrast_en": "Are you a student?",
+          "task_he": "אתם רוצים לברר אם בת השיח מורה. שאלו באנגלית שאלה מלאה עם Are you.",
+          "answer_anchor_en": "Are you a teacher?",
+          "note_he": "בשאלה Are בא לפני you. אין צורך להוסיף do לשאלת זהות הזאת; תשובה אפשרית של בת השיח היא Yes, I am."
+        },
+        {
+          "phase": "support_bridge",
+          "say_he": "לפני הדגם נוודא שהמילים הדרושות להבנה מוכרות. נלמד רק את התמיכות החסרות בחבילות קצרות; אם הן רבות, נעצור ונמשיך במפגש נוסף. אפשר להבין בעזרת שמע ותרגום.",
+          "support_script_lines_he": [
+            "הקשב: at. כאן נספק את המשמעות: ב־ (מקום או נקודה בזמן). נשתמש במילה כדי להבין את המצב, ולא נספור זאת כשליפה עצמאית.",
+            "הקשב: but. כאן נספק את המשמעות: אבל. נשתמש במילה כדי להבין את המצב, ולא נספור זאת כשליפה עצמאית.",
+            "הקשב: class. כאן נספק את המשמעות: מעמד חברתי. נשתמש במילה כדי להבין את המצב, ולא נספור זאת כשליפה עצמאית.",
+            "הקשב: little. כאן נספק את המשמעות: מעט. נשתמש במילה כדי להבין את המצב, ולא נספור זאת כשליפה עצמאית.",
+            "הקשב: meet. כאן נספק את המשמעות: להיפגש. נשתמש במילה כדי להבין את המצב, ולא נספור זאת כשליפה עצמאית.",
+            "הקשב: nice. כאן נספק את המשמעות: נחמד. נשתמש במילה כדי להבין את המצב, ולא נספור זאת כשליפה עצמאית.",
+            "הקשב: to. כאן נספק את המשמעות: אל. נשתמש במילה כדי להבין את המצב, ולא נספור זאת כשליפה עצמאית.",
+            "הקשב: too. כאן נספק את המשמעות: מדי. נשתמש במילה כדי להבין את המצב, ולא נספור זאת כשליפה עצמאית.",
+            "הקשב: what. כאן נספק את המשמעות: מה. נשתמש במילה כדי להבין את המצב, ולא נספור זאת כשליפה עצמאית.",
+            "ביטוי תמיכה לדגם: speak, במשמעות לדבר. נלמד להפיק אותו בהמשך; עכשיו אפשר להיעזר בדגם.",
+            "ביטוי תמיכה לדגם: student, במשמעות תלמיד או סטודנט. נלמד להפיק אותו בהמשך; עכשיו אפשר להיעזר בדגם.",
+            "ביטוי תמיכה לדגם: teacher, במשמעות מורה. נלמד להפיק אותו בהמשך; עכשיו אפשר להיעזר בדגם.",
+            "ביטוי תמיכה לדגם: work, במשמעות לעבוד. נלמד להפיק אותו בהמשך; עכשיו אפשר להיעזר בדגם.",
+            "ביטוי תמיכה לדגם: nice to meet you, במשמעות נעים להכיר. נלמד להפיק אותו בהמשך; עכשיו אפשר להיעזר בדגם.",
+            "ביטוי תמיכה לדגם: where, במשמעות איפה. נלמד להפיק אותו בהמשך; עכשיו אפשר להיעזר בדגם."
+          ],
+          "note_he": "לפני הטקסט בודקים מה המשתמש כבר מבין. תמיכות חדשות נחלקות לחבילות של עד 6 לפני המפגש או לטקסט קצר יותר. אין להניח שמילת תמיכה כבר ידועה, ואין לדחוס את כל רשימת הגלוסות לדקות המורה. זו קריאה מונחית; קריאה עצמאית דורשת בדיקת כיסוי אישית."
+        },
+        {
+          "phase": "model_dialogue",
+          "say_he": "נקשיב לדגם. בפעם הראשונה המטרה היא להבין מי מדבר ומה הוא רוצה. בפעם השנייה תחליף אחד מהדוברים. התרגום נפתח לפי צורך.",
+          "turns": [
+            {
+              "speaker": "teacher",
+              "text_en": "Hello. I am Maya. What is your name?",
+              "text_he": "שלום. אני מאיה. מה שמך?"
+            },
+            {
+              "speaker": "model",
+              "text_en": "My name is Tom. Nice to meet you.",
+              "text_he": "שמי תום. נעים להכיר."
+            },
+            {
+              "speaker": "teacher",
+              "text_en": "Nice to meet you. Where are you from?",
+              "text_he": "נעים להכיר. מאיפה אתה?"
+            },
+            {
+              "speaker": "model",
+              "text_en": "I am from Israel. I live in Haifa.",
+              "text_he": "אני מישראל. אני גר בחיפה."
+            }
+          ]
+        },
+        {
+          "phase": "guided_production",
+          "say_he": "פגשו את {{teacherNameHe}} בקבוצת לימוד. הציגו את עצמכם בשמכם, ציינו את עיר המגורים והשפות שלכם ושאלו את המורה מה שמו ומאיפה הוא.",
+          "task_he": "פגשו את {{teacherNameHe}} בקבוצת לימוד. הציגו את עצמכם בשמכם, ציינו את עיר המגורים והשפות שלכם ושאלו את המורה מה שמו ומאיפה הוא.",
+          "model_en": "Hello. My name is {{teacherName}}. I speak English. What is your name?",
+          "model_visibility_he": "זהו דגם של המורה המציג את עצמו. הלומד משתמש בשמו שלו; אין לדרוש את שם המורה או שם דמיוני בתשובת הלומד."
+        },
+        {
+          "phase": "closing",
+          "say_he": "נבדוק מה עשית בלי עזרה ומה עדיין צריך תמיכה. בחר ביטוי אחד שתוכל להשתמש בו מחוץ לשיעור. בפעם הבאה ננסה מצב חדש.",
+          "report_fields": [
+            "actual_target_use",
+            "assistance",
+            "communication_success",
+            "one_or_two_corrections",
+            "next_step"
+          ]
+        }
+      ],
+      "branches": {
+        "correct_he": "המשמעות עברה. כעת ננסה להשתמש בזה במצב מעט שונה. אמור את אותה כוונה עם פרט אחר משלך.",
+        "partial_he": "הבנתי חלק מהכוונה. נתקן נקודה אחת מן היעד שלמדנו. הקשב לדגם הקצר, ואז נסה שוב עם הפרט שלך.",
+        "incorrect_he": "נבדוק את המשמעות שוב. הנה שתי אפשרויות מן החומר שלמדנו. בחר אחת, הקשב לדגם ונסה להשתמש בו. הניסיון הזה נתמך.",
+        "silence_he": "אפשר לענות במילה אחת, לבחור בין שתי אפשרויות או לבקש לשמוע שוב. נתחיל בצעד קטן.",
+        "asr_uncertain_he": "לא שמעתי בבירור. נסה שוב או הקלד. אין בכך קביעה שהתשובה הלשונית שגויה.",
+        "unexpected_valid_he": "הניסוח שלך מתאים לכוונה. עכשיו ננסה גם את הביטוי המסוים שלמדנו, כדי שאוכל לבדוק אותו.",
+        "fade_support_he": "הפעם הדגם מוסתר. אותה מטרה, מצב חדש. אפשר לעצור ולבקש עזרה; אסמן אם השתמשנו בתמיכה."
+      },
+      "postlesson": [
+        {
+          "number": 1,
+          "kind": "meaning_to_english",
+          "prompt_he": "אמור באנגלית ואז, אם הקריאה כבר מתאימה, הקלד: מ־ לציון מוצא. השתמש במשמעות שנלמדה.",
+          "answer_en": "from",
+          "accepted_note_he": "זו תשובת היעד. תשובה טבעית אחרת יכולה למלא את המשימה אך אינה ראיה לפריט היעד; יש לבקש גם שימוש ביעד. הקלדה אינה חובה לפני ביסוס פענוח.",
+          "hint_he": "הצורה מתחילה ב־f. חשיפת הרמז מסמנת ניסיון נתמך.",
+          "feedback_he": "יעד השיעור הוא from במשמעות מ־ לציון מוצא. אחרי תיקון ננסה שוב במצב חדש, ולא נספור את התיקון כשליפה עצמאית."
+        },
+        {
+          "number": 2,
+          "kind": "meaning_to_english",
+          "prompt_he": "אמור באנגלית ואז, אם הקריאה כבר מתאימה, הקלד: לגור. השתמש במשמעות שנלמדה.",
+          "answer_en": "live",
+          "accepted_note_he": "זו תשובת היעד. תשובה טבעית אחרת יכולה למלא את המשימה אך אינה ראיה לפריט היעד; יש לבקש גם שימוש ביעד. הקלדה אינה חובה לפני ביסוס פענוח.",
+          "hint_he": "הצורה מתחילה ב־l. חשיפת הרמז מסמנת ניסיון נתמך.",
+          "feedback_he": "יעד השיעור הוא live במשמעות לגור. אחרי תיקון ננסה שוב במצב חדש, ולא נספור את התיקון כשליפה עצמאית."
+        },
+        {
+          "number": 3,
+          "kind": "meaning_to_english",
+          "prompt_he": "אמור באנגלית ואז, אם הקריאה כבר מתאימה, הקלד: עיר. השתמש במשמעות שנלמדה.",
+          "answer_en": "city",
+          "accepted_note_he": "זו תשובת היעד. תשובה טבעית אחרת יכולה למלא את המשימה אך אינה ראיה לפריט היעד; יש לבקש גם שימוש ביעד. הקלדה אינה חובה לפני ביסוס פענוח.",
+          "hint_he": "הצורה מתחילה ב־c. חשיפת הרמז מסמנת ניסיון נתמך.",
+          "feedback_he": "יעד השיעור הוא city במשמעות עיר. אחרי תיקון ננסה שוב במצב חדש, ולא נספור את התיקון כשליפה עצמאית."
+        },
+        {
+          "number": 4,
+          "kind": "meaning_to_english",
+          "prompt_he": "אמור באנגלית ואז, אם הקריאה כבר מתאימה, הקלד: מדינה. השתמש במשמעות שנלמדה.",
+          "answer_en": "country",
+          "accepted_note_he": "זו תשובת היעד. תשובה טבעית אחרת יכולה למלא את המשימה אך אינה ראיה לפריט היעד; יש לבקש גם שימוש ביעד. הקלדה אינה חובה לפני ביסוס פענוח.",
+          "hint_he": "הצורה מתחילה ב־c. חשיפת הרמז מסמנת ניסיון נתמך.",
+          "feedback_he": "יעד השיעור הוא country במשמעות מדינה. אחרי תיקון ננסה שוב במצב חדש, ולא נספור את התיקון כשליפה עצמאית."
+        },
+        {
+          "number": 5,
+          "kind": "meaning_to_english",
+          "prompt_he": "אמור באנגלית ואז, אם הקריאה כבר מתאימה, הקלד: אנגלית. השתמש במשמעות שנלמדה.",
+          "answer_en": "English",
+          "accepted_note_he": "זו תשובת היעד. תשובה טבעית אחרת יכולה למלא את המשימה אך אינה ראיה לפריט היעד; יש לבקש גם שימוש ביעד. הקלדה אינה חובה לפני ביסוס פענוח.",
+          "hint_he": "הצורה מתחילה ב־E. חשיפת הרמז מסמנת ניסיון נתמך.",
+          "feedback_he": "יעד השיעור הוא English במשמעות אנגלית. אחרי תיקון ננסה שוב במצב חדש, ולא נספור את התיקון כשליפה עצמאית."
+        },
+        {
+          "number": 6,
+          "kind": "meaning_to_english",
+          "prompt_he": "אמור באנגלית ואז, אם הקריאה כבר מתאימה, הקלד: עברית. השתמש במשמעות שנלמדה.",
+          "answer_en": "Hebrew",
+          "accepted_note_he": "זו תשובת היעד. תשובה טבעית אחרת יכולה למלא את המשימה אך אינה ראיה לפריט היעד; יש לבקש גם שימוש ביעד. הקלדה אינה חובה לפני ביסוס פענוח.",
+          "hint_he": "הצורה מתחילה ב־H. חשיפת הרמז מסמנת ניסיון נתמך.",
+          "feedback_he": "יעד השיעור הוא Hebrew במשמעות עברית. אחרי תיקון ננסה שוב במצב חדש, ולא נספור את התיקון כשליפה עצמאית."
+        },
+        {
+          "number": 7,
+          "kind": "meaning_and_context",
+          "prompt_he": "מה המשמעות של from כאן? הסבר בעברית או באנגלית, ואז אמור תור קצר שבו הכוונה הזו שימושית.",
+          "answer_he": "מ־ לציון מוצא",
+          "answer_anchor_en": "from",
+          "rubric_he": "משמעות מתאימה ליעד + תור קצר שממלא כוונה; במתחיל מותר להיעזר במסגרת הדגם. זו אינה שאלת הבנה של טקסט היחידה שטרם נלמד.",
+          "hint_he": "חזור למשמעות העברית בדגם; שימוש בה הוא תמיכה.",
+          "feedback_he": "בדוק שהכוונה נשמרה. תרגום נכון לבדו אינו מוכיח יכולת הפקה בהקשר."
+        },
+        {
+          "number": 8,
+          "kind": "meaning_and_context",
+          "prompt_he": "מה המשמעות של live כאן? הסבר בעברית או באנגלית, ואז אמור תור קצר שבו הכוונה הזו שימושית.",
+          "answer_he": "לגור",
+          "answer_anchor_en": "live",
+          "rubric_he": "משמעות מתאימה ליעד + תור קצר שממלא כוונה; במתחיל מותר להיעזר במסגרת הדגם. זו אינה שאלת הבנה של טקסט היחידה שטרם נלמד.",
+          "hint_he": "חזור למשמעות העברית בדגם; שימוש בה הוא תמיכה.",
+          "feedback_he": "בדוק שהכוונה נשמרה. תרגום נכון לבדו אינו מוכיח יכולת הפקה בהקשר."
+        },
+        {
+          "number": 9,
+          "kind": "meaning_and_context",
+          "prompt_he": "מה המשמעות של city כאן? הסבר בעברית או באנגלית, ואז אמור תור קצר שבו הכוונה הזו שימושית.",
+          "answer_he": "עיר",
+          "answer_anchor_en": "city",
+          "rubric_he": "משמעות מתאימה ליעד + תור קצר שממלא כוונה; במתחיל מותר להיעזר במסגרת הדגם. זו אינה שאלת הבנה של טקסט היחידה שטרם נלמד.",
+          "hint_he": "חזור למשמעות העברית בדגם; שימוש בה הוא תמיכה.",
+          "feedback_he": "בדוק שהכוונה נשמרה. תרגום נכון לבדו אינו מוכיח יכולת הפקה בהקשר."
+        },
+        {
+          "number": 10,
+          "kind": "listening_spelling_or_oral",
+          "prompt_he": "הקשב לפריט המושמע כאשר הכתיב מוסתר. אמור את המשמעות; אם דפוסי הכתב כבר נלמדו, כתוב את מה ששמעת.",
+          "audio_script_en": "from",
+          "answer_en": "from",
+          "answer_he": "מ־ לציון מוצא",
+          "answer_visibility": "author_reviewer_only; audio script must not be visible during learner attempt",
+          "hint_he": "השמע שוב; חשיפת הכתב היא תמיכה. לפני קריאה מספקת אפשר לענות בקול או לבחור משמעות.",
+          "feedback_he": "איות, משמעות וזיהוי שמע הם ראיות שונות; כשל באחד אינו מוחק את האחרים."
+        },
+        {
+          "number": 11,
+          "kind": "roleplay_rehearsal",
+          "prompt_he": "פגשו את {{teacherNameHe}} בקבוצת לימוד. הציגו את עצמכם בשמכם, ציינו את עיר המגורים והשפות שלכם ושאלו את המורה מה שמו ומאיפה הוא.",
+          "answer_anchor_en": "Hello. My name is {{teacherName}}. I speak English. What is your name?",
+          "rubric_he": "מילוי הכוונה, מובנות, התאמה למצב, שימוש עצמאי לפחות באחד מיעדי הפגישה. תשובה אחרת נכונה מתקבלת. זו משימה מתורגלת, לא הוכחת העברה לנושא חדש. יש לקבל כל שם שבו הלומד מציג את עצמו. בדקו ברכה, הצגה עצמית מובנת ושפה המתאימה ליעד; אין לדרוש שם או פרטים זהים לדגם של המורה.",
+          "hint_he": "בחר משפט פתיחה מדגם השיחה; לאחר מכן נסה ללא הדגם.",
+          "feedback_he": "בחר נקודת יעד אחת לתיקון והפק שוב. בדיקת העברה נפרדת משתמשת בטופס חדש אחרי שלוש יחידות.",
+          "anchor_note_he": "זהו דגם של המורה המציג את עצמו. הלומד משתמש בשמו שלו; אין לדרוש את שם המורה או שם דמיוני בתשובת הלומד."
+        },
+        {
+          "number": 12,
+          "kind": "writing_plan",
+          "prompt_he": "תכנן את המשימה הבאה; בשלב הזה כתוב רק פתיחה ושני פרטים, או אמור אותם בקול: כתבו פרופיל שלכם בן 4 משפטים: השם שלכם, מקום מגורים, תפקיד ושפות.",
+          "rubric_he": "מילוי הכוונה, מובנות, התאמה למצב, שימוש עצמאי לפחות באחד מיעדי הפגישה. תשובה אחרת נכונה מתקבלת. זו משימה מתורגלת, לא הוכחת העברה לנושא חדש. יש לקבל כל שם שבו הלומד מציג את עצמו. בדקו ברכה, הצגה עצמית מובנת ושפה המתאימה ליעד; אין לדרוש שם או פרטים זהים לדגם של המורה.",
+          "answer_anchor_en": "Hello. My name is {{teacherName}}. I speak English. What is your name?",
+          "anchor_note_he": "זהו דגם של המורה המציג את עצמו. הלומד משתמש בשמו שלו; אין לדרוש את שם המורה או שם דמיוני בתשובת הלומד.",
+          "planned_minutes": "3–5",
+          "hint_he": "תכנן כוונה, שני פרטים וסיום. במתחיל גם משפט אחד או אמירה בעל פה יכולים להיות שלב לימוד.",
+          "feedback_he": "ראשית בדוק שהמסר עובר; בחר עד שתי נקודות לתיקון וכתוב או הקלט גרסה שנייה."
+        }
+      ],
+      "postlesson_minutes": "פריטים 1–11: כ־8–20 דקות לפי רמה; פריט 12 הוא תכנון קצר בפגישה א׳ ופרויקט נפרד בפגישה ב׳: 8–15 דקות נוספות. לפצל למקטעים לפי התקציב.",
+      "completion_he": "הוראה שבוצעה + לפחות ניסיון הפקה עצמאי אחד. השלמת פגישה אינה השלמת מילה או הסמכת רמה."
+    },
+    {
+      "id": "A101-L2",
+      "unit": "A101",
+      "band": "A1",
+      "title_he": "מכירים אנשים — שימוש, הבנה והפקה עצמאית",
+      "planned_minutes": 15,
+      "targets": [
+        {
+          "en": "speak",
+          "he": "לדבר"
+        },
+        {
+          "en": "student",
+          "he": "תלמיד או סטודנט"
+        },
+        {
+          "en": "teacher",
+          "he": "מורה"
+        },
+        {
+          "en": "work",
+          "he": "לעבוד"
+        },
+        {
+          "en": "nice to meet you",
+          "he": "נעים להכיר"
+        },
+        {
+          "en": "where",
+          "he": "איפה"
+        }
+      ],
+      "teacher_script": [
+        {
+          "phase": "opening",
+          "say_he": "היום נעבוד על: מכירים אנשים. המטרה היא להציג שם, מקום מגורים ושפות ולשאול בן שיח על עצמו. אפשר לבקש הסבר קצר בעברית או לחלק את המפגש.",
+          "say_en": "We will practise a useful task step by step. You can ask me to repeat or explain. At the end, you will try a new version without the model."
+        },
+        {
+          "phase": "retrieval",
+          "say_he": "לפני הדגם, נסה לומר באנגלית שתי כוונות שכבר פגשנו: מ־ לציון מוצא; לגור.",
+          "expected_en": ["from", "live"],
+          "note_he": "רק אם הפריטים אכן נלמדו קודם; לאחר דילוג בעקבות מיון בוחרים מן הראיות האישיות."
+        },
+        {
+          "phase": "teach_target",
+          "say_he": "הקשב: speak. במשמעות של היום: לדבר. אמור את הצורה, ואז הסבר את המשמעות או בחר את המצב שמתאים לה.",
+          "say_en": "Listen: speak. We are learning this expression with a specific meaning. Say it, then explain when you would use it.",
+          "target_en": "speak",
+          "meaning_he": "לדבר",
+          "correct_response_en": "speak",
+          "note_he": "חזרה אחרי דגם היא תרגול נתמך. אם אין עדיין יכולת קריאה, לא דורשים הקלדה."
+        },
+        {
+          "phase": "teach_target",
+          "say_he": "הקשב: student. במשמעות של היום: תלמיד או סטודנט. אמור את הצורה, ואז הסבר את המשמעות או בחר את המצב שמתאים לה.",
+          "say_en": "Listen: student. We are learning this expression with a specific meaning. Say it, then explain when you would use it.",
+          "target_en": "student",
+          "meaning_he": "תלמיד או סטודנט",
+          "correct_response_en": "student",
+          "note_he": "חזרה אחרי דגם היא תרגול נתמך. אם אין עדיין יכולת קריאה, לא דורשים הקלדה."
+        },
+        {
+          "phase": "teach_target",
+          "say_he": "הקשב: teacher. במשמעות של היום: מורה. אמור את הצורה, ואז הסבר את המשמעות או בחר את המצב שמתאים לה.",
+          "say_en": "Listen: teacher. We are learning this expression with a specific meaning. Say it, then explain when you would use it.",
+          "target_en": "teacher",
+          "meaning_he": "מורה",
+          "correct_response_en": "teacher",
+          "note_he": "חזרה אחרי דגם היא תרגול נתמך. אם אין עדיין יכולת קריאה, לא דורשים הקלדה."
+        },
+        {
+          "phase": "teach_target",
+          "say_he": "הקשב: work. במשמעות של היום: לעבוד. אמור את הצורה, ואז הסבר את המשמעות או בחר את המצב שמתאים לה.",
+          "say_en": "Listen: work. We are learning this expression with a specific meaning. Say it, then explain when you would use it.",
+          "target_en": "work",
+          "meaning_he": "לעבוד",
+          "correct_response_en": "work",
+          "note_he": "חזרה אחרי דגם היא תרגול נתמך. אם אין עדיין יכולת קריאה, לא דורשים הקלדה."
+        },
+        {
+          "phase": "teach_target",
+          "say_he": "הקשב: nice to meet you. במשמעות של היום: נעים להכיר. אמור את הצורה, ואז הסבר את המשמעות או בחר את המצב שמתאים לה.",
+          "say_en": "Listen: nice to meet you. We are learning this expression with a specific meaning. Say it, then explain when you would use it.",
+          "target_en": "nice to meet you",
+          "meaning_he": "נעים להכיר",
+          "correct_response_en": "nice to meet you",
+          "note_he": "חזרה אחרי דגם היא תרגול נתמך. אם אין עדיין יכולת קריאה, לא דורשים הקלדה."
+        },
+        {
+          "phase": "teach_target",
+          "say_he": "הקשב: where. במשמעות של היום: איפה. אמור את הצורה, ואז הסבר את המשמעות או בחר את המצב שמתאים לה.",
+          "say_en": "Listen: where. We are learning this expression with a specific meaning. Say it, then explain when you would use it.",
+          "target_en": "where",
+          "meaning_he": "איפה",
+          "correct_response_en": "where",
+          "note_he": "חזרה אחרי דגם היא תרגול נתמך. אם אין עדיין יכולת קריאה, לא דורשים הקלדה."
+        },
+        {
+          "phase": "language_focus_retrieval",
+          "say_he": "ננסה את תבנית השימוש מהפגישה הקודמת לפני הצגת הדגם. אתם רוצים לברר אם בת השיח מורה. שאלו באנגלית שאלה מלאה עם Are you.",
+          "text_en": "",
+          "contrast_en": "Are you a student?",
+          "task_he": "אתם רוצים לברר אם בת השיח מורה. שאלו באנגלית שאלה מלאה עם Are you.",
+          "answer_anchor_en": "Are you a teacher?",
+          "note_he": "בשאלה Are בא לפני you. אין צורך להוסיף do לשאלת זהות הזאת; תשובה אפשרית של בת השיח היא Yes, I am."
+        },
+        {
+          "phase": "support_bridge",
+          "say_he": "לפני הדגם נוודא שהמילים הדרושות להבנה מוכרות. נלמד רק את התמיכות החסרות בחבילות קצרות; אם הן רבות, נעצור ונמשיך במפגש נוסף. אפשר להבין בעזרת שמע ותרגום.",
+          "support_script_lines_he": [
+            "הקשב: at. כאן נספק את המשמעות: ב־ (מקום או נקודה בזמן). נשתמש במילה כדי להבין את המצב, ולא נספור זאת כשליפה עצמאית.",
+            "הקשב: but. כאן נספק את המשמעות: אבל. נשתמש במילה כדי להבין את המצב, ולא נספור זאת כשליפה עצמאית.",
+            "הקשב: class. כאן נספק את המשמעות: מעמד חברתי. נשתמש במילה כדי להבין את המצב, ולא נספור זאת כשליפה עצמאית.",
+            "הקשב: little. כאן נספק את המשמעות: מעט. נשתמש במילה כדי להבין את המצב, ולא נספור זאת כשליפה עצמאית.",
+            "הקשב: meet. כאן נספק את המשמעות: להיפגש. נשתמש במילה כדי להבין את המצב, ולא נספור זאת כשליפה עצמאית.",
+            "הקשב: nice. כאן נספק את המשמעות: נחמד. נשתמש במילה כדי להבין את המצב, ולא נספור זאת כשליפה עצמאית.",
+            "הקשב: to. כאן נספק את המשמעות: אל. נשתמש במילה כדי להבין את המצב, ולא נספור זאת כשליפה עצמאית.",
+            "הקשב: too. כאן נספק את המשמעות: מדי. נשתמש במילה כדי להבין את המצב, ולא נספור זאת כשליפה עצמאית.",
+            "הקשב: what. כאן נספק את המשמעות: מה. נשתמש במילה כדי להבין את המצב, ולא נספור זאת כשליפה עצמאית."
+          ],
+          "note_he": "לפני הטקסט בודקים מה המשתמש כבר מבין. תמיכות חדשות נחלקות לחבילות של עד 6 לפני המפגש או לטקסט קצר יותר. אין להניח שמילת תמיכה כבר ידועה, ואין לדחוס את כל רשימת הגלוסות לדקות המורה. זו קריאה מונחית; קריאה עצמאית דורשת בדיקת כיסוי אישית."
+        },
+        {
+          "phase": "model_dialogue",
+          "say_he": "נקשיב לדגם. בפעם הראשונה המטרה היא להבין מי מדבר ומה הוא רוצה. בפעם השנייה תחליף אחד מהדוברים. התרגום נפתח לפי צורך.",
+          "turns": [
+            {
+              "speaker": "teacher",
+              "text_en": "Hello. I am Maya. What is your name?",
+              "text_he": "שלום. אני מאיה. מה שמך?"
+            },
+            {
+              "speaker": "model",
+              "text_en": "My name is Tom. Nice to meet you.",
+              "text_he": "שמי תום. נעים להכיר."
+            },
+            {
+              "speaker": "teacher",
+              "text_en": "Nice to meet you. Where are you from?",
+              "text_he": "נעים להכיר. מאיפה אתה?"
+            },
+            {
+              "speaker": "model",
+              "text_en": "I am from Israel. I live in Haifa.",
+              "text_he": "אני מישראל. אני גר בחיפה."
+            },
+            {
+              "speaker": "teacher",
+              "text_en": "Are you a student?",
+              "text_he": "האם אתה תלמיד?"
+            },
+            {
+              "speaker": "model",
+              "text_en": "Yes. I am a student. I speak Hebrew.",
+              "text_he": "כן. אני תלמיד. אני מדבר עברית."
+            },
+            {
+              "speaker": "teacher",
+              "text_en": "Do you speak English?",
+              "text_he": "האם אתה מדבר אנגלית?"
+            },
+            {
+              "speaker": "model",
+              "text_en": "A little. You are my English teacher.",
+              "text_he": "קצת. את המורה שלי לאנגלית."
+            }
+          ]
+        },
+        {
+          "phase": "input",
+          "say_he": "כעת נקשיב לקטע. נסה לזהות את המצב המרכזי. אפשר לשמוע שוב. במצב קריאה נפתח את הכתב; אם בודקים האזנה עצמאית משאירים תמלול סגור בניסיון הראשון.",
+          "text_en": "My name is Tom. I am from Israel, and I live in Haifa. Haifa is a city. I am a student. My friend Maya is a teacher. She is from Israel too. We speak Hebrew. I speak a little English, but Maya speaks English at work. We meet in a small class. My book is blue, and her book is red. Maya says, \"Hello, Tom. Nice to meet you.\" I say, \"Hello, Maya. I am ready.\"",
+          "note_he": "זהו חומר הוראה מוכר, לא unseen לאחר הצגתו."
+        },
+        {
+          "phase": "comprehension",
+          "say_he": "באיזו עיר תום גר?",
+          "say_en": "Where does Tom live?",
+          "answer_anchor_en": "He lives in Haifa.",
+          "accept_he": "יש לקבל פרפרזה נכונה, תשובה קצרה מתאימה ופרטים תומכים מן הטקסט. לא חייבים להעתיק את הדגם."
+        },
+        {
+          "phase": "comprehension",
+          "say_he": "מה העבודה של מאיה?",
+          "say_en": "What is Maya?",
+          "answer_anchor_en": "She is a teacher.",
+          "accept_he": "יש לקבל פרפרזה נכונה, תשובה קצרה מתאימה ופרטים תומכים מן הטקסט. לא חייבים להעתיק את הדגם."
+        },
+        {
+          "phase": "comprehension",
+          "say_he": "איזו שפה שניהם מדברים?",
+          "say_en": "What language do they both speak?",
+          "answer_anchor_en": "Hebrew.",
+          "accept_he": "יש לקבל פרפרזה נכונה, תשובה קצרה מתאימה ופרטים תומכים מן הטקסט. לא חייבים להעתיק את הדגם."
+        },
+        {
+          "phase": "independent_reconstruction",
+          "say_he": "פגשו את {{teacherNameHe}} בקבוצת לימוד. הציגו את עצמכם בשמכם, ציינו את עיר המגורים והשפות שלכם ושאלו את המורה מה שמו ומאיפה הוא.",
+          "say_en": "Try the practised task without reading the model. Explain your choice or ask for clarification when needed.",
+          "model_en": "Hello. My name is {{teacherName}}. I speak English. What is your name?",
+          "model_visibility_he": "זהו דגם של המורה המציג את עצמו. הלומד משתמש בשמו שלו; אין לדרוש את שם המורה או שם דמיוני בתשובת הלומד."
+        },
+        {
+          "phase": "writing_project_brief",
+          "say_he": "כתבו פרופיל שלכם בן 4 משפטים: השם שלכם, מקום מגורים, תפקיד ושפות.",
+          "note_he": "הכתיבה המלאה אינה נכללת בדקות המורה. לפי אוריינות אפשר לתרגל בקול, אך במבחן כתיבה עצמאי אין להחליף אוטומטית בדיבור."
+        },
+        {
+          "phase": "closing",
+          "say_he": "נבדוק מה עשית בלי עזרה ומה עדיין צריך תמיכה. בחר ביטוי אחד שתוכל להשתמש בו מחוץ לשיעור. בפעם הבאה ננסה מצב חדש.",
+          "report_fields": [
+            "actual_target_use",
+            "assistance",
+            "communication_success",
+            "one_or_two_corrections",
+            "next_step"
+          ]
+        }
+      ],
+      "branches": {
+        "correct_he": "המשמעות עברה. כעת ננסה להשתמש בזה במצב מעט שונה. אמור את אותה כוונה עם פרט אחר משלך.",
+        "partial_he": "הבנתי חלק מהכוונה. נתקן נקודה אחת מן היעד שלמדנו. הקשב לדגם הקצר, ואז נסה שוב עם הפרט שלך.",
+        "incorrect_he": "נבדוק את המשמעות שוב. הנה שתי אפשרויות מן החומר שלמדנו. בחר אחת, הקשב לדגם ונסה להשתמש בו. הניסיון הזה נתמך.",
+        "silence_he": "אפשר לענות במילה אחת, לבחור בין שתי אפשרויות או לבקש לשמוע שוב. נתחיל בצעד קטן.",
+        "asr_uncertain_he": "לא שמעתי בבירור. נסה שוב או הקלד. אין בכך קביעה שהתשובה הלשונית שגויה.",
+        "unexpected_valid_he": "הניסוח שלך מתאים לכוונה. עכשיו ננסה גם את הביטוי המסוים שלמדנו, כדי שאוכל לבדוק אותו.",
+        "fade_support_he": "הפעם הדגם מוסתר. אותה מטרה, מצב חדש. אפשר לעצור ולבקש עזרה; אסמן אם השתמשנו בתמיכה."
+      },
+      "postlesson": [
+        {
+          "number": 1,
+          "kind": "meaning_to_english",
+          "prompt_he": "אמור באנגלית ואז, אם הקריאה כבר מתאימה, הקלד: לדבר. השתמש במשמעות שנלמדה.",
+          "answer_en": "speak",
+          "accepted_note_he": "זו תשובת היעד. תשובה טבעית אחרת יכולה למלא את המשימה אך אינה ראיה לפריט היעד; יש לבקש גם שימוש ביעד. הקלדה אינה חובה לפני ביסוס פענוח.",
+          "hint_he": "הצורה מתחילה ב־s. חשיפת הרמז מסמנת ניסיון נתמך.",
+          "feedback_he": "יעד השיעור הוא speak במשמעות לדבר. אחרי תיקון ננסה שוב במצב חדש, ולא נספור את התיקון כשליפה עצמאית."
+        },
+        {
+          "number": 2,
+          "kind": "meaning_to_english",
+          "prompt_he": "אמור באנגלית ואז, אם הקריאה כבר מתאימה, הקלד: תלמיד או סטודנט. השתמש במשמעות שנלמדה.",
+          "answer_en": "student",
+          "accepted_note_he": "זו תשובת היעד. תשובה טבעית אחרת יכולה למלא את המשימה אך אינה ראיה לפריט היעד; יש לבקש גם שימוש ביעד. הקלדה אינה חובה לפני ביסוס פענוח.",
+          "hint_he": "הצורה מתחילה ב־s. חשיפת הרמז מסמנת ניסיון נתמך.",
+          "feedback_he": "יעד השיעור הוא student במשמעות תלמיד או סטודנט. אחרי תיקון ננסה שוב במצב חדש, ולא נספור את התיקון כשליפה עצמאית."
+        },
+        {
+          "number": 3,
+          "kind": "meaning_to_english",
+          "prompt_he": "אמור באנגלית ואז, אם הקריאה כבר מתאימה, הקלד: מורה. השתמש במשמעות שנלמדה.",
+          "answer_en": "teacher",
+          "accepted_note_he": "זו תשובת היעד. תשובה טבעית אחרת יכולה למלא את המשימה אך אינה ראיה לפריט היעד; יש לבקש גם שימוש ביעד. הקלדה אינה חובה לפני ביסוס פענוח.",
+          "hint_he": "הצורה מתחילה ב־t. חשיפת הרמז מסמנת ניסיון נתמך.",
+          "feedback_he": "יעד השיעור הוא teacher במשמעות מורה. אחרי תיקון ננסה שוב במצב חדש, ולא נספור את התיקון כשליפה עצמאית."
+        },
+        {
+          "number": 4,
+          "kind": "meaning_to_english",
+          "prompt_he": "אמור באנגלית ואז, אם הקריאה כבר מתאימה, הקלד: לעבוד. השתמש במשמעות שנלמדה.",
+          "answer_en": "work",
+          "accepted_note_he": "זו תשובת היעד. תשובה טבעית אחרת יכולה למלא את המשימה אך אינה ראיה לפריט היעד; יש לבקש גם שימוש ביעד. הקלדה אינה חובה לפני ביסוס פענוח.",
+          "hint_he": "הצורה מתחילה ב־w. חשיפת הרמז מסמנת ניסיון נתמך.",
+          "feedback_he": "יעד השיעור הוא work במשמעות לעבוד. אחרי תיקון ננסה שוב במצב חדש, ולא נספור את התיקון כשליפה עצמאית."
+        },
+        {
+          "number": 5,
+          "kind": "meaning_to_english",
+          "prompt_he": "אמור באנגלית ואז, אם הקריאה כבר מתאימה, הקלד: נעים להכיר. השתמש במשמעות שנלמדה.",
+          "answer_en": "nice to meet you",
+          "accepted_note_he": "זו תשובת היעד. תשובה טבעית אחרת יכולה למלא את המשימה אך אינה ראיה לפריט היעד; יש לבקש גם שימוש ביעד. הקלדה אינה חובה לפני ביסוס פענוח.",
+          "hint_he": "הצורה מתחילה ב־n. חשיפת הרמז מסמנת ניסיון נתמך.",
+          "feedback_he": "יעד השיעור הוא nice to meet you במשמעות נעים להכיר. אחרי תיקון ננסה שוב במצב חדש, ולא נספור את התיקון כשליפה עצמאית."
+        },
+        {
+          "number": 6,
+          "kind": "meaning_to_english",
+          "prompt_he": "אמור באנגלית ואז, אם הקריאה כבר מתאימה, הקלד: איפה. השתמש במשמעות שנלמדה.",
+          "answer_en": "where",
+          "accepted_note_he": "זו תשובת היעד. תשובה טבעית אחרת יכולה למלא את המשימה אך אינה ראיה לפריט היעד; יש לבקש גם שימוש ביעד. הקלדה אינה חובה לפני ביסוס פענוח.",
+          "hint_he": "הצורה מתחילה ב־w. חשיפת הרמז מסמנת ניסיון נתמך.",
+          "feedback_he": "יעד השיעור הוא where במשמעות איפה. אחרי תיקון ננסה שוב במצב חדש, ולא נספור את התיקון כשליפה עצמאית."
+        },
+        {
+          "number": 7,
+          "kind": "reading_or_listening_comprehension",
+          "prompt_he": "למי מתייחסת She במשפט על מאיה?",
+          "prompt_en": "Who is she in the sentence about Maya?",
+          "answer_en": "Maya.",
+          "hint_he": "מצא או שמע את החלק הרלוונטי בקטע. שימוש חוזר בקטע הוא תרגול הבנה, לא מבחן זכירה ללא תמיכה.",
+          "feedback_he": "השווה את תשובתך למידע בקטע. פרפרזה נכונה מתקבלת; ידע חיצוני שאינו מופיע בקטע אינו נדרש."
+        },
+        {
+          "number": 8,
+          "kind": "reading_or_listening_comprehension",
+          "prompt_he": "מה מטרת הטקסט?",
+          "prompt_en": "What is the text mainly about?",
+          "answer_en": "Tom introduces himself and Maya.",
+          "hint_he": "מצא או שמע את החלק הרלוונטי בקטע. שימוש חוזר בקטע הוא תרגול הבנה, לא מבחן זכירה ללא תמיכה.",
+          "feedback_he": "השווה את תשובתך למידע בקטע. פרפרזה נכונה מתקבלת; ידע חיצוני שאינו מופיע בקטע אינו נדרש."
+        },
+        {
+          "number": 9,
+          "kind": "reading_or_listening_comprehension",
+          "prompt_he": "הציגו את תום בשני פרטים מן הטקסט.",
+          "prompt_en": "Introduce Tom with two facts.",
+          "answer_en": "His name is Tom. He lives in Haifa.",
+          "hint_he": "מצא או שמע את החלק הרלוונטי בקטע. שימוש חוזר בקטע הוא תרגול הבנה, לא מבחן זכירה ללא תמיכה.",
+          "feedback_he": "השווה את תשובתך למידע בקטע. פרפרזה נכונה מתקבלת; ידע חיצוני שאינו מופיע בקטע אינו נדרש."
+        },
+        {
+          "number": 10,
+          "kind": "listening_spelling_or_oral",
+          "prompt_he": "הקשב לפריט המושמע כאשר הכתיב מוסתר. אמור את המשמעות; אם דפוסי הכתב כבר נלמדו, כתוב את מה ששמעת.",
+          "audio_script_en": "speak",
+          "answer_en": "speak",
+          "answer_he": "לדבר",
+          "answer_visibility": "author_reviewer_only; audio script must not be visible during learner attempt",
+          "hint_he": "השמע שוב; חשיפת הכתב היא תמיכה. לפני קריאה מספקת אפשר לענות בקול או לבחור משמעות.",
+          "feedback_he": "איות, משמעות וזיהוי שמע הם ראיות שונות; כשל באחד אינו מוחק את האחרים."
+        },
+        {
+          "number": 11,
+          "kind": "roleplay_rehearsal",
+          "prompt_he": "פגשו את {{teacherNameHe}} בקבוצת לימוד. הציגו את עצמכם בשמכם, ציינו את עיר המגורים והשפות שלכם ושאלו את המורה מה שמו ומאיפה הוא.",
+          "answer_anchor_en": "Hello. My name is {{teacherName}}. I speak English. What is your name?",
+          "rubric_he": "מילוי הכוונה, מובנות, התאמה למצב, שימוש עצמאי לפחות באחד מיעדי הפגישה. תשובה אחרת נכונה מתקבלת. זו משימה מתורגלת, לא הוכחת העברה לנושא חדש. יש לקבל כל שם שבו הלומד מציג את עצמו. בדקו ברכה, הצגה עצמית מובנת ושפה המתאימה ליעד; אין לדרוש שם או פרטים זהים לדגם של המורה.",
+          "hint_he": "בחר משפט פתיחה מדגם השיחה; לאחר מכן נסה ללא הדגם.",
+          "feedback_he": "בחר נקודת יעד אחת לתיקון והפק שוב. בדיקת העברה נפרדת משתמשת בטופס חדש אחרי שלוש יחידות.",
+          "anchor_note_he": "זהו דגם של המורה המציג את עצמו. הלומד משתמש בשמו שלו; אין לדרוש את שם המורה או שם דמיוני בתשובת הלומד."
+        },
+        {
+          "number": 12,
+          "kind": "writing_or_recording_project",
+          "prompt_he": "כתבו פרופיל שלכם בן 4 משפטים: השם שלכם, מקום מגורים, תפקיד ושפות.",
+          "rubric_he": "מילוי משימה, מסר ברור, סדר מתאים לרמה ודיוק ביעדים שנלמדו; אין תשובה יחידה. יש לקבל כל שם שבו הלומד מציג את עצמו. בדקו ברכה, הצגה עצמית מובנת ושפה המתאימה ליעד; אין לדרוש שם או פרטים זהים לדגם של המורה.",
+          "answer_anchor_en": "Hello. My name is {{teacherName}}. I speak English. What is your name?",
+          "anchor_note_he": "זהו דגם של המורה המציג את עצמו. הלומד משתמש בשמו שלו; אין לדרוש את שם המורה או שם דמיוני בתשובת הלומד.",
+          "planned_minutes": "8–15",
+          "hint_he": "תכנן כוונה, שני פרטים וסיום. במתחיל גם משפט אחד או אמירה בעל פה יכולים להיות שלב לימוד.",
+          "feedback_he": "ראשית בדוק שהמסר עובר; בחר עד שתי נקודות לתיקון וכתוב או הקלט גרסה שנייה."
+        }
+      ],
+      "postlesson_minutes": "פריטים 1–11: כ־8–20 דקות לפי רמה; פריט 12 הוא תכנון קצר בפגישה א׳ ופרויקט נפרד בפגישה ב׳: 8–15 דקות נוספות. לפצל למקטעים לפי התקציב.",
+      "completion_he": "הוראה שבוצעה + לפחות ניסיון הפקה עצמאי אחד. השלמת פגישה אינה השלמת מילה או הסמכת רמה."
+    }
+  ]
+}

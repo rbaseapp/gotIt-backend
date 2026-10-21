@@ -1,4 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto';
+import { curriculumTeacherVoice } from './curriculum.participants.js';
 import type { Pool } from 'pg';
 import { withTransaction, type DatabaseTransaction } from '../../shared/database/transaction.js';
 import { AppError } from '../../shared/errors/app-error.js';
@@ -79,6 +80,14 @@ export const curriculumMissing = () =>
 
 export class CurriculumStore {
   constructor(readonly pool: Pool) {}
+  async teacherVoice(
+    scope: ProfileScope,
+    completedLessonSource?: string,
+    tx?: DatabaseTransaction,
+  ): Promise<'female' | 'male'> {
+    return curriculumTeacherVoice(tx ?? this.pool, scope, completedLessonSource);
+  }
+
   async catalog() {
     const row = (
       await this.pool.query(

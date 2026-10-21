@@ -13,6 +13,7 @@ import {
 } from './curriculum.content.js';
 import { scopeArgs, curriculumMissing, type CurriculumState } from './curriculum.store.js';
 import { introduce, recallEvidence, reviewPriority } from './curriculum.policy.js';
+import { curriculumParticipants, curriculumTeacherVoice } from './curriculum.participants.js';
 
 export function curriculumPlacedBelow(state: CurriculumState, band: Band) {
   return ['reading', 'listening', 'speaking', 'writing', 'vocabulary'].every((skill) => {
@@ -93,8 +94,10 @@ export async function prepareCurriculumPractice(
 ) {
   await lockCurriculumPractice(tx, scope);
   const state = await enrollment(tx, scope);
-  const unit = unitById.get(unitId);
+  let unit = unitById.get(unitId);
   if (!unit || !curriculumUnitUnlocked(state, unitId)) throw curriculumMissing();
+  if (JSON.stringify(unit).includes('{{teacherName'))
+    unit = curriculumParticipants(unit, await curriculumTeacherVoice(tx, scope));
   const words = allTargets.filter((target) => target.unit === unitId);
   if (!words.length || words.length > 100) throw curriculumMissing();
   state.practiceItems ??= {};

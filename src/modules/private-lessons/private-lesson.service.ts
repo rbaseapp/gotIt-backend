@@ -5,6 +5,7 @@ import {
 import type { unitPathChoiceSchema } from '../word-packs/unit-path-choices.js';
 import { adminRuntimeContext } from '../admin/admin.context.js';
 import type { CurriculumService } from '../curriculum/curriculum.service.js';
+import { curriculumParticipants } from '../curriculum/curriculum.participants.js';
 import { buildRealtimeLessonContract } from './private-lesson.realtime.js';
 import { AdaptiveLessonPlanner, lessonPlanningRequirements } from './private-lesson.planner.js';
 import {
@@ -492,7 +493,7 @@ export class PrivateLessonService {
     if (curriculum)
       plan = {
         ...plan,
-        curriculum: curriculum.context,
+        curriculum: curriculumParticipants(curriculum.context, plan.teacherVoice),
         roadmap: null,
         continuity: null,
         topic: curriculum.title,
