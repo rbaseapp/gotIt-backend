@@ -1,4 +1,5 @@
 import { Router, text as expressText } from 'express';
+import { createCurriculumRoutes } from './modules/curriculum/curriculum.routes.js';
 import {
   createProductAdminRouter,
   createLearnerSupportRouter,
@@ -269,12 +270,25 @@ export function createRoutes(dependencies: AppDependencies) {
     );
   }
   if (dependencies.courseService) {
-    router.use('/api/v1/courses', createCourseRoutes(dependencies.courseService, requireCourse));
+    router.use(
+      '/api/v1/courses',
+      createCourseRoutes(
+        dependencies.courseService,
+        requireCourse,
+        dependencies.programArtworkService,
+      ),
+    );
   }
   if (dependencies.dashboardService) {
+    // Other product surfaces keep their existing entitlement and routing contracts.
     router.use('/api/v1/dashboard', createDashboardRoutes(dependencies.dashboardService));
     router.use('/api/v1/gamification', createGamificationRoutes(dependencies.dashboardService));
   }
+  if (dependencies.curriculumService)
+    router.use(
+      '/api/v1/structured-english',
+      createCurriculumRoutes(dependencies.curriculumService, requirePractice, requireCourse),
+    );
   if (dependencies.readingService)
     router.use('/api/v1/reading', createReadingRoutes(dependencies.readingService, requireAi));
   if (dependencies.speechService) {

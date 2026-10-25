@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { randomUUID } from 'node:crypto';
 import { createTestDatabase } from '../helpers/postgres.js';
+import { ensureProfileRow } from '../helpers/profile-row.js';
 import { ProductAdminService, type AdminActor } from '../../src/modules/admin/admin.service.js';
 import { wordImageSchema } from '../../src/modules/admin/admin.word-images.js';
 import { wordListSchema } from '../../src/modules/admin/admin.words.js';
@@ -42,7 +43,7 @@ test(
           `INSERT INTO core.application_users(application_id,id,email) VALUES($1,$2,$3)`,
           [a, u, `${u}@test.invalid`],
         );
-        await profiles.getProfile({ applicationId: a, applicationUserId: u });
+        await ensureProfileRow(db.runtimePool, { applicationId: a, applicationUserId: u });
       }
       async function item(
         a: string,

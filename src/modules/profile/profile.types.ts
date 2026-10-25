@@ -33,7 +33,9 @@ export type ProfileLanguage = {
 };
 
 export type GotItProfile = {
-  learningPreferences?: { enabledSkills: import('../learning/learning.policy.js').Skill[] };
+  displayName?: string | null;
+  avatarData?: string | null;
+  learningPreferences?: LearningPreferences;
   /** Null means that the translation provider must detect the source language. */
   defaultSourceLanguage: string | null;
   defaultTranslationLanguage: string | null;
@@ -49,7 +51,9 @@ export type GotItProfile = {
 };
 
 export type ProfilePatchInput = {
-  learningPreferences?: { enabledSkills: import('../learning/learning.policy.js').Skill[] };
+  displayName?: string | null;
+  avatarData?: string | null;
+  learningPreferences?: LearningPreferences;
   defaultSourceLanguage?: string | null;
   defaultTranslationLanguage?: string | null;
   timezone?: string;
@@ -64,6 +68,16 @@ export type ProfilePatchInput = {
     selfAssessedLevel: CefrLevel | null;
   }>;
   interests?: string[];
+};
+
+export type LearningPreferences = {
+  enabledSkills: import('../learning/learning.policy.js').Skill[];
+  uiLocale?: 'ar' | 'de' | 'en' | 'es' | 'fr' | 'he' | 'ru' | 'zh';
+  textScale?: 'normal' | 'large';
+  reducedMotion?: boolean;
+  sounds?: boolean;
+  textDirection?: 'rtl' | 'ltr';
+  highContrast?: boolean;
 };
 
 export type ProfileDefaults = Pick<

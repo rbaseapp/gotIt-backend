@@ -267,7 +267,7 @@ export class ProductAdminService {
     await this.access(actor);
     if (query.activity && (resource !== 'usage' || id))
       throw new AppError(400, 'VALIDATION_ERROR', 'Unsupported activity filter');
-    if (resource === 'catalog-programs') return this.catalog(query, id);
+    if (resource === 'catalog-programs') return this.catalog(actor, query, id);
     if (resource === 'prompts' || resource === 'policies') await this.defaults(actor.applicationId);
     const documents = resource in contentSchemas;
     const source = documents
@@ -352,7 +352,7 @@ export class ProductAdminService {
     }
     return { data: result.rows, total: count.rows[0].total };
   }
-  private async catalog(query: z.infer<typeof listSchema>, id?: string) {
+  private async catalog(actor: AdminActor, query: z.infer<typeof listSchema>, id?: string) {
     // The vocabulary catalog is shared product content, as in learner discovery.
     // No learner membership, progress or identity joins are exposed here.
     const values: unknown[] = [];
@@ -385,8 +385,8 @@ export class ProductAdminService {
     if (!rows[0]) throw notFound();
     rows[0].units = (
       await this.db.query(
-        `SELECT p.id,p.title,p.module_number AS "moduleNumber",p.version,tr.title AS track,tr.level_code AS "levelCode",tr.cefr_from AS "cefrFrom",tr.cefr_to AS "cefrTo",count(e.id)::int AS "wordCount" FROM product_gotit.word_packs p JOIN product_gotit.word_tracks tr ON tr.id=p.track_id LEFT JOIN product_gotit.word_pack_entries e ON e.pack_id=p.id WHERE tr.topic_id=$1 AND tr.is_active AND p.is_active GROUP BY p.id,tr.id ORDER BY tr.sort_order,p.sort_order,p.module_number,p.id`,
-        [id],
+        `SELECT p.id,COALESCE((SELECT c.content->>'title' FROM product_gotit.admin_unit_content c WHERE c.application_id=$2 AND c.pack_id=p.id AND c.application_user_id IS NULL),p.title) AS title,p.module_number AS "moduleNumber",p.version,tr.title AS track,tr.level_code AS "levelCode",tr.cefr_from AS "cefrFrom",tr.cefr_to AS "cefrTo",count(e.id)::int AS "wordCount" FROM product_gotit.word_packs p JOIN product_gotit.word_tracks tr ON tr.id=p.track_id LEFT JOIN product_gotit.word_pack_entries e ON e.pack_id=p.id WHERE tr.topic_id=$1 AND tr.is_active AND p.is_active GROUP BY p.id,tr.id ORDER BY tr.sort_order,p.sort_order,p.module_number,p.id`,
+        [id, actor.applicationId],
       )
     ).rows;
     return { data: rows[0] };

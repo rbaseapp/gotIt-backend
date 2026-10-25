@@ -3,7 +3,29 @@ import type { DatabasePool } from '../../shared/database/pool.js';
 import type { ProfileScope } from '../profile/profile.types.js';
 import type { NotificationPreferences } from './notification.policy.js';
 
+const extraColumns = {
+  enabled: 'enabled',
+  reminderMinute: 'reminder_minute',
+  reminderDays: 'reminder_days',
+  quietEnabled: 'quiet_enabled',
+  quietStart: 'quiet_start',
+  quietEnd: 'quiet_end',
+  streakEmail: 'streak_email',
+  streakPush: 'streak_push',
+  weeklyEmail: 'weekly_email',
+  weeklyPush: 'weekly_push',
+} as const;
 type PreferenceRow = {
+  enabled?: boolean;
+  reminder_minute?: number;
+  reminder_days?: number[];
+  quiet_enabled?: boolean;
+  quiet_start?: number;
+  quiet_end?: number;
+  streak_email?: boolean;
+  streak_push?: boolean;
+  weekly_email?: boolean;
+  weekly_push?: boolean;
   practice_email: boolean;
   practice_push: boolean;
   system_email: boolean;
@@ -15,7 +37,7 @@ export type Delivery = {
   id: string;
   application_id: string;
   application_user_id: string;
-  kind: 'practice' | 'system';
+  kind: 'practice' | 'system' | 'streak' | 'weekly';
   channel: 'email' | 'push';
   occurrence_key: string;
   subject: string;
@@ -25,6 +47,16 @@ export type Delivery = {
 };
 
 const defaults: NotificationPreferences = {
+  enabled: true,
+  reminderMinute: 0,
+  reminderDays: [0, 1, 2, 3, 4, 5, 6],
+  quietEnabled: false,
+  quietStart: 1320,
+  quietEnd: 420,
+  streakEmail: false,
+  streakPush: false,
+  weeklyEmail: false,
+  weeklyPush: false,
   practiceEmail: false,
   practicePush: false,
   systemEmail: false,
@@ -35,6 +67,12 @@ const defaults: NotificationPreferences = {
 function map(row: PreferenceRow | undefined): NotificationPreferences {
   if (!row) return defaults;
   return {
+    ...defaults,
+    ...Object.fromEntries(
+      Object.entries(extraColumns)
+        .filter(([, column]) => row[column as keyof PreferenceRow] !== undefined)
+        .map(([key, column]) => [key, row[column as keyof PreferenceRow]]),
+    ),
     practiceEmail: row.practice_email,
     practicePush: row.practice_push,
     systemEmail: row.system_email,
@@ -48,7 +86,7 @@ export class NotificationRepository {
 
   async getPreferences(scope: ProfileScope) {
     const result = await this.pool.query<PreferenceRow>(
-      `SELECT practice_email,practice_push,system_email,system_push,reminder_hour
+      `SELECT *
        FROM product_gotit.notification_preferences
        WHERE application_id=$1 AND application_user_id=$2`,
       [scope.applicationId, scope.applicationUserId],
@@ -61,33 +99,25 @@ export class NotificationRepository {
     patch: Partial<NotificationPreferences>,
     verifiedEmail?: string,
   ) {
+    const columns = {
+      practiceEmail: 'practice_email',
+      practicePush: 'practice_push',
+      systemEmail: 'system_email',
+      systemPush: 'system_push',
+      reminderHour: 'reminder_hour',
+      ...extraColumns,
+    };
+    const entries = Object.entries(patch).filter(([key]) => key in columns);
+    const names = entries.map(([key]) => columns[key as keyof typeof columns]);
+    const values = entries.map(([, value]) => value);
     const result = await this.pool.query<PreferenceRow>(
-      `INSERT INTO product_gotit.notification_preferences
-       (application_id,application_user_id,practice_email,practice_push,system_email,system_push,reminder_hour,verified_email)
-       VALUES($1,$2,$3,$4,$5,$6,$7,$8)
-       ON CONFLICT(application_id,application_user_id) DO UPDATE SET
-         practice_email=COALESCE($9,notification_preferences.practice_email),
-         practice_push=COALESCE($10,notification_preferences.practice_push),
-         system_email=COALESCE($11,notification_preferences.system_email),
-         system_push=COALESCE($12,notification_preferences.system_push),
-         reminder_hour=COALESCE($13,notification_preferences.reminder_hour),
-         verified_email=$8,updated_at=now()
-       RETURNING practice_email,practice_push,system_email,system_push,reminder_hour`,
-      [
-        scope.applicationId,
-        scope.applicationUserId,
-        patch.practiceEmail ?? false,
-        patch.practicePush ?? false,
-        patch.systemEmail ?? false,
-        patch.systemPush ?? false,
-        patch.reminderHour ?? 18,
-        verifiedEmail ?? null,
-        patch.practiceEmail ?? null,
-        patch.practicePush ?? null,
-        patch.systemEmail ?? null,
-        patch.systemPush ?? null,
-        patch.reminderHour ?? null,
-      ],
+      `
+      INSERT INTO product_gotit.notification_preferences(application_id,application_user_id,verified_email,${names.join(',')})
+      VALUES($1,$2,$3,${names.map((_, i) => '$' + (i + 4)).join(',')})
+      ON CONFLICT(application_id,application_user_id) DO UPDATE SET
+      verified_email=$3,${names.map((name) => `${name}=EXCLUDED.${name}`).join(',')},updated_at=now()
+      RETURNING *`,
+      [scope.applicationId, scope.applicationUserId, verifiedEmail ?? null, ...values],
     );
     return map(result.rows[0]);
   }
@@ -131,41 +161,42 @@ export class NotificationRepository {
   }
 
   async queuePractice(now: Date) {
-    // The local date and hour come from the profile; the unique occurrence key survives DST repeats.
     const result = await this.pool.query(
-      `WITH candidates AS (
-         SELECT p.application_id,p.application_user_id,p.timezone,n.reminder_hour,
-           to_char($1::timestamptz AT TIME ZONE p.timezone,'YYYY-MM-DD') AS local_day,
-           n.practice_email,n.practice_push,n.verified_email
-         FROM product_gotit.notification_preferences n
-         JOIN product_gotit.user_profiles p USING(application_id,application_user_id)
-         WHERE extract(hour FROM $1::timestamptz AT TIME ZONE p.timezone)>=n.reminder_hour
-           AND (n.practice_email OR n.practice_push)
-       ), eligible AS (
-         SELECT c.* FROM candidates c
-         WHERE EXISTS (
-           SELECT 1 FROM product_gotit.learning_items li
-           WHERE li.application_id=c.application_id AND li.application_user_id=c.application_user_id
-             AND li.deleted_at IS NULL AND li.user_status='active' AND li.next_review_at <= $1
-         ) AND NOT EXISTS (
-           SELECT 1 FROM product_gotit.practice_attempts a
-           WHERE a.application_id=c.application_id AND a.application_user_id=c.application_user_id
-             AND (a.created_at AT TIME ZONE c.timezone)::date=c.local_day::date
-             AND a.result<>'skipped'
-         )
-       )
-       INSERT INTO product_gotit.notification_deliveries
-         (id,application_id,application_user_id,kind,channel,occurrence_key,subject,body)
-       SELECT gen_random_uuid(),e.application_id,e.application_user_id,'practice',v.channel,e.local_day,
-         'Time to practice','You have vocabulary ready for review in GotIt.'
-       FROM eligible e CROSS JOIN LATERAL (
-         VALUES('email',e.practice_email AND e.verified_email IS NOT NULL),
-               ('push',e.practice_push AND EXISTS(
-                 SELECT 1 FROM product_gotit.push_subscriptions s
-                 WHERE s.application_id=e.application_id AND s.application_user_id=e.application_user_id))
-       ) AS v(channel,enabled)
-       WHERE v.enabled
-       ON CONFLICT(application_id,application_user_id,kind,channel,occurrence_key) DO NOTHING`,
+      `
+      WITH clocks AS (
+        SELECT n.*, p.timezone, $1::timestamptz AT TIME ZONE p.timezone AS local_now
+        FROM product_gotit.notification_preferences n
+        JOIN product_gotit.user_profiles p USING(application_id,application_user_id)
+        WHERE n.enabled
+      ), candidates AS (
+        SELECT c.*,extract(hour FROM local_now)::int*60+extract(minute FROM local_now)::int AS minute,
+          local_now::date AS local_day FROM clocks c
+      ), eligible AS (
+        SELECT c.*,v.kind,v.channel,v.enabled AS channel_enabled FROM candidates c
+        CROSS JOIN LATERAL (VALUES
+          ('practice','email',c.practice_email),('practice','push',c.practice_push),
+          ('streak','email',c.streak_email),('streak','push',c.streak_push),
+          ('weekly','email',c.weekly_email),('weekly','push',c.weekly_push)
+        ) v(kind,channel,enabled)
+        WHERE v.enabled AND extract(dow FROM c.local_now)::int=ANY(c.reminder_days)
+          AND c.minute >= c.reminder_hour*60+c.reminder_minute
+          AND NOT(c.quiet_enabled AND CASE WHEN c.quiet_start<c.quiet_end
+            THEN c.minute>=c.quiet_start AND c.minute<c.quiet_end
+            ELSE c.minute>=c.quiet_start OR c.minute<c.quiet_end END)
+          AND (v.channel<>'email' OR c.verified_email IS NOT NULL)
+          AND (v.channel<>'push' OR EXISTS(SELECT 1 FROM product_gotit.push_subscriptions ps WHERE ps.application_id=c.application_id AND ps.application_user_id=c.application_user_id))
+          AND (v.kind='weekly' AND extract(dow FROM c.local_now)=0 AND EXISTS(
+            SELECT 1 FROM product_gotit.practice_attempts a WHERE a.application_id=c.application_id AND a.application_user_id=c.application_user_id AND a.created_at >= $1::timestamptz-interval '7 days' AND a.result<>'skipped')
+          OR v.kind IN ('practice','streak') AND NOT EXISTS(
+            SELECT 1 FROM product_gotit.practice_attempts a WHERE a.application_id=c.application_id AND a.application_user_id=c.application_user_id AND (a.created_at AT TIME ZONE c.timezone)::date=c.local_day AND a.result<>'skipped')
+            AND (v.kind='practice' AND EXISTS(SELECT 1 FROM product_gotit.learning_items li WHERE li.application_id=c.application_id AND li.application_user_id=c.application_user_id AND li.deleted_at IS NULL AND li.user_status='active' AND li.next_review_at<=$1)
+            OR v.kind='streak' AND EXISTS(SELECT 1 FROM product_gotit.practice_attempts a WHERE a.application_id=c.application_id AND a.application_user_id=c.application_user_id AND (a.created_at AT TIME ZONE c.timezone)::date=c.local_day-1 AND a.result<>'skipped')))
+      )
+      INSERT INTO product_gotit.notification_deliveries(id,application_id,application_user_id,kind,channel,occurrence_key,subject,body)
+      SELECT gen_random_uuid(),application_id,application_user_id,kind,channel,local_day::text,
+        CASE kind WHEN 'weekly' THEN 'GotIt ? Your weekly progress' WHEN 'streak' THEN 'GotIt ? Keep your streak' ELSE 'GotIt ? Time to practice' END,
+        CASE kind WHEN 'weekly' THEN 'Your weekly progress is ready. Open GotIt to see your learning activity and continue your plan.' WHEN 'streak' THEN 'You practiced yesterday. A short practice today will keep your learning streak going.' ELSE 'Your vocabulary is ready for review. Open GotIt for a short practice.' END
+      FROM eligible ON CONFLICT(application_id,application_user_id,kind,channel,occurrence_key) DO NOTHING`,
       [now],
     );
     return result.rowCount ?? 0;
@@ -183,7 +214,7 @@ export class NotificationRepository {
                  SELECT 1 FROM product_gotit.push_subscriptions s
                  WHERE s.application_id=n.application_id AND s.application_user_id=n.application_user_id))
        ) AS v(channel,enabled)
-       WHERE n.application_id=$1 AND n.application_user_id=$2 AND v.enabled
+       WHERE n.application_id=$1 AND n.application_user_id=$2 AND v.enabled AND n.enabled
        ON CONFLICT(application_id,application_user_id,kind,channel,occurrence_key) DO NOTHING`,
       [scope.applicationId, scope.applicationUserId, eventKey, subject, body],
     );
@@ -196,11 +227,15 @@ export class NotificationRepository {
   ): Promise<Delivery | undefined> {
     const result = await this.pool.query<Delivery>(
       `WITH picked AS (
-         SELECT id FROM product_gotit.notification_deliveries
-         WHERE status IN ('pending','failed') AND next_attempt_at <= $1 AND attempts < 5
+         SELECT d.id FROM product_gotit.notification_deliveries d
+         JOIN product_gotit.notification_preferences n USING(application_id,application_user_id)
+         JOIN product_gotit.user_profiles p USING(application_id,application_user_id)
+         WHERE n.enabled AND NOT(n.quiet_enabled AND CASE WHEN n.quiet_start<n.quiet_end
+           THEN (extract(hour FROM $1::timestamptz AT TIME ZONE p.timezone)*60+extract(minute FROM $1::timestamptz AT TIME ZONE p.timezone))>=n.quiet_start AND (extract(hour FROM $1::timestamptz AT TIME ZONE p.timezone)*60+extract(minute FROM $1::timestamptz AT TIME ZONE p.timezone))<n.quiet_end
+           ELSE (extract(hour FROM $1::timestamptz AT TIME ZONE p.timezone)*60+extract(minute FROM $1::timestamptz AT TIME ZONE p.timezone))>=n.quiet_start OR (extract(hour FROM $1::timestamptz AT TIME ZONE p.timezone)*60+extract(minute FROM $1::timestamptz AT TIME ZONE p.timezone))<n.quiet_end END) AND status IN ('pending','failed') AND next_attempt_at <= $1 AND attempts < 5
            AND channel=ANY($2::varchar[])
-           AND (kind='system' OR created_at >= $1::timestamptz-interval '1 day')
-         ORDER BY next_attempt_at,id FOR UPDATE SKIP LOCKED LIMIT 1
+           AND (kind='system' OR d.created_at >= $1::timestamptz-interval '1 day')
+         ORDER BY next_attempt_at,d.id FOR UPDATE OF d SKIP LOCKED LIMIT 1
        ) UPDATE product_gotit.notification_deliveries d
        SET status='sending',attempts=attempts+1,lease_until=$1::timestamptz+interval '2 minutes'
        FROM picked,product_gotit.notification_preferences n
@@ -215,7 +250,11 @@ export class NotificationRepository {
   async allowed(delivery: Delivery): Promise<boolean> {
     const scope = [delivery.application_id, delivery.application_user_id];
     const result = await this.pool.query<{ allowed: boolean }>(
-      `SELECT CASE WHEN $3='practice' AND $4='email' THEN n.practice_email AND n.verified_email IS NOT NULL
+      `SELECT n.enabled AND CASE WHEN $3='streak' AND $4='email' THEN n.streak_email AND n.verified_email IS NOT NULL
+                   WHEN $3='streak' AND $4='push' THEN n.streak_push
+                   WHEN $3='weekly' AND $4='email' THEN n.weekly_email AND n.verified_email IS NOT NULL
+                   WHEN $3='weekly' AND $4='push' THEN n.weekly_push
+                   WHEN $3='practice' AND $4='email' THEN n.practice_email AND n.verified_email IS NOT NULL
                    WHEN $3='practice' AND $4='push' THEN n.practice_push
                    WHEN $3='system' AND $4='email' THEN n.system_email AND n.verified_email IS NOT NULL
                    ELSE n.system_push END AS allowed
@@ -254,7 +293,7 @@ export class NotificationRepository {
     await this.pool.query(
       `UPDATE product_gotit.notification_deliveries
        SET status='suppressed',last_error_code='REMINDER_EXPIRED'
-       WHERE kind='practice' AND status IN ('pending','failed')
+       WHERE kind<>'system' AND status IN ('pending','failed')
          AND created_at < $1::timestamptz-interval '1 day'`,
       [now],
     );

@@ -13,6 +13,8 @@ import type {
 } from './profile.types.js';
 
 type ProfileRow = {
+  display_name: string | null;
+  avatar_data: string | null;
   learning_preferences: GotItProfile['learningPreferences'] | null;
   default_source_language: string | null;
   default_translation_language: string | null;
@@ -124,14 +126,30 @@ export class ProfileRepository {
           patch.translationMethodPreference !== undefined
             ? patch.translationMethodPreference
             : current.translation_method_preference,
-          JSON.stringify(
-            patch.learningPreferences ??
-              current.learning_preferences ??
-              defaults.learningPreferences,
-          ),
+          JSON.stringify({
+            ...defaults.learningPreferences,
+            ...current.learning_preferences,
+            ...patch.learningPreferences,
+          }),
         ],
       );
 
+      if (patch.displayName !== undefined || patch.avatarData !== undefined) {
+        await client.query(
+          `UPDATE product_gotit.user_profiles SET
+          display_name=CASE WHEN $3 THEN $4 ELSE display_name END,
+          avatar_data=CASE WHEN $5 THEN $6 ELSE avatar_data END,updated_at=now()
+          WHERE application_id=$1 AND application_user_id=$2`,
+          [
+            scope.applicationId,
+            scope.applicationUserId,
+            patch.displayName !== undefined,
+            patch.displayName ?? null,
+            patch.avatarData !== undefined,
+            patch.avatarData ?? null,
+          ],
+        );
+      }
       if (patch.languages !== undefined) {
         await this.replaceUserLanguagePreferences(client, scope, patch.languages);
       }
@@ -350,6 +368,7 @@ export class ProfileRepository {
     const profileResult = await client.query<ProfileRow>(
       `
         SELECT
+          display_name, avatar_data,
           default_source_language,
           default_translation_language,
           timezone,
@@ -423,6 +442,8 @@ export class ProfileRepository {
     }
 
     return {
+      displayName: row.display_name ?? null,
+      avatarData: row.avatar_data ?? null,
       learningPreferences: row.learning_preferences ?? PROFILE_DEFAULTS.learningPreferences,
       defaultSourceLanguage: row.default_source_language,
       defaultTranslationLanguage: row.default_translation_language,

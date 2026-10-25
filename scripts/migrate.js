@@ -123,7 +123,9 @@ export async function migrate(databaseUrl, direction = 'up') {
     migrationsSchema: 'gotit_migrations',
     migrationsTable: 'pgmigrations',
     createMigrationsSchema: false,
-    checkOrder: true,
+    // A database that ran only one of two merged migration lines needs the other line's earlier
+    // migrations applied once. Set GOTIT_MIGRATION_CHECK_ORDER=false for that single deployment.
+    checkOrder: process.env.GOTIT_MIGRATION_CHECK_ORDER !== 'false',
     // Use node-pg-migrate's default lock, shared with Core's existing runner.
     log: () => {},
   });

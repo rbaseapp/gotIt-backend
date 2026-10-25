@@ -29,9 +29,41 @@ export const sessionSchema = z
     sourceLanguageCode: languageSchema.optional(),
     count: z.number().int().min(1).max(100).default(10),
     includeNewItems: z.boolean().optional(),
+    curriculumOrder: z.boolean().optional(),
+    curriculumUnitId: z
+      .string()
+      .regex(/^[A-Z][A-Z0-9]{1,10}$/u)
+      .optional(),
   })
   .strict()
   .superRefine((v, ctx) => {
+    if (
+      v.curriculumUnitId &&
+      (![
+        'smart_review',
+        'flashcards',
+        'matching',
+        'recall',
+        'listening_spelling',
+        'pronunciation',
+      ].includes(v.sessionType) ||
+        v.scope ||
+        v.learningItemIds ||
+        v.readingId ||
+        v.sourceLanguageCode !== 'en')
+    )
+      ctx.addIssue({
+        code: 'custom',
+        message: 'Curriculum smart practice requires its own English unit scope',
+      });
+    if (v.curriculumOrder && (v.sessionType !== 'smart_review' || v.scope?.type !== 'pack'))
+      ctx.addIssue({ code: 'custom', message: 'Curriculum order requires unit smart practice' });
+    if (v.includeNewItems !== undefined && v.sessionType !== 'smart_review')
+      ctx.addIssue({
+        code: 'custom',
+        path: ['includeNewItems'],
+        message: 'Scheduling options require smart review',
+      });
     if ((v.sessionType === 'article_quiz') !== Boolean(v.readingId))
       ctx.addIssue({ code: 'custom', message: 'Article quiz requires readingId' });
     if (v.scope && (v.learningItemIds || v.readingId))

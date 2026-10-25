@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { validAvatar } from './profile.avatar.js';
 import { CEFR_LEVELS, DAILY_GOAL_TYPES, TRANSLATION_METHODS } from './profile.types.js';
 
 function canonicalLanguageCode(value: string) {
@@ -40,6 +41,8 @@ const languageSchema = z
 
 export const profilePatchSchema = z
   .object({
+    displayName: z.string().trim().min(1).max(80).nullable().optional(),
+    avatarData: z.string().max(180000).refine(validAvatar).nullable().optional(),
     learningPreferences: z
       .object({
         enabledSkills: z
@@ -47,6 +50,12 @@ export const profilePatchSchema = z
           .min(1)
           .max(5)
           .refine((v) => new Set(v).size === v.length, 'Duplicate enabled skills'),
+        uiLocale: z.enum(['ar', 'de', 'en', 'es', 'fr', 'he', 'ru', 'zh']).optional(),
+        textScale: z.enum(['normal', 'large']).optional(),
+        reducedMotion: z.boolean().optional(),
+        sounds: z.boolean().optional(),
+        textDirection: z.enum(['rtl', 'ltr']).optional(),
+        highContrast: z.boolean().optional(),
       })
       .strict()
       .optional(),

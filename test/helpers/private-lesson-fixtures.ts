@@ -1,0 +1,32 @@
+import type { PrivateLessonPlan } from '../../src/modules/private-lessons/private-lesson.prompt.js';
+export const guidedLessonPlan: PrivateLessonPlan = {
+  id: '11111111-1111-4111-8111-111111111111',
+  durationSeconds: 300,
+  targetLanguageCode: 'ja',
+  supportLanguageCode: 'ar',
+  teachingLanguage: 'support',
+  lessonMode: 'absolute_beginner',
+  level: 'A1',
+  topic: 'asking for water',
+  grammarFocus: null,
+  focusAreas: ['speaking'],
+  customFocus: null,
+  correctionMode: 'recast',
+  vocabularyMode: 'none',
+  teacherVoice: 'female',
+  speechRate: 'slow',
+  interests: [],
+  targets: [],
+  continuity: null,
+  teachingBrief: {
+    openingExplanation: 'نستخدم هذا التعبير لطلب شيء بطريقة مهذبة.',
+    examples: [
+      { targetText: '水をください。', meaningAndReason: 'أريد الماء من فضلك.' },
+      { targetText: 'お茶をください。', meaningAndReason: 'أريد الشاي من فضلك.' },
+    ],
+    recognitionQuestion: 'متى نستخدم هذا التعبير لطلب شيء؟',
+    guidedPrompt: 'حاول الآن طلب الماء بطريقة مهذبة.',
+    independentPrompt: 'كيف تطلب القهوة في موقف مختلف؟',
+    correctionTip: 'ابدأ باسم الشيء ثم أضف التعبير المهذب.',
+  },
+};

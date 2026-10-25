@@ -2,8 +2,7 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import test from 'node:test';
 import { createTestDatabase } from '../helpers/postgres.js';
-import { ProfileRepository } from '../../src/modules/profile/profile.repository.js';
-import { PROFILE_DEFAULTS } from '../../src/modules/profile/profile.constants.js';
+import { ensureProfileRow } from '../helpers/profile-row.js';
 
 test(
   'catalog migration remaps only identical words and meanings, preserving unmatched progress in the archive',
@@ -38,10 +37,7 @@ test(
         'INSERT INTO core.application_users(id,application_id,email) VALUES($1,$2,$3)',
         [userId, applicationId, 'english-migration@example.test'],
       );
-      await new ProfileRepository(db.runtimePool).ensureAndGet(
-        { applicationId, applicationUserId: userId },
-        PROFILE_DEFAULTS,
-      );
+      await ensureProfileRow(db.runtimePool, { applicationId, applicationUserId: userId });
       const old = await db.adminPool.query(`SELECT e.id,e.source_text,e.pack_id
         FROM product_gotit.word_pack_entries e
         JOIN product_gotit.word_packs p ON p.id=e.pack_id

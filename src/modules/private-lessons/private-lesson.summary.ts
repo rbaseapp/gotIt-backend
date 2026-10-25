@@ -111,6 +111,19 @@ export const privateLessonTurnSchema = z
 export const privateLessonReportSchema = z
   .object({
     summary: z.string().trim().min(1).max(2000),
+    activitySummary: z
+      .object({
+        protocolVersion: z.literal('adaptive-v1'),
+        planned: z.number().int().nonnegative(),
+        completed: z.number().int().nonnegative(),
+        independent: z.number().int().nonnegative(),
+        assisted: z.number().int().nonnegative(),
+        needsLaterPractice: z.number().int().nonnegative(),
+        skipped: z.number().int().nonnegative(),
+        exhaustedEarly: z.boolean(),
+      })
+      .strict()
+      .optional(),
     assessment: z
       .object({
         overallLevel: cefrSchema.nullable(),
@@ -549,6 +562,7 @@ export class OpenAiPrivateLessonSummaryGenerator implements PrivateLessonSummary
                     : plan.roadmap,
                   course: plan.course ?? null,
                   targetVocabulary: plan.targets,
+                  activityEvidence: plan.learningEvidence ?? null,
                   transcript: turns,
                 },
               }),
@@ -793,7 +807,7 @@ export function basicPrivateLessonReport(plan: PrivateLessonPlan): PrivateLesson
   };
 }
 
-function sanitizeReport(
+export function sanitizeReport(
   report: PrivateLessonReport,
   plan: PrivateLessonPlan,
   turns: PrivateLessonTurn[],
@@ -928,6 +942,8 @@ function normalizeRoadmapProgress(
     progress.objectiveCompletionScore * 0.7 + progress.targetFormControlScore * 0.3,
   );
   const taskCompleted =
+    (plan.learningEvidence === undefined ||
+      plan.learningEvidence.some((outcome) => outcome.outcome === 'independent')) &&
     progress.confidence !== 'low' &&
     progress.objectiveCompletionScore >= 70 &&
     progress.targetFormControlScore >= 60 &&

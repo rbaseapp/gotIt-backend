@@ -55,11 +55,12 @@ test(
           transcriptionModel: 'fixture',
           profiles: new ProfileService(profileRepo),
           vocabulary: { learned: async () => ({ items: [] }) },
-          wordPacks: packs,
+          mapWordPacks: packs,
           journal: new PostgresPrivateLessonJournal(database.runtimePool),
           courses: new CourseService(
             new PostgresLearningDocumentStore(database.runtimePool),
             new ProfileService(profileRepo),
+            undefined,
             undefined,
             undefined,
             journal,

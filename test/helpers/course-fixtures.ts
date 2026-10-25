@@ -250,6 +250,18 @@ export class FixtureGenerator implements CourseGenerator {
                 : name === 'lesson_homework_review'
                   ? { valid: true, feedback: 'Clear and grounded' }
                   : { result: 'retry', feedback: 'Try matching the subject.' };
+    if (name === 'lesson_homework') {
+      const content = result as ReturnType<typeof expandedHomeworkContent>;
+      const quotes = (data as { source: { quotes: Array<{ id: string; text: string }> } }).source
+        .quotes;
+      return schema.parse({
+        ...content,
+        tasks: content.tasks.map(({ sourceQuote, ...task }) => ({
+          ...task,
+          sourceId: quotes.find((quote) => quote.text === sourceQuote)?.id ?? 'unknown_source',
+        })),
+      });
+    }
     return schema.parse(result);
   }
   async transcribe() {

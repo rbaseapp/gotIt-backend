@@ -10,6 +10,8 @@ export type NotificationProviderConfig = {
   smtpUser?: string;
   smtpPassword?: string;
   emailFrom?: string;
+  resendApiKey?: string;
+  appUrl?: string;
   vapidSubject?: string;
   vapidPublicKey?: string;
   vapidPrivateKey?: string;
@@ -20,6 +22,29 @@ export function createNotificationSender(
   repository: NotificationRepository,
 ): NotificationSender {
   const sender: NotificationSender = {};
+  if (config.resendApiKey && config.emailFrom) {
+    sender.email = async (recipient, subject, body, key) => {
+      const response = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        redirect: 'error',
+        signal: AbortSignal.timeout(15000),
+        headers: {
+          Authorization: `Bearer ${config.resendApiKey}`,
+          'Content-Type': 'application/json',
+          'Idempotency-Key': key,
+        },
+        body: JSON.stringify({
+          from: config.emailFrom,
+          to: [recipient],
+          subject,
+          text: `${body}\n\n${config.appUrl ?? 'https://gotit.rbaseapp.com'}/learn`,
+        }),
+      });
+      await response.body?.cancel();
+      if (response.status === 429) throw new RetryableDeliveryError('Email service rate limit');
+      if (!response.ok) throw new Error('Email service rejected delivery');
+    };
+  }
   if (config.smtpHost && config.smtpPort && config.emailFrom) {
     const transport = nodemailer.createTransport({
       host: config.smtpHost,
@@ -45,7 +70,7 @@ export function createNotificationSender(
     webPush.setVapidDetails(config.vapidSubject, config.vapidPublicKey, config.vapidPrivateKey);
     sender.push = async (scope: ProfileScope, subject, body) => {
       const subscriptions = await repository.subscriptions(scope);
-      const payload = JSON.stringify({ title: subject, body, url: '/practice' });
+      const payload = JSON.stringify({ title: subject, body, url: '/learn' });
       let delivered = false;
       for (const subscription of subscriptions) {
         try {
@@ -69,6 +94,7 @@ export function createNotificationSender(
           throw error;
         }
       }
+      if (!delivered) throw new RetryableDeliveryError('No active push subscription');
     };
   }
   return sender;

@@ -18,6 +18,7 @@ export interface RealtimeCallGuard {
     feature: Feature,
     durationSeconds: number,
     lessonId?: string,
+    setupTimeoutSeconds?: number,
   ): Promise<string>;
   issue(ticketId: string, providerSecret: string): Promise<void>;
   cancel(ticketId: string): Promise<void>;
@@ -31,7 +32,13 @@ export class PostgresRealtimeCallGuard implements RealtimeCallGuard {
     private readonly fetchImpl: typeof fetch = fetch,
   ) {}
 
-  async reserve(scope: ProfileScope, feature: Feature, durationSeconds: number, lessonId?: string) {
+  async reserve(
+    scope: ProfileScope,
+    feature: Feature,
+    durationSeconds: number,
+    lessonId?: string,
+    setupTimeoutSeconds = TICKET_TTL_SECONDS,
+  ) {
     const limit = feature === 'private_lesson' ? 30 : 20;
     const id = randomUUID();
     const db = await this.pool.connect();
@@ -81,7 +88,7 @@ export class PostgresRealtimeCallGuard implements RealtimeCallGuard {
           feature,
           lessonId ?? null,
           durationSeconds,
-          TICKET_TTL_SECONDS,
+          Math.max(TICKET_TTL_SECONDS, Math.min(240, setupTimeoutSeconds)),
         ],
       );
       await db.query('COMMIT');

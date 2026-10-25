@@ -78,6 +78,63 @@ test(
       );
       const packs = new WordPackRepository(db.runtimePool),
         query = listSchema.parse({});
+      await t.test(
+        'station settings are scoped, reach learner catalog/maps and match admin previews',
+        async () => {
+          const guidedId = (
+            await db.runtimePool.query(
+              `SELECT p.id FROM product_gotit.word_packs p JOIN product_gotit.word_tracks tr ON tr.id=p.track_id JOIN product_gotit.word_topics t ON t.id=tr.topic_id WHERE t.slug IN ('daily-english','english-learning-path-en-he') AND tr.source_language_code='en' AND tr.translation_language_code='he' ORDER BY p.sort_order LIMIT 1`,
+            )
+          ).rows[0].id;
+          const original = (await owner.programContent.units(actor, query, guidedId)).data as any;
+          assert.equal(original.learningPath.enabled, true);
+          assert.equal(original.learningPath.stations.length, 3);
+          const total = original.content.entries.length;
+          const content = {
+            ...original.content,
+            stationSettings: {
+              supported: { requiredWords: Math.min(8, total), durationMinutes: 7 },
+              midpoint: {
+                requiredWords: Math.max(Math.min(8, total), Math.ceil(total * 0.6)),
+                durationMinutes: 9,
+              },
+              review: { requiredWords: total, durationMinutes: 12 },
+            },
+          };
+          await owner.programContent.saveUnit(
+            actor,
+            guidedId,
+            unitSaveSchema.parse({ ...command(), expectedRevision: 0, content }),
+          );
+          const live = await packs.lessonUnit(actor, guidedId);
+          assert.equal(
+            live.teacherStations[0]!.requiredWords,
+            content.stationSettings.supported.requiredWords,
+          );
+          assert.equal(live.teacherStations[0]!.durationMinutes, 7);
+          assert.equal(
+            (await packs.detail(actor, guidedId)).pack.teacherStations[1]!.durationMinutes,
+            9,
+          );
+          assert.equal(
+            (await packs.lessonUnit(other, guidedId)).teacherStations[0]!.durationMinutes,
+            5,
+          );
+          const preview = await owner.programContent.previewUnit(actor, {
+            unitId: guidedId,
+            content,
+            station: 'supported',
+          });
+          assert.match(preview.data.contract.session.instructions, /"durationSeconds": 420/);
+          const loaded = (await owner.programContent.units(actor, query, guidedId)).data as any;
+          assert.equal(loaded.learningPath.stations[0].durationMinutes, 7);
+          // Leave other integration cases at the original content baseline.
+          await db.runtimePool.query(
+            `DELETE FROM product_gotit.admin_unit_content WHERE application_id=$1 AND pack_id=$2 AND application_user_id IS NULL`,
+            [applicationId, guidedId],
+          );
+        },
+      );
       const row = (await owner.programContent.units(actor, query)).data[0] as any;
       const packId = row.packId;
       const original = (await owner.programContent.units(actor, query, packId)).data as any;
@@ -96,6 +153,16 @@ test(
           const result = await owner.programContent.saveUnit(actor, packId, save);
           assert.equal(result.data.revision, 1);
           assert.deepEqual(await owner.programContent.saveUnit(actor, packId, save), result);
+          const catalog = (await owner.list(actor, 'catalog-programs', query, original.programId))
+            .data as any;
+          const otherCatalog = (
+            await owner.list(other, 'catalog-programs', query, original.programId)
+          ).data as any;
+          assert.equal(catalog.units.find((unit: any) => unit.id === packId).title, content.title);
+          assert.notEqual(
+            otherCatalog.units.find((unit: any) => unit.id === packId).title,
+            content.title,
+          );
           assert.equal(
             (await packs.detail(actor, packId)).entries[0]!.translationText,
             'administrator authored meaning',

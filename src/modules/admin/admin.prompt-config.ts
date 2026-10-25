@@ -67,6 +67,7 @@ export const realtimeConfigSchema = z
         packId: true,
         station: true,
         interactionMode: true,
+        interactionProtocol: true,
         targetLanguageCode: true,
       })
       .partial()

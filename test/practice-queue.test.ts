@@ -81,7 +81,7 @@ test('learning queue uses a non-reserved translation alias and maps it to the re
   const client = {
     async query(input: string | { text: string }) {
       const sql = typeof input === 'string' ? input : input.text;
-      if (sql.includes('WITH candidates AS')) {
+      if (sql.includes('candidates AS')) {
         queueSql = sql;
         return {
           rows: [

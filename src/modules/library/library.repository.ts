@@ -14,6 +14,7 @@ import {
   type LearningPolicy,
 } from '../learning/learning.policy.js';
 import type { ListInput, EditInput, BulkInput } from './library.validation.js';
+import { ReadingGuideService, type ReadingGuideProvider } from './reading-guide.js';
 export const scopeValues = (scope: ProfileScope) => [scope.applicationId, scope.applicationUserId];
 export const itemNotFound = () => new AppError(404, 'NOT_FOUND', 'Learning item not found');
 const cursorSchema = z
@@ -51,10 +52,14 @@ export function itemSnapshot(row: Record<string, unknown>, translations: unknown
   });
 }
 export class LibraryRepository {
+  readonly readingGuides: ReadingGuideService;
   constructor(
     readonly pool: Pool,
     readonly policy: LearningPolicy = DEFAULT_LEARNING_POLICY,
-  ) {}
+    readingGuideProvider?: ReadingGuideProvider,
+  ) {
+    this.readingGuides = new ReadingGuideService(pool, readingGuideProvider);
+  }
   private async requirements(tx: DatabaseTransaction, scope: ProfileScope, ids: string[]) {
     if (!ids.length) return new Map<string, ReturnType<typeof masteryRequirements>>();
     const timezone = (
@@ -126,7 +131,7 @@ export class LibraryRepository {
           where = ['li.application_id=$1', 'li.application_user_id=$2'];
         const add = (clause: string, value: unknown) => {
           parameters.push(value);
-          where.push(clause.replace('?', `$${parameters.length}`));
+          where.push(clause.replaceAll('?', `$${parameters.length}`));
         };
         where.push(
           input.userStatus === 'deleted' ? 'li.deleted_at IS NOT NULL' : 'li.deleted_at IS NULL',
@@ -134,12 +139,26 @@ export class LibraryRepository {
         if (!['all', 'deleted'].includes(input.userStatus))
           add('li.user_status=?', input.userStatus);
         if (input.learningStatus) add('li.learning_status=?', input.learningStatus);
+        if (input.learningStatuses)
+          add('li.learning_status=ANY(?::text[])', input.learningStatuses);
+        if (input.partsOfSpeech)
+          add('lower(li.part_of_speech)=ANY(?::text[])', input.partsOfSpeech);
+        if (input.origins) {
+          add(
+            `(EXISTS(SELECT 1 FROM product_gotit.item_occurrences origin
+            WHERE origin.application_id=li.application_id AND origin.application_user_id=li.application_user_id
+              AND origin.learning_item_id=li.id AND origin.source_type=ANY(?::text[]))${input.origins.includes('program') ? ` OR EXISTS(SELECT 1 FROM product_gotit.learning_item_pack_entries origin_pack WHERE origin_pack.application_id=li.application_id AND origin_pack.application_user_id=li.application_user_id AND origin_pack.learning_item_id=li.id AND origin_pack.excluded_at IS NULL)` : ''})`,
+            input.origins,
+          );
+        }
         if (input.sourceLanguageCode) add('li.source_language_code=?', input.sourceLanguageCode);
         if (input.translationLanguageCode)
           add('li.translation_language_code=?', input.translationLanguageCode);
         if (input.search)
           add(
-            `li.normalized_source_text LIKE ? ESCAPE '\\'`,
+            input.view === 'cards'
+              ? `(li.normalized_source_text LIKE ? OR EXISTS(SELECT 1 FROM product_gotit.item_translations st WHERE st.application_id=li.application_id AND st.application_user_id=li.application_user_id AND st.learning_item_id=li.id AND st.is_current AND lower(st.translation_text) LIKE ?) OR EXISTS(SELECT 1 FROM product_gotit.item_occurrences sc WHERE sc.application_id=li.application_id AND sc.application_user_id=li.application_user_id AND sc.learning_item_id=li.id AND lower(COALESCE(sc.sentence_text,sc.paragraph_text,'')) LIKE ?))`
+              : `li.normalized_source_text LIKE ? ESCAPE '\\'`,
             `%${lookupText(input.search).replace(/[\\%_]/gu, '\\$&')}%`,
           );
         if (input.difficult)
@@ -214,6 +233,38 @@ export class LibraryRepository {
             )
           ).rows[0]?.count ?? 0,
         );
+        // Header and category counts share the visible library's language/status scope,
+        // but remain independent of search and category filters.
+        const summary =
+          input.view === 'cards'
+            ? (
+                await tx.query(
+                  `
+          WITH visible AS (SELECT li.* FROM product_gotit.learning_items li
+            WHERE li.application_id=$1 AND li.application_user_id=$2
+              AND ($3::text IS NULL OR li.source_language_code=$3)
+              AND CASE WHEN $4='deleted' THEN li.deleted_at IS NOT NULL ELSE li.deleted_at IS NULL END
+              AND ($4 IN ('all','deleted') OR li.user_status=$4))
+          SELECT count(*)::integer total,count(*) FILTER(WHERE learning_status='new')::integer new,
+            count(*) FILTER(WHERE learning_status='mastered')::integer mastered,
+            count(*) FILTER(WHERE next_review_at<=now())::integer due,
+            (SELECT COALESCE(jsonb_object_agg(tag_id,n),'{}'::jsonb) FROM
+              (SELECT it.tag_id,count(DISTINCT v.id)::integer n FROM visible v
+                JOIN product_gotit.learning_item_tags it ON it.application_id=v.application_id
+                  AND it.application_user_id=v.application_user_id AND it.learning_item_id=v.id GROUP BY it.tag_id) counts) tags,
+            (SELECT COALESCE(jsonb_object_agg(topic_id,n),'{}'::jsonb) FROM
+              (SELECT track.topic_id,count(DISTINCT v.id)::integer n FROM visible v
+                JOIN product_gotit.learning_item_pack_entries link ON link.application_id=v.application_id
+                  AND link.application_user_id=v.application_user_id AND link.learning_item_id=v.id AND link.excluded_at IS NULL
+                JOIN product_gotit.user_word_packs membership ON membership.application_id=link.application_id
+                  AND membership.application_user_id=link.application_user_id AND membership.pack_id=link.pack_id AND membership.status='active'
+                JOIN product_gotit.word_packs p ON p.id=link.pack_id
+                JOIN product_gotit.word_tracks track ON track.id=p.track_id
+                GROUP BY track.topic_id) counts) topics FROM visible`,
+                  [...scopeValues(scope), input.sourceLanguageCode ?? null, input.userStatus],
+                )
+              ).rows[0]
+            : undefined;
         if (cursor) {
           let claim: z.output<typeof cursorSchema>;
           try {
@@ -235,7 +286,20 @@ export class LibraryRepository {
         if (page) parameters.push((page - 1) * input.limit);
         const rows = (
           await tx.query(
-            `SELECT ${fields},(${metric})::text AS cursor_value FROM product_gotit.learning_items li
+            `SELECT ${fields}${
+              input.view === 'cards'
+                ? `,li.part_of_speech AS "partOfSpeech",
+              (SELECT jsonb_build_object('sourceType',o.source_type,'pageUrl',o.page_url,'pageTitle',o.page_title,'sentenceText',o.sentence_text,'paragraphText',o.paragraph_text,'capturedAt',o.captured_at)
+                FROM product_gotit.item_occurrences o WHERE o.application_id=li.application_id AND o.application_user_id=li.application_user_id AND o.learning_item_id=li.id ORDER BY o.captured_at DESC,o.id DESC LIMIT 1) AS source,
+              COALESCE((SELECT jsonb_agg(jsonb_build_object('id',t.id,'name',t.name) ORDER BY t.name) FROM product_gotit.learning_item_tags it JOIN product_gotit.tags t ON t.application_id=it.application_id AND t.application_user_id=it.application_user_id AND t.id=it.tag_id WHERE it.application_id=li.application_id AND it.application_user_id=li.application_user_id AND it.learning_item_id=li.id),'[]'::jsonb) AS tags,
+              (SELECT jsonb_build_object('title',p.title,'topic',topic.title) FROM product_gotit.learning_item_pack_entries link
+                JOIN product_gotit.user_word_packs membership ON membership.application_id=link.application_id AND membership.application_user_id=link.application_user_id AND membership.pack_id=link.pack_id AND membership.status='active'
+                JOIN product_gotit.word_packs p ON p.id=link.pack_id JOIN product_gotit.word_tracks track ON track.id=p.track_id
+                JOIN product_gotit.word_topics topic ON topic.id=track.topic_id WHERE link.application_id=li.application_id
+                  AND link.application_user_id=li.application_user_id AND link.learning_item_id=li.id AND link.excluded_at IS NULL ORDER BY link.created_at DESC,link.pack_id LIMIT 1) AS program,
+              (SELECT jsonb_build_object('correct',count(*) FILTER(WHERE a.result='correct'),'total',count(*)) FROM product_gotit.practice_attempts a WHERE a.application_id=li.application_id AND a.application_user_id=li.application_user_id AND a.learning_item_id=li.id AND COALESCE(a.learning_revision,1)=li.learning_revision AND a.result<>'skipped') AS answers`
+                : ''
+            },(${metric})::text AS cursor_value FROM product_gotit.learning_items li
       WHERE ${where.join(' AND ')} ORDER BY ${metric} ${direction},li.id ${direction} LIMIT $${limitParameter}${page ? ` OFFSET $${parameters.length}` : ''}`,
             parameters,
           )
@@ -260,6 +324,7 @@ export class LibraryRepository {
                 ).toString('base64url')
               : null,
           totalCount,
+          ...(summary ? { summary } : {}),
           ...(page
             ? {
                 page,
