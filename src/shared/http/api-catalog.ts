@@ -5,6 +5,7 @@ export const API_ROUTES = [
   ['POST', '/private-lessons/units/:id/path-choices'],
   ['GET', '/structured-english/catalog'],
   ['POST', '/structured-english/enroll'],
+  ['POST', '/structured-english/placement'],
   ['GET', '/structured-english/units/:id'],
   ['POST', '/structured-english/exposures'],
   ['POST', '/structured-english/work'],

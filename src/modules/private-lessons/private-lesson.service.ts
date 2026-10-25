@@ -292,6 +292,16 @@ export class PrivateLessonService {
   async createSession(scope: ProfileScope, input: PrivateLessonInput, accessToken?: string) {
     const runtimePrompt = adminRuntimeContext.getStore()?.prompts['lesson-live'];
     input = { ...runtimePrompt?.realtime?.lessonDefaults, ...input };
+    // Free conversation opens once the learner has a base (see curriculum.placement.ts); lessons
+    // that belong to a program, course or unit are not affected.
+    if (this.options.curriculum && !input.courseId && !input.packId && !input.curriculumLessonId) {
+      const gate = await this.options.curriculum.tutorGate(scope);
+      if (!gate.unlocked)
+        throw new AppError(409, 'TUTOR_LOCKED', 'Free conversation opens after the first units', {
+          done: gate.done,
+          required: gate.required,
+        });
+    }
     const adaptive = input.interactionProtocol === 'adaptive-v1';
     if (
       adaptive &&

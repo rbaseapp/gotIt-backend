@@ -27,6 +27,16 @@ export type CurriculumState = {
   articleJob?: string;
   activeAttempts?: Record<string, string>;
   practiceItems?: Record<string, string>;
+  /** Set when the learner was placed by the onboarding check (see curriculum.placement.ts). */
+  onboarding?: {
+    theta: number;
+    startUnit: number;
+    goal: string;
+    deadlineMonths: number;
+    minutesPerDay: number;
+    reliability: number;
+    placedAt: string;
+  };
 };
 export type Enrollment = { revision: number; state: CurriculumState };
 export type Grade = {

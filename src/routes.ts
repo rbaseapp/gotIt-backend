@@ -187,6 +187,18 @@ export function createRoutes(dependencies: AppDependencies) {
   const requireCourse = dependencies.enforceAddonEntitlements
     ? requireBoth(requirePractice, createRequireAddonMiddleware(dependencies.addonAccess!, 'ai'))
     : requirePractice;
+  // Programs and the free-conversation teacher are paid (or trial) features; saving words, games
+  // and the onboarding placement stay free.
+  const requireCurriculum = createRequireEntitlementMiddleware(
+    dependencies.coreAuthClient,
+    'curriculum.access',
+    dependencies.enforcePaidEntitlements === true,
+  );
+  const requireTutorSession = createRequireEntitlementMiddleware(
+    dependencies.coreAuthClient,
+    'tutor.session',
+    dependencies.enforcePaidEntitlements === true,
+  );
   const requireAiTranslation = dependencies.enforceAddonEntitlements
     ? requireBoth(
         requirePaidAiTranslation,
@@ -266,7 +278,11 @@ export function createRoutes(dependencies: AppDependencies) {
   if (dependencies.privateLessonService) {
     router.use(
       '/api/v1/private-lessons',
-      createPrivateLessonRoutes(dependencies.privateLessonService, requireLesson),
+      createPrivateLessonRoutes(
+        dependencies.privateLessonService,
+        requireLesson,
+        requireTutorSession,
+      ),
     );
   }
   if (dependencies.courseService) {
@@ -287,7 +303,11 @@ export function createRoutes(dependencies: AppDependencies) {
   if (dependencies.curriculumService)
     router.use(
       '/api/v1/structured-english',
-      createCurriculumRoutes(dependencies.curriculumService, requirePractice, requireCourse),
+      createCurriculumRoutes(
+        dependencies.curriculumService,
+        requireBoth(requirePractice, requireCurriculum),
+        requireBoth(requireCourse, requireCurriculum),
+      ),
     );
   if (dependencies.readingService)
     router.use('/api/v1/reading', createReadingRoutes(dependencies.readingService, requireAi));

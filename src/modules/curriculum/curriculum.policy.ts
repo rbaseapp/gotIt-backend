@@ -15,6 +15,8 @@ export type WordEvidence = {
   failures: number[];
   dimensions: Partial<Record<Dimension, number>>;
   status: 'introduced' | 'acquiring' | 'usable' | 'retained' | 'maintenance';
+  /** Present when the word came from the onboarding placement rather than from a lesson. */
+  source?: 'placement';
 };
 const DAY = 86_400_000;
 export function introduce(now: Date): WordEvidence {

@@ -19,6 +19,7 @@ import {
 export function createPrivateLessonRoutes(
   service: PrivateLessonService,
   requireLessonAccess: RequestHandler,
+  requireTutorSession: RequestHandler = (_request, _response, next) => next(),
 ) {
   const router = Router();
   router.post('/units/:id/path-choices', async (req, res) =>
@@ -89,17 +90,22 @@ export function createPrivateLessonRoutes(
     });
   });
 
-  router.post('/realtime-sessions', requireLessonAccess, async (request, response) => {
-    if (request.body?.interactionProtocol === 'adaptive-v1') response.setTimeout(210_000);
-    response.status(201).json({
-      ...(await service.createSession(
-        request.gotitAuth!,
-        parseInput(privateLessonInputSchema, request.body),
-        request.gotitCoreAccessToken,
-      )),
-      requestId: request.id,
-    });
-  });
+  router.post(
+    '/realtime-sessions',
+    requireTutorSession,
+    requireLessonAccess,
+    async (request, response) => {
+      if (request.body?.interactionProtocol === 'adaptive-v1') response.setTimeout(210_000);
+      response.status(201).json({
+        ...(await service.createSession(
+          request.gotitAuth!,
+          parseInput(privateLessonInputSchema, request.body),
+          request.gotitCoreAccessToken,
+        )),
+        requestId: request.id,
+      });
+    },
+  );
 
   router.get('/', requireLessonAccess, async (request, response) => {
     const input = parseInput(privateLessonListSchema, request.query);

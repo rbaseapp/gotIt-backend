@@ -1365,7 +1365,7 @@ test('course HTTP routes enforce Core identity, entitlement, strict input and pr
       ({ method, path }) => method === 'POST' && path === '/api/v1/admin/programs/preview',
     ),
   );
-  assert.equal(API_ROUTES.length, 183);
+  assert.equal(API_ROUTES.length, 184);
   assert.ok(
     API_ROUTES.some(
       ({ method, path }) => method === 'POST' && path === '/api/v1/learning-items/reading-guides',

@@ -7,6 +7,12 @@ import {
 import { curriculumUnitUnlocked, curriculumPlacedBelow } from './curriculum.practice.js';
 import { randomInt, randomUUID } from 'node:crypto';
 import { curriculumParticipants } from './curriculum.participants.js';
+import {
+  applyPlacement,
+  hasLearningProgress,
+  tutorGate,
+  type PlacementInput,
+} from './curriculum.placement.js';
 import { privateLessonIntroductionPolicy } from '../private-lessons/private-lesson.teachers.js';
 import { withTransaction } from '../../shared/database/transaction.js';
 import { z } from 'zod';
@@ -118,6 +124,9 @@ const requireEnrollment = (value: Enrollment | null) => {
   if (!value) throw curriculumMissing();
   return value;
 };
+type PlacementResponse =
+  | { applied: false; reason: 'existing_progress' }
+  | ({ applied: true } & ReturnType<typeof applyPlacement>);
 const initialState = (timezone: string): CurriculumState => ({
   minutes: 20,
   timezone,
@@ -192,6 +201,31 @@ export class CurriculumService {
       return { state, response: { enrolled: true } };
     });
   }
+  /**
+   * Applies the onboarding placement once. Learners who already have lesson progress keep
+   * their program unchanged and are told so, so a late claim can never overwrite real work.
+   */
+  async place(scope: ProfileScope, input: PlacementInput & { eventId: string }) {
+    if (!(await this.store.catalog())) throw curriculumMissing();
+    const profile = await this.profiles.getProfile(scope);
+    return this.store.command<PlacementResponse>(
+      scope,
+      input.eventId,
+      ['placement', input],
+      null,
+      async (enrollment) => {
+        const state = enrollment?.state ?? initialState(profile.timezone);
+        if (enrollment && hasLearningProgress(state))
+          return { state, response: { applied: false, reason: 'existing_progress' } };
+        const summary = applyPlacement(state, input, this.clock());
+        return { state, response: { applied: true, ...summary } };
+      },
+    );
+  }
+  /** Whether free conversation with the teacher is open for this learner. */
+  async tutorGate(scope: ProfileScope) {
+    return tutorGate((await this.store.get(scope))?.state);
+  }
   async get(scope: ProfileScope) {
     const enrollment = await this.store.get(scope);
     if (!(await this.store.catalog()) && !enrollment) throw curriculumMissing();
@@ -236,6 +270,8 @@ export class CurriculumService {
       settings: state
         ? { minutes: state.minutes, literacy: state.literacy, timezone: state.timezone }
         : null,
+      onboarding: state?.onboarding ?? null,
+      tutor: tutorGate(state),
       currentUnit: currentUnit.id,
       pathChoices: state?.pathChoices ?? { units: [], activities: [] },
       navigationComplete: Boolean(state && !nextPathUnit(state)),

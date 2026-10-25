@@ -10,6 +10,24 @@ const activityId = z
   .max(120)
   .regex(/^[\w:-]+$/u);
 const id = z.uuid();
+const band = z.enum(['Pre-A1', 'A1', 'A2', 'B1', 'B2', 'C1']);
+const skill = z.object({ band, score: z.number().min(0).max(1) }).strict();
+const placementSchema = z
+  .object({
+    eventId: z.uuid(),
+    theta: z.number().min(0).max(84),
+    startUnit: z.number().int().min(1).max(84),
+    literacy: z.enum(['starting', 'developing', 'independent']),
+    minutesPerDay: z.number().int().min(5).max(120),
+    goal: z.enum(['travel', 'work', 'study', 'talk', 'abroad', 'other']),
+    deadlineMonths: z.number().int().min(0).max(24),
+    reliability: z.number().min(0).max(1),
+    skills: z
+      .object({ vocabulary: skill, reading: skill.nullable(), listening: skill.nullable() })
+      .strict(),
+    knownWords: z.array(z.string().regex(/^[A-Za-z]{2,40}$/u)).max(1500),
+  })
+  .strict();
 const pathId = z.string().regex(/^[\w-]{1,40}$/u);
 export function createCurriculumRoutes(
   service: CurriculumService,
@@ -23,6 +41,10 @@ export function createCurriculumRoutes(
   });
   router.get('/catalog', async (_req, res) => res.json(await service.catalog()));
   router.get('/', async (req, res) => res.json(await service.get(req.gotitAuth!)));
+  // Onboarding placement is open to every signed-in learner, including free accounts.
+  router.post('/placement', async (req, res) =>
+    res.json(await service.place(req.gotitAuth!, parseInput(placementSchema, req.body))),
+  );
   router.post('/path-choices', requirePractice, async (req, res) =>
     res.json(
       await service.pathChoice(
