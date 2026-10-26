@@ -39,7 +39,7 @@ export type CurriculumState = {
     /** What the learner told us in the first-entry questions (see the placement flow doc). */
     profile?: {
       answerMode: 'voice' | 'text';
-      ageBand: '13-17' | '18+';
+      ageBand: 'under9' | '9-12' | '13-17' | '18+';
       readingComfort: 'easy' | 'some' | 'hard';
       selfLevel: 0 | 1 | 2 | 3 | null;
       /** The tap-to-answer conversation check, when the learner did it. */

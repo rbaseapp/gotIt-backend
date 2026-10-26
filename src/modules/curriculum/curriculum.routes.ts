@@ -29,8 +29,7 @@ const placementSchema = z
     profile: z
       .object({
         answerMode: z.enum(['voice', 'text']),
-        // Under-13s are stopped before sign-up in this version, so the band is never lower.
-        ageBand: z.enum(['13-17', '18+']),
+        ageBand: z.enum(['under9', '9-12', '13-17', '18+']),
         readingComfort: z.enum(['easy', 'some', 'hard']),
         selfLevel: z.union([z.literal(0), z.literal(1), z.literal(2), z.literal(3)]).nullable(),
         talk: z
