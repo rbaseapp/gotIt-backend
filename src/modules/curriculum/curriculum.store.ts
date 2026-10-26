@@ -43,7 +43,7 @@ export type CurriculumState = {
       readingComfort: 'easy' | 'some' | 'hard';
       selfLevel: 0 | 1 | 2 | 3 | null;
       /** The tap-to-answer conversation check, when the learner did it. */
-      talk?: { correct: number; total: number };
+      talk?: { correct: number; total: number; unknown?: number };
     };
   };
 };
