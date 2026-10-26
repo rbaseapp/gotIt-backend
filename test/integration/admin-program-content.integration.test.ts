@@ -309,7 +309,7 @@ test(
             transcriptionModel: 'fixture',
             profiles,
             vocabulary: { learned: async () => ({ items: [] }) },
-            wordPacks: packs,
+            mapWordPacks: packs,
             readingProgress: progress,
           });
           const map = await service.getLearningMap(actor, studioPackId);

@@ -262,7 +262,8 @@ export class PrivateLessonService {
     };
   }
   async completeReading(scope: ProfileScope, id: string, readingId: string, contentHash: string) {
-    const unit = await this.getUnit(scope, id);
+    if (!this.options.mapWordPacks) throw new AppError(503, 'PRIVATE_LESSON_UNITS_UNAVAILABLE', 'Unit maps are unavailable');
+    const unit = await this.options.mapWordPacks.lessonUnit(scope, id);
     const reading = unit.readingSteps?.find((step) => step.id === readingId);
     if (!reading) throw new AppError(404, 'NOT_FOUND', 'Reading step not found');
     if (readingHash(reading) !== contentHash)
@@ -275,23 +276,6 @@ export class PrivateLessonService {
       );
     await this.options.profiles.getProfile(scope);
     await this.options.readingProgress.complete(scope, id, reading);
-    return this.getLearningMap(scope, id);
-  }
-
-  async chooseUnitPath(
-    scope: ProfileScope,
-    id: string,
-    input: z.infer<typeof unitPathChoiceSchema>,
-  ) {
-    if (!this.options.courses)
-      throw new AppError(503, 'COURSE_AI_UNAVAILABLE', 'Learning choices are unavailable');
-    const path = await this.getLearningMap(scope, id);
-    await this.options.courses.saveUnitPathChoices(
-      scope,
-      id,
-      input,
-      path.steps.filter((step) => !step.complete).map((step) => step.key),
-    );
     return this.getLearningMap(scope, id);
   }
 

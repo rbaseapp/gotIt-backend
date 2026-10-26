@@ -60,7 +60,7 @@ export class OpenAiCourseGenerator implements CourseGenerator {
         ? 18_000
         : name === 'private_lesson_plan_review'
           ? 30_000
-          : ['course_plan', 'lesson_homework', 'private_lesson_plan'].includes(name)
+          : ['course_plan', 'lesson_homework', 'private_lesson_plan', 'authoring_material', 'authoring_review'].includes(name)
             ? 100_000
             : 65_000;
     const signal = AbortSignal.timeout(
@@ -93,6 +93,8 @@ export class OpenAiCourseGenerator implements CourseGenerator {
                 'private_lesson_plan',
                 'private_lesson_plan_review',
                 'lesson_homework',
+                'authoring_material',
+                'authoring_review',
               ].includes(name)
                 ? 'medium'
                 : 'none'),
@@ -102,7 +104,7 @@ export class OpenAiCourseGenerator implements CourseGenerator {
               ? 1800
               : name === 'private_lesson_plan_review'
                 ? 3000
-                : name === 'private_lesson_plan' || name === 'private_lesson_plan_repair'
+                : ['private_lesson_plan','private_lesson_plan_repair','authoring_material'].includes(name)
                   ? 20000
                   : name === 'course_plan'
                     ? 30000

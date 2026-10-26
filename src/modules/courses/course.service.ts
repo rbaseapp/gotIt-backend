@@ -1,8 +1,3 @@
-import {
-  emptyUnitPathChoices,
-  unitPathDocumentId,
-  type unitPathChoiceSchema,
-} from '../word-packs/unit-path-choices.js';
 import { randomUUID } from 'node:crypto';
 import {
   emptyUnitPathChoices,
