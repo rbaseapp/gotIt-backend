@@ -33,6 +33,10 @@ const placementSchema = z
         ageBand: z.enum(['13-17', '18+']),
         readingComfort: z.enum(['easy', 'some', 'hard']),
         selfLevel: z.union([z.literal(0), z.literal(1), z.literal(2), z.literal(3)]).nullable(),
+        talk: z
+          .object({ correct: z.number().int().min(0).max(8), total: z.number().int().min(1).max(8) })
+          .strict()
+          .optional(),
       })
       .strict()
       .optional(),
