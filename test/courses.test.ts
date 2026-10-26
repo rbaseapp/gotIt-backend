@@ -1287,7 +1287,7 @@ test('course HTTP routes enforce Core identity, entitlement, strict input and pr
               tier: allowed ? 'paid' : 'free',
               access: allowed,
               plan: { key: 'test', name: 'Test', kind: allowed ? 'paid' : 'free' },
-              entitlements: allowed ? ['practice.play'] : [],
+              entitlements: allowed ? ['practice.play', 'curriculum.access'] : [],
               subscription: null,
               trial: null,
             },
