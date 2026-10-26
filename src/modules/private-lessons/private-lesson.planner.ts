@@ -8,41 +8,10 @@ import { privateLessonBriefInput } from './private-lesson.content.js';
 import { privateLessonIntroductionPolicy } from './private-lesson.teachers.js';
 import type { LessonMaterial } from '../courses/lesson-material.schema.js';
 
+import { adaptivePlanSchema, adaptiveActivitySchema, type AdaptivePlan, type AdaptiveActivity } from '../courses/teaching-plan.schema.js';
+export { adaptivePlanSchema, adaptiveActivitySchema } from '../courses/teaching-plan.schema.js';
+export type { AdaptivePlan, AdaptiveActivity } from '../courses/teaching-plan.schema.js';
 const text = (max: number) => z.string().trim().min(1).max(max);
-export const adaptiveActivitySchema = z
-  .object({
-    id: text(60),
-    family: text(100),
-    objective: text(250),
-    kind: z.enum([
-      'meaning',
-      'guided_use',
-      'recall',
-      'contrast',
-      'information_gap',
-      'role_play',
-      'transfer',
-    ]),
-    route: z.enum(['core', 'support', 'extension']),
-    context: text(250),
-    prompt: text(350),
-    hint: text(350),
-    criterion: text(500),
-    requiredWords: z.array(text(120)).max(20),
-    estimatedSeconds: z.number().int().min(15).max(150),
-    independent: z.boolean(),
-  })
-  .strict();
-export type AdaptiveActivity = z.infer<typeof adaptiveActivitySchema>;
-export const adaptivePlanSchema = z
-  .object({
-    version: z.literal('adaptive-v1'),
-    opening: text(1500),
-    exhaustedMessage: text(700),
-    activities: z.array(adaptiveActivitySchema).min(3).max(48),
-  })
-  .strict();
-export type AdaptivePlan = z.infer<typeof adaptivePlanSchema>;
 const normalize = (value: string) =>
   value
     .normalize('NFKC')
@@ -81,14 +50,20 @@ export function lessonPlanningRequirements(
 export function lessonMaterialReadiness(plan: PrivateLessonPlan) {
   const material = plan.course?.material ?? plan.wordPack?.material;
   const requirements = lessonPlanningRequirements(plan);
-  const authoredTasks = material?.practice?.tasks ?? [];
+  const authoredTasks = material?.teachingPlan?.activities ?? material?.practice?.tasks ?? [];
   return {
     protocol: 'adaptive-v1',
     policy: material?.adaptationPolicy ?? 'within_objective',
-    source: material ? 'authored_with_runtime_planning' : 'runtime_planning',
+    source: material?.teachingPlan
+      ? 'authored_teaching_plan'
+      : material
+        ? 'authored_with_runtime_planning'
+        : 'runtime_planning',
     authoredTaskCount: authoredTasks.length,
     requirements,
-    needsRuntimePlanning: true,
+    needsRuntimePlanning: !(
+      material?.teachingPlan && material.adaptationPolicy === 'authored_only'
+    ),
     note: 'Authored text and estimated minutes alone do not establish sufficient varied learner work. Runtime planning and semantic review are required.',
   };
 }
@@ -99,6 +74,20 @@ export function authoredMaterialIssue(
   durationSeconds: number,
 ): string | null {
   if (material?.adaptationPolicy !== 'authored_only') return null;
+  if (material.teachingPlan) {
+    const ids = material.teachingPlan.activities.map((activity) => activity.id);
+    if (
+      new Set(ids).size !== ids.length ||
+      !material.teachingPlan.activities.some((activity) => activity.route === 'core')
+    )
+      return 'The teaching plan needs unique activity ids and a core activity';
+    return (
+      adaptivePlanIssues(
+        { durationSeconds, speechRate: 'normal', course: null, wordPack: null },
+        material.teachingPlan,
+      )[0] ?? null
+    );
+  }
   const tasks = material.practice?.tasks ?? [];
   const minimum = lessonPlanningRequirements({
     durationSeconds,
@@ -118,7 +107,10 @@ export function authoredMaterialIssue(
   return null;
 }
 
-export function adaptivePlanIssues(plan: PrivateLessonPlan, candidate: AdaptivePlan): string[] {
+export function adaptivePlanIssues(
+  plan: Pick<PrivateLessonPlan, 'durationSeconds' | 'speechRate' | 'course' | 'wordPack'>,
+  candidate: AdaptivePlan,
+): string[] {
   const requirements = lessonPlanningRequirements(plan);
   const activities = candidate.activities;
   const issues: string[] = [];
@@ -174,10 +166,33 @@ export function adaptivePlanIssues(plan: PrivateLessonPlan, candidate: AdaptiveP
   const material = plan.course?.material ?? plan.wordPack?.material;
   if (material?.adaptationPolicy === 'authored_only') {
     const authored = new Set(
-      (material.practice?.tasks ?? []).map((task) => normalize(task.prompt)),
+      (material.teachingPlan?.activities ?? material.practice?.tasks ?? []).map((task) =>
+        normalize(task.prompt),
+      ),
     );
     if (activities.some((activity) => !authored.has(normalize(activity.prompt))))
       issues.push('Authored-only material cannot be expanded or rewritten');
+  }
+  if (material?.teachingPlan) {
+    const approved =
+      material.adaptationPolicy === 'authored_only'
+        ? material.teachingPlan.activities
+        : material.teachingPlan.activities.filter((activity) => activity.route === 'core');
+    if (
+      approved.some(
+        (activity) =>
+          !activities.some((candidate) => JSON.stringify(candidate) === JSON.stringify(activity)),
+      )
+    )
+      issues.push('Approved teaching activities must be preserved exactly');
+    const expected = approved.map((activity) => activity.id);
+    if (
+      activities
+        .filter((activity) => expected.includes(activity.id))
+        .map((activity) => activity.id)
+        .join('|') !== expected.join('|')
+    )
+      issues.push('Approved teaching activity order changed');
   }
   if (
     plan.course?.isUnitCheck &&
@@ -213,6 +228,14 @@ export class AdaptiveLessonPlanner {
     mode: 'guided' | 'conversation',
   ): Promise<AdaptivePlan> {
     const requirements = lessonPlanningRequirements(plan);
+    const material = plan.course?.material ?? plan.wordPack?.material;
+    if (material?.teachingPlan && material.adaptationPolicy === 'authored_only') {
+      const approved = adaptivePlanSchema.parse(material.teachingPlan);
+      const issues = adaptivePlanIssues(plan, approved);
+      if (issues.length)
+        throw new AppError(503, 'PRIVATE_LESSON_PLAN_INSUFFICIENT', issues.join('; '));
+      return approved;
+    }
     const deadlineMs = Date.now() + 180_000;
     let revisionFeedback: string | null = null;
     let candidate: AdaptivePlan | undefined;
@@ -282,6 +305,13 @@ export class AdaptiveLessonPlanner {
             { deadlineMs: deadlineMs - 25_000, reasoningEffort: 'low' },
           ),
         );
+      const approvedCore = material?.teachingPlan?.activities.filter(activity => activity.route === 'core');
+      if (approvedCore) candidate = adaptivePlanSchema.parse({
+        ...candidate,
+        opening: material!.teachingPlan!.opening,
+        exhaustedMessage: material!.teachingPlan!.exhaustedMessage,
+        activities: [...approvedCore, ...candidate!.activities.filter(activity => activity.route !== 'core' && !approvedCore.some(approved => approved.id === activity.id))],
+      });
       const issues = adaptivePlanIssues(plan, candidate);
       if (!issues.length) {
         const review = reviewSchema.parse(

@@ -290,6 +290,7 @@ export class WordPackRepository {
     return {
       packId: pack.id,
       ...(materials ? { materials } : {}),
+      ...(override?.readingSteps ? { readingSteps: override.readingSteps } : {}),
       title: pack.title,
       moduleNumber: pack.moduleNumber,
       targetLanguageCode: pack.track.sourceLanguageCode,
@@ -303,15 +304,34 @@ export class WordPackRepository {
       stageWords,
       stageWordsByStation: Object.fromEntries(
         stations.map((station, index) => {
+          const authored = materials?.[station.station];
+          const selectedWords = new Set(
+            (authored?.teachingPlan
+              ? [
+                  ...(authored?.words ?? []).map((word) => word.sourceText),
+                  ...(authored?.teachingPlan?.activities ?? []).flatMap(
+                    (activity) => activity.requiredWords,
+                  ),
+                ]
+              : []
+            ).map((word) => lookupText(word)),
+          );
           const start = index ? stations[index - 1]!.requiredWords : 0;
           const availableEntries = entries
-            .slice(start, station.requiredWords)
-            .filter((entry) => !entry.excludedAt);
+            .slice(selectedWords.size ? 0 : start, station.requiredWords)
+            .filter(
+              (entry) =>
+                !entry.excludedAt &&
+                (!selectedWords.size || selectedWords.has(lookupText(entry.sourceText))),
+            );
           const pending = availableEntries.findIndex((entry) => !entry.introduced);
           const offset = Math.max(0, pending < 0 ? availableEntries.length - 6 : pending);
           return [
             station.station,
-            availableEntries.slice(offset, offset + 6).map((entry) => ({
+            (selectedWords.size
+              ? availableEntries
+              : availableEntries.slice(offset, offset + 6)
+            ).map((entry) => ({
               sourceText: entry.sourceText,
               translationText: entry.translationText,
               exampleText: entry.exampleText,

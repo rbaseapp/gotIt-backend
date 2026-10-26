@@ -4,6 +4,11 @@ import {
   type unitPathChoiceSchema,
 } from '../word-packs/unit-path-choices.js';
 import { randomUUID } from 'node:crypto';
+import {
+  emptyUnitPathChoices,
+  unitPathDocumentId,
+  type unitPathChoiceSchema,
+} from '../word-packs/unit-path-choices.js';
 import { z } from 'zod';
 import { AppError } from '../../shared/errors/app-error.js';
 import type { ProfileScope, ProfileServiceContract } from '../profile/profile.types.js';
@@ -992,6 +997,7 @@ export class CourseService {
       courseTitle: next.version.plan.title,
       unitTitle: next.unit.title,
       lessonTitle: next.lesson.title,
+      ...(next.lesson.durationMinutes ? { durationMinutes: next.lesson.durationMinutes } : {}),
       ...(next.lesson.material ? { material: next.lesson.material } : {}),
       level: next.unit.level,
       objective: next.lesson.objective,
@@ -1027,7 +1033,7 @@ export class CourseService {
       level: context.level,
       topic: context.lessonTitle,
       grammarFocus: context.grammar.join('; ').slice(0, 160) || null,
-      durationSeconds: context.preferences.minutesPerLesson * 60,
+      durationSeconds: (context.durationMinutes ?? context.preferences.minutesPerLesson) * 60,
       interests: context.preferences.interests,
       correctionMode:
         context.preferences.path === 'grammar'
@@ -1062,10 +1068,22 @@ export class CourseService {
     if (!(await this.store.get(scope, lesson.id))) {
       // A planned authored bank is not evidence it was taught. Adaptive lessons
       // prepare homework from the authoritative performed turns/report instead.
+      const material = lesson.course?.material ?? lesson.wordPack?.material;
+      const performed = new Set(
+        (lesson.learningEvidence ?? [])
+          .filter((evidence) => evidence.outcome !== 'skipped')
+          .map((evidence) => evidence.activityId),
+      );
+      const linkedTasks =
+        material?.practice?.tasks.filter(
+          (task) => task.sourceActivityId && performed.has(task.sourceActivityId),
+        ) ?? [];
       const authoredPractice =
         lesson.interactionProtocol === 'adaptive-v1'
-          ? null
-          : (lesson.course?.material?.practice ?? lesson.wordPack?.material?.practice ?? null);
+          ? linkedTasks.length >= 3 && material?.practice
+            ? { ...material.practice, tasks: linkedTasks }
+            : null
+          : (material?.practice ?? null);
       const homework: HomeworkDocument = {
         ...(lesson.wordPack
           ? { wordPack: { packId: lesson.wordPack.packId, station: lesson.wordPack.station } }

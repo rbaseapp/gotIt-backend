@@ -1,4 +1,5 @@
 import { Router, type Request, type ErrorRequestHandler } from 'express';
+import { authoringRequestSchema } from './admin.authoring.js';
 import { z } from 'zod';
 import { AppError } from '../../shared/errors/app-error.js';
 import { ProductAdminService, type AdminActor } from './admin.service.js';
@@ -38,6 +39,36 @@ export function createProductAdminRouter(service: ProductAdminService) {
     next();
   });
   router.get('/access', async (req, res) => res.json(await service.access(actor(req))));
+  router.get('/units/:id/history', async (req, res) =>
+    res.json(
+      await service.programContent.history(
+        actor(req),
+        unitIdSchema.parse(req.params.id),
+        z
+          .object({
+            version: z
+              .string()
+              .regex(/^[0-9]{1,18}$/)
+              .optional(),
+          })
+          .strict()
+          .parse(req.query).version,
+      ),
+    ),
+  );
+  router.post('/units/:id/drafts', async (req, res) =>
+    res.json(
+      await service.programContent.draft(
+        actor(req),
+        unitIdSchema.parse(req.params.id),
+        unitSaveSchema.parse(req.body),
+      ),
+    ),
+  );
+  router.post('/authoring', async (req, res) => {
+    res.setTimeout(210_000);
+    res.json(await service.authoring.run(actor(req), authoringRequestSchema.parse(req.body)));
+  });
   for (const resource of ['catalog-units', 'learner-units'] as const) {
     router.get(`/${resource}`, async (req, res) =>
       res.json(

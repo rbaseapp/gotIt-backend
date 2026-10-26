@@ -31,6 +31,7 @@ export function teacherStations(total: number, introduced: number, settings?: St
 }
 
 export type LessonUnit = {
+  readingSteps?: import('./unit-reading.js').UnitReading[];
   material?: LessonMaterial;
   materials?: Partial<Record<TeacherStation, LessonMaterial>>;
   packId: string;

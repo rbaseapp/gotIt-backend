@@ -21,6 +21,10 @@ export function createPrivateLessonRoutes(
   requireLessonAccess: RequestHandler,
 ) {
   const router = Router();
+  router.post('/units/:id/readings/:readingId', async (request,response)=>{
+    const input=parseInput(z.object({contentHash:z.string().regex(/^[a-f0-9]{64}$/)}).strict(),request.body);
+    response.json({path:await service.completeReading(request.gotitAuth!,parseInput(uuidSchema,request.params.id),parseInput(z.string().regex(/^[a-zA-Z0-9-]{1,60}$/),request.params.readingId),input.contentHash),requestId:request.id});
+  });
   router.post('/units/:id/path-choices', async (req, res) =>
     res.json({
       path: await service.chooseUnitPath(

@@ -1,9 +1,11 @@
 import { z } from 'zod';
+import { unitReadingSchema } from '../word-packs/unit-reading.js';
 import { lessonMaterialSchema } from '../courses/lesson-material.schema.js';
 import type { DatabaseTransaction } from '../../shared/database/transaction.js';
 import type { ProfileScope } from '../profile/profile.types.js';
 import { teacherStations } from '../word-packs/teacher-stations.js';
 import { authoredMaterialIssue } from '../private-lessons/private-lesson.planner.js';
+import { lookupText } from '../capture/capture.validation.js';
 
 const stationSetting = z
   .object({
@@ -15,6 +17,7 @@ const stationSetting = z
 export const unitContentSchema = z
   .object({
     title: z.string().trim().min(1).max(200),
+    readingSteps: z.array(unitReadingSchema).max(12).optional(),
     entries: z
       .array(
         z
@@ -48,7 +51,31 @@ export const unitContentSchema = z
   })
   .strict()
   .superRefine((value, ctx) => {
+    if (
+      new Set((value.readingSteps ?? []).map((step) => step.id)).size !==
+        value.readingSteps?.length &&
+      value.readingSteps
+    )
+      ctx.addIssue({
+        code: 'custom',
+        path: ['readingSteps'],
+        message: 'Reading step ids must be unique',
+      });
     for (const step of teacherStations(value.entries.length, 0, value.stationSettings)) {
+      const material = value.materials[step.station];
+      const allowed = new Set(
+        value.entries.slice(0, step.requiredWords).map((entry) => lookupText(entry.sourceText)),
+      );
+      const required = [
+        ...(material?.words ?? []).map((word) => word.sourceText),
+        ...(material?.teachingPlan?.activities ?? []).flatMap((activity) => activity.requiredWords),
+      ];
+      if (material?.teachingPlan && required.some((word) => !allowed.has(lookupText(word))))
+        ctx.addIssue({
+          code: 'custom',
+          path: ['materials', step.station],
+          message: 'Lesson words must be available before this station',
+        });
       const issue = authoredMaterialIssue(value.materials[step.station], step.durationMinutes * 60);
       if (issue)
         ctx.addIssue({

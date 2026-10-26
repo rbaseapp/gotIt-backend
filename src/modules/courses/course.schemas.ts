@@ -63,6 +63,7 @@ export const courseUnitSchema = z
           .object({
             title: text(150),
             objective: text(350),
+            durationMinutes: z.number().int().min(2).max(20).optional(),
             material: lessonMaterialSchema.optional(),
           })
           .strict(),
@@ -90,7 +91,9 @@ export const generatedCoursePlanSchema = coursePlanSchema.extend({
     .array(
       courseUnitSchema.extend({
         lessons: z
-          .array(courseUnitSchema.shape.lessons.element.omit({ material: true }))
+          .array(
+            courseUnitSchema.shape.lessons.element.omit({ material: true, durationMinutes: true }),
+          )
           .min(2)
           .max(10),
       }),
@@ -141,6 +144,7 @@ export type CourseDocument = {
   pendingPlanChange?: string;
 };
 export type CourseLessonContext = {
+  durationMinutes?: number;
   material?: LessonMaterial;
   courseId: string;
   version: number;

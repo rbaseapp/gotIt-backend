@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import test from 'node:test';
+import { z } from 'zod';
 import { createTestDatabase } from '../helpers/postgres.js';
 import { ProductAdminService, type AdminActor } from '../../src/modules/admin/admin.service.js';
 import { unitSaveSchema } from '../../src/modules/admin/admin.programs.js';
@@ -16,6 +17,9 @@ import { plan, preferences } from '../helpers/course-fixtures.js';
 import { unitLesson } from '../helpers/unit-path-fixtures.js';
 import { PostgresPrivateLessonJournal } from '../../src/modules/private-lessons/private-lesson.repository.js';
 import { buildRealtimeLessonContract } from '../../src/modules/private-lessons/private-lesson.realtime.js';
+import { UnitReadingRepository, readingHash } from '../../src/modules/word-packs/unit-reading.js';
+import { PrivateLessonService } from '../../src/modules/private-lessons/private-lesson.service.js';
+import { adaptiveLesson, adaptiveCurriculum } from '../helpers/adaptive-lesson-fixtures.js';
 
 const command = () => ({ operationId: randomUUID(), reason: 'Verify authored program content' });
 test(
@@ -224,6 +228,294 @@ test(
           await assert.rejects(() => owner.programContent.saveUnit(other, id, input), {
             code: 'NOT_FOUND',
           });
+        },
+      );
+      await t.test(
+        'studio drafts, immutable published history, reading revisions and authoring receipts stay scoped',
+        async () => {
+          const studioPackId = (
+            await db.runtimePool.query(
+              `SELECT p.id FROM product_gotit.word_packs p JOIN product_gotit.word_tracks tr ON tr.id=p.track_id JOIN product_gotit.word_topics t ON t.id=tr.topic_id WHERE t.slug IN ('daily-english','english-learning-path-en-he') AND tr.source_language_code='en' AND tr.translation_language_code='he' ORDER BY p.sort_order LIMIT 1`,
+            )
+          ).rows[0].id;
+          const current = (await owner.programContent.units(actor, query, studioPackId))
+            .data as any;
+          const draft = { ...structuredClone(current.content), title: 'Unpublished studio draft' };
+          const draftInput = unitSaveSchema.parse({
+            ...command(),
+            expectedRevision: current.revision,
+            content: draft,
+          });
+          const saved = await owner.programContent.draft(actor, studioPackId, draftInput);
+          assert.deepEqual(
+            await owner.programContent.draft(actor, studioPackId, draftInput),
+            saved,
+          );
+          assert.equal(
+            ((await owner.programContent.units(actor, query, studioPackId)).data as any).content
+              .title,
+            current.content.title,
+          );
+          const history = await owner.programContent.history(actor, studioPackId);
+          assert.ok(history.data.some((row) => row.kind === 'draft'));
+          assert.equal(history.data[0].content, undefined);
+          const restored = await owner.programContent.history(
+            actor,
+            studioPackId,
+            saved.data.id as string,
+          );
+          assert.equal(restored.data[0].content.title, draft.title);
+          assert.equal((await owner.programContent.history(other, studioPackId)).data.length, 0);
+          const reading = {
+            id: 'intro',
+            title: 'A short reading',
+            passage: 'Hello, Maya.',
+            after: 'supported:meeting' as const,
+            estimatedMinutes: 2,
+            questions: ['Who is greeted?'],
+          };
+          const scripted = adaptiveCurriculum(adaptiveLesson(300));
+          for (const activity of scripted.activities)
+            activity.requiredWords = [current.content.entries[0].sourceText];
+          const scriptedMaterial = lessonMaterialSchema.parse({
+            adaptationPolicy: 'authored_only',
+            teachingPlan: scripted,
+            words: [
+              {
+                sourceText: current.content.entries[0].sourceText,
+                translationText: current.content.entries[0].translationText,
+                exampleText: '',
+              },
+            ],
+          });
+          const nextContent = {
+            ...current.content,
+            readingSteps: [reading],
+            materials: { ...current.content.materials, supported: scriptedMaterial },
+          };
+          await owner.programContent.saveUnit(
+            actor,
+            studioPackId,
+            unitSaveSchema.parse({
+              ...command(),
+              expectedRevision: current.revision,
+              content: nextContent,
+            }),
+          );
+          const progress = new UnitReadingRepository(db.runtimePool);
+          const service = new PrivateLessonService({
+            model: 'fixture',
+            voice: 'fixture',
+            transcriptionModel: 'fixture',
+            profiles,
+            vocabulary: { learned: async () => ({ items: [] }) },
+            wordPacks: packs,
+            readingProgress: progress,
+          });
+          const map = await service.getLearningMap(actor, studioPackId);
+          const resolved = await packs.lessonUnit(actor, studioPackId);
+          assert.deepEqual(
+            resolved.stageWordsByStation?.supported?.map((word) => word.sourceText),
+            [current.content.entries[0].sourceText],
+          );
+          assert.equal((await service.getPreparedUnit(actor, studioPackId)).materials, undefined);
+          assert.equal(map.readings[0]?.complete, false);
+          await assert.rejects(
+            () => service.completeReading(actor, studioPackId, 'intro', '0'.repeat(64)),
+            { code: 'CONFLICT' },
+          );
+          const complete = await service.completeReading(
+            actor,
+            studioPackId,
+            'intro',
+            readingHash(reading),
+          );
+          assert.equal(complete.readings[0]?.complete, true);
+          await service.completeReading(actor, studioPackId, 'intro', readingHash(reading));
+          assert.equal((await progress.completed(other, studioPackId)).length, 0);
+          assert.equal((await progress.completed(actor, studioPackId)).length, 1);
+          const after = (await owner.programContent.units(actor, query, studioPackId)).data as any;
+          await owner.programContent.saveUnit(
+            actor,
+            studioPackId,
+            unitSaveSchema.parse({
+              ...command(),
+              expectedRevision: after.revision,
+              content: { ...nextContent, readingSteps: [{ ...reading, passage: 'Hello, Alex.' }] },
+            }),
+          );
+          assert.equal(
+            (await service.getLearningMap(actor, studioPackId)).readings[0]?.complete,
+            false,
+          );
+          let generations = 0;
+          const authoringOwner: ProductAdminService = new ProductAdminService(
+            db.runtimePool,
+            {
+              getAdminAccess: async () =>
+                ({
+                  ...actor,
+                  permissions: ['content.write'],
+                  mfaVerified: true,
+                  mfaEnrolled: true,
+                }) as any,
+              getAdminUser: async () => ({ id: adminId, status: 'active' }),
+            },
+            profiles,
+            DEFAULT_LEARNING_POLICY,
+            {
+              async generate(_scope, schema, name) {
+                generations++;
+                if (name === 'authoring_material') {
+                  const strict = (node: any) => {
+                    if (!node || typeof node !== 'object') return;
+                    if (node.type === 'object') {
+                      assert.equal(node.additionalProperties, false);
+                      assert.deepEqual(
+                        new Set(node.required),
+                        new Set(Object.keys(node.properties ?? {})),
+                      );
+                    }
+                    for (const value of Object.values(node))
+                      if (typeof value === 'object')
+                        Array.isArray(value) ? value.forEach(strict) : strict(value);
+                  };
+                  strict(z.toJSONSchema(schema, { io: 'input' }));
+                  return schema.parse({
+                    summary: 'Editable proposal',
+                    durationMinutes: 5,
+                    material: {
+                      ...practiceMaterial,
+                      objective: 'Directions',
+                      prohibitedTopics: [],
+                    },
+                  });
+                }
+                if (name === 'private_lesson_answer')
+                  return schema.parse({
+                    result: 'independent',
+                    feedback: 'A relevant question.',
+                    retryQuestion: 'Ask for the missing information.',
+                    evidenceQuote: 'Where is the station?',
+                  });
+                return schema.parse({ findings: [], summary: 'Reviewed' });
+              },
+              async transcribe() {
+                return '';
+              },
+            },
+          );
+          const material = lessonMaterialSchema.parse({
+            adaptationPolicy: 'authored_only',
+            teachingPlan: adaptiveCurriculum(adaptiveLesson(300)),
+          });
+          const input = {
+            ...command(),
+            action: 'review' as const,
+            instruction: '',
+            context: {
+              title: 'Travel',
+              objective: 'Directions',
+              targetLanguageCode: 'en',
+              supportLanguageCode: 'he',
+              level: 'A2' as const,
+              durationMinutes: 5,
+              words: [],
+              ageGroup: 'adult' as const,
+              literacy: 'independent' as const,
+            },
+            material,
+          };
+          const reviewed = await authoringOwner.authoring.run(actor, input);
+          assert.deepEqual(await authoringOwner.authoring.run(actor, input), reviewed);
+          assert.equal(generations, 1);
+          await assert.rejects(
+            () => authoringOwner.authoring.run(actor, { ...input, instruction: 'changed' }),
+            { code: 'CONFLICT' },
+          );
+          const started = await authoringOwner.authoring.run(actor, {
+            ...input,
+            ...command(),
+            action: 'start',
+          });
+          const rehearsal = started.data as any;
+          const progressed = await authoringOwner.authoring.run(actor, {
+            ...input,
+            ...command(),
+            action: 'act',
+            rehearsal,
+            command: {
+              eventId: randomUUID(),
+              revision: rehearsal.state.view.revision,
+              activityId: rehearsal.state.view.activityId,
+              action: 'answer',
+              answer: 'Where is the station?',
+              channel: 'text',
+            },
+          });
+          assert.notEqual(
+            (progressed.data as any).state.view.activityId,
+            rehearsal.state.view.activityId,
+          );
+          const practiceMaterial = lessonMaterialSchema.parse({
+            ...material,
+            practice: {
+              title: 'Directions practice',
+              objective: 'Choose a direction',
+              estimatedMinutes: 3,
+              tasks: [0, 1, 2].map((index) => ({
+                kind: 'choice',
+                objective: 'Choose a direction',
+                sourceActivityId: material.teachingPlan!.activities[index]!.id,
+                prompt: 'Choose: left or right?',
+                sourceQuote: 'Turn left.',
+                choices: ['left', 'right'],
+                tokens: [],
+                listeningText: null,
+                hint: 'Think of the direction.',
+                explanation: 'Left is the requested direction.',
+                expectedAnswer: 'left',
+                acceptedAnswers: ['left'],
+              })),
+            },
+          });
+          const practice = await authoringOwner.authoring.run(actor, {
+            ...input,
+            ...command(),
+            action: 'practice',
+            material: practiceMaterial,
+            practiceIndex: 0,
+            practiceAnswer: 'left',
+          });
+          assert.equal((practice.data as any).practiceResult.attempts[0].result, 'correct');
+          const proposal = await authoringOwner.authoring.run(actor, {
+            ...input,
+            ...command(),
+            action: 'suggest',
+            instruction: 'Keep the objective and prepare exact questions.',
+          });
+          assert.equal(
+            (proposal.data as any).material.teachingPlan.activities.length,
+            material.teachingPlan!.activities.length,
+          );
+          assert.equal(
+            (
+              await db.runtimePool.query(
+                `SELECT count(*)::int AS n FROM product_gotit.learning_documents WHERE application_id=$1 AND application_user_id=$2 AND kind IN ('course','homework')`,
+                [actor.applicationId, actor.applicationUserId],
+              )
+            ).rows[0].n,
+            0,
+          );
+          const migration = await import(
+            new URL('../../migrations/1792970000000_curriculum-studio.js', import.meta.url).href
+          );
+          const sql: string[] = [];
+          migration.down({ sql: (value: string) => sql.push(value) });
+          await assert.rejects(
+            () => db.adminPool.query(sql[0]!),
+            /Curriculum history or reading progress exists/,
+          );
         },
       );
       await t.test(

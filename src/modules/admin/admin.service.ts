@@ -14,6 +14,9 @@ import { validatePromptContent, type PromptContent } from './admin.prompt-config
 import { promptPreviewSchema, previewRealtimePrompt } from './admin.prompt-preview.js';
 import type { RealtimeDefaults } from '../private-lessons/private-lesson.realtime.js';
 import { ProgramAdmin } from './admin.programs.js';
+import { AuthoringAdmin } from './admin.authoring.js';
+import { CourseService } from '../courses/course.service.js';
+import type { LearningDocumentStore } from '../courses/course.repository.js';
 import {
   contentSchemas,
   promptKeys,
@@ -55,6 +58,12 @@ function validateAdminPlan(...args: Parameters<typeof validateCoursePlan>) {
 const columns = `d.id,d.key,d.title,d.title AS name,d.version,d.revision,d.status,d.application_user_id AS "applicationUserId",d.created_at AS "createdAt",d.updated_at AS "updatedAt",d.content->'preferences'->>'targetLanguageCode' AS "languageCode",a.document_id AS "activeId"`;
 
 export class ProductAdminService {
+  courseRehearsal(store: LearningDocumentStore) {
+    return new CourseService(store, this.profiles, this.generator);
+  }
+  get authoring() {
+    return new AuthoringAdmin(this, this.generator);
+  }
   get programContent() {
     return new ProgramAdmin(this, this.realtimeDefaults);
   }

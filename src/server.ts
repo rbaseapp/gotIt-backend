@@ -40,6 +40,7 @@ import { WordPackRepository } from './modules/word-packs/word-packs.repository.j
 import { WordPackStudyService } from './modules/word-packs/word-pack-study.service.js';
 import { OpenAiWordPackExampleProvider } from './modules/word-packs/word-pack-example.provider.js';
 import { PrivateLessonService } from './modules/private-lessons/private-lesson.service.js';
+import { UnitReadingRepository } from './modules/word-packs/unit-reading.js';
 import {
   LessonActivityService as LegacyActivityService,
   PostgresLessonActivityStore as LegacyActivityStore,
@@ -303,6 +304,7 @@ const privateLessonService = new PrivateLessonService({
   curriculum: curriculumService,
   wordPacks: new PostgresPrivateLessonWordPackSource(pool),
   mapWordPacks: new WordPackRepository(pool),
+  readingProgress: new UnitReadingRepository(pool),
   activities: privateLessonContentGenerator
     ? new LessonActivityService(lessonActivityStore, privateLessonContentGenerator)
     : undefined,

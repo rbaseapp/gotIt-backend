@@ -52,6 +52,61 @@ export class ProgramAdmin {
     private readonly owner: ProductAdminService,
     private readonly defaults: RealtimeDefaults,
   ) {}
+  async history(actor: AdminActor, id: string, version?: string) {
+    await this.units(actor, listSchema.parse({}), id, id.includes('_'));
+    const parts = unitIdSchema.parse(id).split('_');
+    return {
+      data: (
+        await this.owner.db.query(
+          `SELECT id::text,kind,base_revision AS "baseRevision",${version ? 'content,' : ''}reason,created_at AS "createdAt" FROM product_gotit.admin_unit_history WHERE application_id=$1 AND pack_id=$2 AND application_user_id IS NOT DISTINCT FROM $3::uuid AND ($4::bigint IS NULL OR id=$4::bigint) ORDER BY id DESC LIMIT 30`,
+          [
+            actor.applicationId,
+            parts.at(-1),
+            parts.length === 2 ? parts[0] : null,
+            version ?? null,
+          ],
+        )
+      ).rows,
+    };
+  }
+  async draft(actor: AdminActor, id: string, input: z.infer<typeof unitSaveSchema>) {
+    const current = await this.units(actor, listSchema.parse({}), id, id.includes('_'));
+    if (current.data.revision !== input.expectedRevision) throw conflict();
+    const activeContent = unitContentSchema.parse(current.data.content);
+    if (
+      activeContent.entries.length !== input.content.entries.length ||
+      activeContent.entries.some(
+        (entry) => !input.content.entries.some((candidate) => candidate.id === entry.id),
+      )
+    )
+      throw new AppError(400, 'VALIDATION_ERROR', 'Keep the unit entry identities');
+    const parts = unitIdSchema.parse(id).split('_');
+    return this.owner.command(
+      actor,
+      'content.write',
+      'unit.draft',
+      'catalog-units',
+      parts.at(-1)!,
+      { ...input, unitId: id },
+      async (tx) => {
+        const saved = (
+          await tx.query(
+            `INSERT INTO product_gotit.admin_unit_history(application_id,pack_id,application_user_id,actor_id,kind,base_revision,content,reason) VALUES($1,$2,$3,$4,'draft',$5,$6::jsonb,$7) RETURNING id::text`,
+            [
+              actor.applicationId,
+              parts.at(-1),
+              parts.length === 2 ? parts[0] : null,
+              actor.applicationUserId,
+              input.expectedRevision,
+              JSON.stringify(input.content),
+              input.reason,
+            ],
+          )
+        ).rows[0];
+        return { ...saved, kind: 'draft', revision: input.expectedRevision };
+      },
+    );
+  }
   async previewUnit(actor: AdminActor, input: z.infer<typeof unitPreviewSchema>) {
     await this.units(actor, listSchema.parse({}), input.unitId, input.unitId.includes('_'));
     const packId = input.unitId.split('_').at(-1)!;
@@ -162,7 +217,7 @@ export class ProgramAdmin {
     const inherited = own ?? overrides[0];
     const metadata = (
       await this.owner.db.query(
-        `SELECT t.id AS "programId",t.title AS "programTitle",t.slug,tr.source_language_code,tr.translation_language_code FROM product_gotit.word_packs p JOIN product_gotit.word_tracks tr ON tr.id=p.track_id JOIN product_gotit.word_topics t ON t.id=tr.topic_id WHERE p.id=$1`,
+        `SELECT t.id AS "programId",t.title AS "programTitle",t.slug,tr.source_language_code,tr.translation_language_code,tr.cefr_from FROM product_gotit.word_packs p JOIN product_gotit.word_tracks tr ON tr.id=p.track_id JOIN product_gotit.word_topics t ON t.id=tr.topic_id WHERE p.id=$1`,
         [packId],
       )
     ).rows[0];
@@ -200,6 +255,11 @@ export class ProgramAdmin {
         content,
         programId: metadata.programId,
         programTitle: metadata.programTitle,
+        teachingContext: {
+          targetLanguageCode: metadata.source_language_code,
+          supportLanguageCode: metadata.translation_language_code,
+          level: metadata.cefr_from,
+        },
         learningPath: {
           enabled: supportsTeacherStations(
             metadata.slug,
@@ -217,10 +277,12 @@ export class ProgramAdmin {
       },
     };
   }
-  saveUnit(actor: AdminActor, id: string, input: z.infer<typeof unitSaveSchema>) {
+  async saveUnit(actor: AdminActor, id: string, input: z.infer<typeof unitSaveSchema>) {
     const parts = unitIdSchema.parse(id).split('_'),
       userId = parts.length === 2 ? parts[0]! : null,
       packId = parts.at(-1)!;
+    const baseline = (await this.units(actor, listSchema.parse({}), id, Boolean(userId))).data
+      .content;
     return this.owner.command(
       actor,
       'content.write',
@@ -268,10 +330,10 @@ export class ProgramAdmin {
         );
         if (new Set(senses).size !== senses.length)
           throw new AppError(400, 'VALIDATION_ERROR', 'Duplicate word senses');
-        if (input.content.stationSettings) {
+        if (input.content.stationSettings || input.content.readingSteps?.length) {
           const metadata = (
             await tx.query(
-              `SELECT t.slug,tr.source_language_code,tr.translation_language_code FROM product_gotit.word_packs p JOIN product_gotit.word_tracks tr ON tr.id=p.track_id JOIN product_gotit.word_topics t ON t.id=tr.topic_id WHERE p.id=$1`,
+              `SELECT t.slug,tr.source_language_code,tr.translation_language_code,tr.cefr_from FROM product_gotit.word_packs p JOIN product_gotit.word_tracks tr ON tr.id=p.track_id JOIN product_gotit.word_topics t ON t.id=tr.topic_id WHERE p.id=$1`,
               [packId],
             )
           ).rows[0];
@@ -318,8 +380,31 @@ export class ProgramAdmin {
         }
         const revision = (old?.revision ?? 0) + 1;
         await tx.query(
+          `INSERT INTO product_gotit.admin_unit_history(application_id,pack_id,application_user_id,actor_id,kind,base_revision,content,reason) SELECT $1,$2,$3,$4,'published',$5,$6::jsonb,'Initial content before first studio publication' WHERE NOT EXISTS(SELECT 1 FROM product_gotit.admin_unit_history WHERE application_id=$1 AND pack_id=$2 AND application_user_id IS NOT DISTINCT FROM $3::uuid AND kind='published')`,
+          [
+            actor.applicationId,
+            packId,
+            userId,
+            actor.applicationUserId,
+            revision - 1,
+            JSON.stringify(baseline),
+          ],
+        );
+        await tx.query(
           `INSERT INTO product_gotit.admin_unit_content(application_id,pack_id,application_user_id,revision,content) VALUES($1,$2,$3,$4,$5::jsonb) ON CONFLICT(application_id,pack_id,application_user_id) DO UPDATE SET revision=EXCLUDED.revision,content=EXCLUDED.content,updated_at=now()`,
           [actor.applicationId, packId, userId, revision, JSON.stringify(input.content)],
+        );
+        await tx.query(
+          `INSERT INTO product_gotit.admin_unit_history(application_id,pack_id,application_user_id,actor_id,kind,base_revision,content,reason) VALUES($1,$2,$3,$4,'published',$5,$6::jsonb,$7)`,
+          [
+            actor.applicationId,
+            packId,
+            userId,
+            actor.applicationUserId,
+            revision,
+            JSON.stringify(input.content),
+            input.reason,
+          ],
         );
         return {
           id,
@@ -414,7 +499,7 @@ export class ProgramAdmin {
     const plan: PrivateLessonPlan = {
       id: course.courseId,
       course,
-      durationSeconds: prefs.minutesPerLesson * 60,
+      durationSeconds: (lesson.durationMinutes ?? prefs.minutesPerLesson) * 60,
       targetLanguageCode: prefs.targetLanguageCode,
       supportLanguageCode: prefs.supportLanguageCode,
       lessonMode: prefs.absoluteBeginner && unit.level === 'A1' ? 'absolute_beginner' : 'standard',
