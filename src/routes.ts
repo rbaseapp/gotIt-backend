@@ -184,9 +184,6 @@ export function createRoutes(dependencies: AppDependencies) {
           createRequireAddonMiddleware(dependencies.addonAccess!, 'private_lessons'),
         )
       : requirePractice;
-  const requireCourse = dependencies.enforceAddonEntitlements
-    ? requireBoth(requirePractice, createRequireAddonMiddleware(dependencies.addonAccess!, 'ai'))
-    : requirePractice;
   // Programs and the free-conversation teacher are paid (or trial) features; saving words, games
   // and the onboarding placement stay free.
   const requireCurriculum = createRequireEntitlementMiddleware(
@@ -199,6 +196,10 @@ export function createRoutes(dependencies: AppDependencies) {
     'tutor.session',
     dependencies.enforcePaidEntitlements === true,
   );
+  const requireCourseBase = dependencies.enforceAddonEntitlements
+    ? requireBoth(requirePractice, createRequireAddonMiddleware(dependencies.addonAccess!, 'ai'))
+    : requirePractice;
+  const requireCourse = requireBoth(requireCourseBase, requireCurriculum);
   const requireAiTranslation = dependencies.enforceAddonEntitlements
     ? requireBoth(
         requirePaidAiTranslation,
@@ -306,7 +307,7 @@ export function createRoutes(dependencies: AppDependencies) {
       createCurriculumRoutes(
         dependencies.curriculumService,
         requireBoth(requirePractice, requireCurriculum),
-        requireBoth(requireCourse, requireCurriculum),
+        requireCourse,
       ),
     );
   if (dependencies.readingService)
