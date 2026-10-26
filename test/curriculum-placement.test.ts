@@ -278,14 +278,12 @@ test('learning state exposes the onboarding record and the teacher gate', async 
 test('the answers to the first-entry questions are stored with the placement', async () => {
   const { service: s } = service();
   await s.place(scope, {
-    ...input({ profile: { answerMode: 'text', ageBand: '18+', readingComfort: 'some', selfLevel: 2 } }),
+    ...input({ profile: { selfLevel: 2, talk: { correct: 2, total: 3, unknown: 1 } } }),
     eventId: randomUUID(),
   });
   const state = await s.get(scope);
   assert.deepEqual((state.onboarding as { profile: unknown }).profile, {
-    answerMode: 'text',
-    ageBand: '18+',
-    readingComfort: 'some',
     selfLevel: 2,
+    talk: { correct: 2, total: 3, unknown: 1 },
   });
 });

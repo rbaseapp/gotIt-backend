@@ -38,10 +38,7 @@ export type CurriculumState = {
     placedAt: string;
     /** What the learner told us in the first-entry questions (see the placement flow doc). */
     profile?: {
-      answerMode: 'voice' | 'text';
-      ageBand: 'under9' | '9-12' | '13-17' | '18+';
-      readingComfort: 'easy' | 'some' | 'hard';
-      selfLevel: 0 | 1 | 2 | 3 | null;
+      selfLevel?: 0 | 1 | 2 | 3;
       /** The tap-to-answer conversation check, when the learner did it. */
       talk?: { correct: number; total: number; unknown?: number };
     };

@@ -28,10 +28,7 @@ const placementSchema = z
     knownWords: z.array(z.string().regex(/^[A-Za-z]{2,40}$/u)).max(1500),
     profile: z
       .object({
-        answerMode: z.enum(['voice', 'text']),
-        ageBand: z.enum(['under9', '9-12', '13-17', '18+']),
-        readingComfort: z.enum(['easy', 'some', 'hard']),
-        selfLevel: z.union([z.literal(0), z.literal(1), z.literal(2), z.literal(3)]).nullable(),
+        selfLevel: z.union([z.literal(0), z.literal(1), z.literal(2), z.literal(3)]).optional(),
         talk: z
           .object({
             correct: z.number().int().min(0).max(8),
@@ -42,7 +39,6 @@ const placementSchema = z
           .optional(),
       })
       .strict()
-      .optional(),
   })
   .strict();
 const pathId = z.string().regex(/^[\w-]{1,40}$/u);
