@@ -26,6 +26,16 @@ const placementSchema = z
       .object({ vocabulary: skill, reading: skill.nullable(), listening: skill.nullable() })
       .strict(),
     knownWords: z.array(z.string().regex(/^[A-Za-z]{2,40}$/u)).max(1500),
+    profile: z
+      .object({
+        answerMode: z.enum(['voice', 'text']),
+        // Under-13s are stopped before sign-up in this version, so the band is never lower.
+        ageBand: z.enum(['13-17', '18+']),
+        readingComfort: z.enum(['easy', 'some', 'hard']),
+        selfLevel: z.union([z.literal(0), z.literal(1), z.literal(2), z.literal(3)]).nullable(),
+      })
+      .strict()
+      .optional(),
   })
   .strict();
 const pathId = z.string().regex(/^[\w-]{1,40}$/u);

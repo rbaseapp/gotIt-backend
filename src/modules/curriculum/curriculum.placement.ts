@@ -37,6 +37,7 @@ export type PlacementInput = {
     listening: PlacementSkill | null;
   };
   knownWords: string[];
+  profile?: NonNullable<CurriculumState['onboarding']>['profile'];
 };
 
 export const studyMinutes = (minutesPerDay: number): 10 | 20 | 30 | 45 | 60 =>
@@ -110,6 +111,7 @@ export function applyPlacement(state: CurriculumState, input: PlacementInput, no
     minutesPerDay: input.minutesPerDay,
     reliability: input.reliability,
     placedAt: now.toISOString(),
+    ...(input.profile ? { profile: input.profile } : {}),
   };
 
   const known = new Set(input.knownWords.map((word) => word.toLowerCase()));

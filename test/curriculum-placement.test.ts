@@ -274,3 +274,18 @@ test('learning state exposes the onboarding record and the teacher gate', async 
   assert.equal(state.tutor.required, 3);
   assert.equal((await s.tutorGate(scope)).unlocked, false);
 });
+
+test('the answers to the first-entry questions are stored with the placement', async () => {
+  const { service: s } = service();
+  await s.place(scope, {
+    ...input({ profile: { answerMode: 'text', ageBand: '18+', readingComfort: 'some', selfLevel: 2 } }),
+    eventId: randomUUID(),
+  });
+  const state = await s.get(scope);
+  assert.deepEqual((state.onboarding as { profile: unknown }).profile, {
+    answerMode: 'text',
+    ageBand: '18+',
+    readingComfort: 'some',
+    selfLevel: 2,
+  });
+});

@@ -36,6 +36,13 @@ export type CurriculumState = {
     minutesPerDay: number;
     reliability: number;
     placedAt: string;
+    /** What the learner told us in the first-entry questions (see the placement flow doc). */
+    profile?: {
+      answerMode: 'voice' | 'text';
+      ageBand: '13-17' | '18+';
+      readingComfort: 'easy' | 'some' | 'hard';
+      selfLevel: 0 | 1 | 2 | 3 | null;
+    };
   };
 };
 export type Enrollment = { revision: number; state: CurriculumState };
