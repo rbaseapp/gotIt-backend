@@ -12,6 +12,18 @@ const activityId = z
 const id = z.uuid();
 const band = z.enum(['Pre-A1', 'A1', 'A2', 'B1', 'B2', 'C1']);
 const skill = z.object({ band, score: z.number().min(0).max(1) }).strict();
+const interestIds = [
+  'travel',
+  'business',
+  'tech',
+  'series',
+  'food',
+  'sport',
+  'studies',
+  'news',
+  'music',
+] as const;
+const priorityIds = ['vocabulary', 'grammar', 'speaking', 'listening', 'writing', 'teacher'] as const;
 const placementSchema = z
   .object({
     eventId: z.uuid(),
@@ -28,7 +40,12 @@ const placementSchema = z
     knownWords: z.array(z.string().regex(/^[A-Za-z]{2,40}$/u)).max(1500),
     profile: z
       .object({
-        selfLevel: z.union([z.literal(0), z.literal(1), z.literal(2), z.literal(3)]).optional(),
+        selfLevel: z
+          .union([z.literal(0), z.literal(1), z.literal(2), z.literal(3), z.literal(4)])
+          .optional(),
+        interests: z.array(z.enum(interestIds)).max(3).optional(),
+        priorities: z.array(z.enum(priorityIds)).max(2).optional(),
+        targetBand: band.optional(),
         talk: z
           .object({
             correct: z.number().int().min(0).max(8),

@@ -287,3 +287,16 @@ test('the answers to the first-entry questions are stored with the placement', a
     talk: { correct: 2, total: 3, unknown: 1 },
   });
 });
+
+test('interests, priorities and the chosen target level are stored with the placement', async () => {
+  const { service: s } = service();
+  const profile = {
+    selfLevel: 4 as const,
+    interests: ['travel', 'music'],
+    priorities: ['speaking'],
+    targetBand: 'C1',
+  };
+  await s.place(scope, { ...input({ profile }), eventId: randomUUID() });
+  const state = await s.get(scope);
+  assert.deepEqual((state.onboarding as { profile: unknown }).profile, profile);
+});

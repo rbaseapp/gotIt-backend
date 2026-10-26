@@ -38,9 +38,16 @@ export type CurriculumState = {
     placedAt: string;
     /** What the learner told us in the first-entry questions (see the placement flow doc). */
     profile?: {
-      selfLevel?: 0 | 1 | 2 | 3;
+      /** 0 zero, 1 basic, 2 intermediate, 3 advanced, 4 fluent. */
+      selfLevel?: 0 | 1 | 2 | 3 | 4;
       /** The tap-to-answer conversation check, when the learner did it. */
       talk?: { correct: number; total: number; unknown?: number };
+      /** Up to three topics the lessons should draw on. */
+      interests?: string[];
+      /** Up to two things to improve first; "teacher" leaves the choice to the teacher. */
+      priorities?: string[];
+      /** The level the learner chose to aim for. */
+      targetBand?: string;
     };
   };
 };
