@@ -23,7 +23,14 @@ const interestIds = [
   'news',
   'music',
 ] as const;
-const priorityIds = ['vocabulary', 'grammar', 'speaking', 'listening', 'writing', 'teacher'] as const;
+const priorityIds = [
+  'vocabulary',
+  'grammar',
+  'speaking',
+  'listening',
+  'writing',
+  'teacher',
+] as const;
 const placementSchema = z
   .object({
     eventId: z.uuid(),
@@ -55,7 +62,7 @@ const placementSchema = z
           .strict()
           .optional(),
       })
-      .strict()
+      .strict(),
   })
   .strict();
 const pathId = z.string().regex(/^[\w-]{1,40}$/u);

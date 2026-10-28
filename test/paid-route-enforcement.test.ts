@@ -263,7 +263,14 @@ test('placing yourself never opens paid lesson content: free accounts can place 
   const get = (path: string) =>
     request(app).get(`/api/v1/structured-english${path}`).set('authorization', 'Bearer token');
 
-  for (const path of ['/units/U84', '/phonics/F01', '/unseen/U84', '/teacher/U84-L1', '/attempts/abc', '/articles/abc']) {
+  for (const path of [
+    '/units/U84',
+    '/phonics/F01',
+    '/unseen/U84',
+    '/teacher/U84-L1',
+    '/attempts/abc',
+    '/articles/abc',
+  ]) {
     const response = await get(path);
     assert.equal(response.status, 402, path);
     assert.equal(response.body.error.code, 'SUBSCRIPTION_REQUIRED', path);
