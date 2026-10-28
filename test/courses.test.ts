@@ -1454,3 +1454,102 @@ test('course session resolves approved language and objective before creating th
   assert.match(sessionInstructions, /when and why to use each form/u);
   assert.match(sessionInstructions, /contrasting examples/u);
 });
+
+test('a learner who took the placement check is asked only what it did not establish', async () => {
+  const store = new MemoryLearningStore();
+  const instructions: string[] = [];
+  const ai = new (class extends FixtureGenerator {
+    override async generate<T>(
+      scopeArg: Parameters<FixtureGenerator['generate']>[0],
+      schema: Parameters<FixtureGenerator['generate']>[1],
+      name: string,
+      instruction: string,
+      data: unknown,
+    ): Promise<T> {
+      instructions.push(instruction);
+      const result = (await super.generate(scopeArg, schema, name, instruction, data)) as T;
+      if (name !== 'course_intake_questions') return result;
+      const interview = result as { questions: unknown[]; closing: string };
+      // The fixture writes six; this learner needs goal, age and reading, and learning style.
+      return { ...interview, questions: [0, 2, 4].map((i) => interview.questions[i]) } as T;
+    }
+  })();
+  const facts = {
+    startingLevel: 'A2' as const,
+    absoluteBeginner: false,
+    interests: ['business', 'music'],
+    minutesPerDay: 20,
+  };
+  const service = new CourseService(
+    store,
+    profiles,
+    ai,
+    undefined,
+    undefined,
+    undefined,
+    async () => facts,
+  );
+  const started = await service.start(scope, {
+    targetLanguageCode: 'en',
+    supportLanguageCode: 'he',
+    eventId: randomUUID(),
+  });
+  assert.deepEqual(started.intakeProgress, { current: 1, answered: 0, total: 3 });
+  assert.equal(started.preferences.startingLevel, 'A2');
+  assert.deepEqual(started.preferences.interests, ['business', 'music']);
+  assert.equal(started.preferences.minutesPerLesson, 15);
+  assert.equal(started.preferences.daysPerWeek, 5);
+  assert.match(instructions[0]!, /exactly three/u);
+  assert.doesNotMatch(instructions[0]!, /previous experience|minutes per lesson/u);
+  let current = started;
+  for (const [index, answer] of ['לדבר בעבודה', 'מבוגר, קורא בנוחות', 'בשיחות'].entries()) {
+    current = await service.turn(scope, started.id, {
+      ...command(current.revision),
+      mode: 'preferences',
+      channel: 'text',
+      message: answer,
+    });
+    assert.equal(current.ready, index === 2);
+  }
+  assert.deepEqual(
+    current.intakeAnswers?.map((answer) => answer.topic),
+    ['goal', 'ageAndLiteracy', 'learningPreferences'],
+  );
+  // The tested level and the onboarding time survive the conversation.
+  assert.equal(current.preferences.startingLevel, 'A2');
+  assert.equal(current.preferences.daysPerWeek, 5);
+  await assert.rejects(
+    service
+      .turn(scope, started.id, {
+        ...command(current.revision),
+        mode: 'preferences',
+        channel: 'text',
+        message: 'עוד משהו',
+      })
+      .then((course) => {
+        // A message after the last answer is a correction, never a fourth question.
+        assert.equal(course.intakeProgress?.answered, 3);
+        throw new Error('handled');
+      }),
+    /handled/,
+  );
+});
+
+test('without a placement check the intake still asks all six questions', async () => {
+  const store = new MemoryLearningStore();
+  const service = new CourseService(
+    store,
+    profiles,
+    new FixtureGenerator(),
+    undefined,
+    undefined,
+    undefined,
+    async () => null,
+  );
+  const started = await service.start(scope, {
+    targetLanguageCode: 'en',
+    supportLanguageCode: 'he',
+    eventId: randomUUID(),
+  });
+  assert.equal(started.intakeProgress?.total, 6);
+});

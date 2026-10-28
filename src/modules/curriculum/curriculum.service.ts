@@ -227,6 +227,24 @@ export class CurriculumService {
       },
     );
   }
+  /**
+   * What the placement check established, for a personal course in English: the tested
+   * level, the chosen interests and the daily time. Null when the learner never took it.
+   */
+  async learnerFacts(scope: ProfileScope, targetLanguageCode: string) {
+    if (new Intl.Locale(targetLanguageCode).language !== 'en') return null;
+    const onboarding = (await this.store.get(scope))?.state.onboarding;
+    if (!onboarding) return null;
+    const unit =
+      content.units[Math.min(Math.max(onboarding.startUnit, 1), content.units.length) - 1]!;
+    return {
+      // Courses start at A1; a Pre-A1 learner is an absolute beginner within it.
+      startingLevel: unit.band === 'Pre-A1' ? ('A1' as const) : unit.band,
+      absoluteBeginner: unit.band === 'Pre-A1',
+      interests: onboarding.profile?.interests ?? [],
+      minutesPerDay: onboarding.minutesPerDay,
+    };
+  }
   /** Whether free conversation with the teacher is open for this learner. */
   async tutorGate(scope: ProfileScope) {
     return tutorGate((await this.store.get(scope))?.state);
