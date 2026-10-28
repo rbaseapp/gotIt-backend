@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { parseInput, uuidSchema } from '../capture/capture.validation.js';
 import {
   commandSchema,
+  coursePathChoiceSchema,
   coursePreferencesSchema,
   courseTurnSchema,
   homeworkActionSchema,
@@ -10,10 +11,32 @@ import {
   speechInputSchema,
 } from './course.schemas.js';
 import { CourseService, publicCourse, publicHomework } from './course.service.js';
+import { ProgramArtworkService, programArtworkInput } from './program-artwork.service.js';
 
-export function createCourseRoutes(service: CourseService, requireAccess: RequestHandler) {
+export function createCourseRoutes(
+  service: CourseService,
+  requireAccess: RequestHandler,
+  artwork?: ProgramArtworkService,
+) {
   const router = Router();
   router.use(requireAccess);
+  if (artwork) {
+    router.post('/artwork/lookup', async (req, res) => {
+      res
+        .set('Cache-Control', 'no-store')
+        .json(
+          await artwork.artwork(req.gotitAuth!, parseInput(programArtworkInput, req.body), false),
+        );
+    });
+    router.post('/artwork/generate', async (req, res) => {
+      req.setTimeout(115_000);
+      res
+        .set('Cache-Control', 'no-store')
+        .json(
+          await artwork.artwork(req.gotitAuth!, parseInput(programArtworkInput, req.body), true),
+        );
+    });
+  }
   router.get('/', async (req, res) => res.json(await service.list(req.gotitAuth!)));
   router.post('/templates/:id/use', async (req, res) =>
     res.status(201).json({
@@ -64,6 +87,31 @@ export function createCourseRoutes(service: CourseService, requireAccess: Reques
     res.json({
       course: publicCourse(
         await service.course(req.gotitAuth!, parseInput(uuidSchema, req.params.id)),
+      ),
+    }),
+  );
+  router.get('/:id/units/:unitKey/words', async (req, res) =>
+    res.json(
+      await service.unitWords(
+        req.gotitAuth!,
+        parseInput(uuidSchema, req.params.id),
+        parseInput(
+          z
+            .string()
+            .min(1)
+            .max(70)
+            .regex(/^[a-z0-9-]+$/),
+          req.params.unitKey,
+        ),
+      ),
+    ),
+  );
+  router.post('/:id/path-choices', async (req, res) =>
+    res.json({
+      course: await service.pathChoice(
+        req.gotitAuth!,
+        parseInput(uuidSchema, req.params.id),
+        parseInput(coursePathChoiceSchema, req.body),
       ),
     }),
   );

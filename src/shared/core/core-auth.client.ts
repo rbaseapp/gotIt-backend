@@ -40,7 +40,7 @@ const billingStatusSchema = z.object({
 const minuteGrantsSchema = z.object({
   grants: z.array(
     z.object({
-      sourceKind: z.enum(['subscription', 'purchase']),
+      sourceKind: z.enum(['subscription', 'purchase', 'trial']),
       sourceId: z.string().min(1),
       startsAt: z.string().datetime({ offset: true }),
       endsAt: z.string().datetime({ offset: true }),

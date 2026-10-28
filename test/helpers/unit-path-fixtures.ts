@@ -90,7 +90,7 @@ export function unitHistoryFixture(lessons: StoredPrivateLesson[]) {
   return {
     journal,
     store,
-    courses: new CourseService(store, profiles, undefined, undefined, journal),
+    courses: new CourseService(store, profiles, undefined, undefined, undefined, journal),
     seed: (identity = scope) =>
       lessons.forEach((lesson) =>
         store.documents.set(store.key(identity, lesson.id), unitAssignment(lesson, true)),

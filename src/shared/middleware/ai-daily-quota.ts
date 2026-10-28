@@ -5,7 +5,12 @@ import type { RateLimitContract } from './rate-limit.js';
 export type AiDailyFeature =
   | 'course_generation'
   | 'course_transcription'
+  | 'curriculum_generation'
+  | 'curriculum_audio'
+  | 'curriculum_transcription'
   | 'private_lesson_brief'
+  | 'private_lesson_plan'
+  | 'private_lesson_answer'
   | 'private_lesson_report'
   | 'ai_translation'
   | 'concept_assignment_live'
@@ -16,7 +21,12 @@ export type AiDailyFeature =
 const LIMITS: Record<AiDailyFeature, number> = {
   course_generation: 40,
   course_transcription: 40,
+  curriculum_generation: 120,
+  curriculum_audio: 120,
+  curriculum_transcription: 80,
   private_lesson_brief: 60,
+  private_lesson_plan: 120,
+  private_lesson_answer: 600,
   private_lesson_report: 60,
   ai_translation: 100,
   concept_assignment_live: 200,

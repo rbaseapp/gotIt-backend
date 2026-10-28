@@ -186,7 +186,7 @@ export class ReadingService {
       null;
     const ids =
       input.learningItemIds ??
-      (await this.practice.queue(scope, 20)).items
+      (await this.practice.queue(scope, 20, input.targetLanguageCode)).items
         .filter((i) => i.sourceLanguageCode === input.targetLanguageCode)
         .slice(0, 10)
         .map((i) => i.id as string);

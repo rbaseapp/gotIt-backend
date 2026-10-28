@@ -254,6 +254,60 @@ test('course requires two explicit approvals; a preview cannot start a lesson', 
   });
   assert.equal(active.nextLesson?.unitKey, 'foundation');
 });
+test('review can correct every preference, including target language before the first plan', async () => {
+  const { store, service } = setup();
+  const course = courseFixture();
+  course.reportedAvailability = '10 minutes twice a week';
+  store.seed(course);
+  const approved = await service.approvePreferences(scope, course.id, command(0));
+  const preferences = {
+    ...course.preferences,
+    targetLanguageCode: 'de',
+    supportLanguageCode: 'fr',
+    path: 'goal' as const,
+    goal: 'Travel conversations',
+    experience: 'Some prior lessons',
+    startingLevel: 'A2' as const,
+    absoluteBeginner: false,
+    ageGroup: 'teen' as const,
+    literacy: 'developing' as const,
+    minutesPerLesson: 5 as const,
+    daysPerWeek: 2,
+    interests: [],
+    statedNeeds: ['Short explanations'],
+    recommendations: [],
+  };
+  const input = { ...command(approved.revision), preferences };
+  const edited = await service.updatePreferences(scope, course.id, input);
+  assert.deepEqual(edited.preferences, preferences);
+  assert.equal(edited.approvedPreferences, null);
+  assert.equal(edited.preferencesApprovedAt, null);
+  assert.equal(edited.reportedAvailability, undefined);
+  assert.deepEqual(await service.updatePreferences(scope, course.id, input), edited);
+  await assert.rejects(() => service.plan(scope, course.id, command(edited.revision)), conflict);
+  const reapproved = await service.approvePreferences(scope, course.id, command(edited.revision));
+  assert.deepEqual(reapproved.approvedPreferences, preferences);
+});
+
+test('target language stays fixed once a course plan exists', async () => {
+  const { store, service } = setup();
+  const course = courseFixture();
+  course.versions = [
+    { version: 1, preferences: course.preferences, plan, createdAt: course.createdAt },
+  ];
+  course.draftVersion = 1;
+  store.seed(course);
+  await assert.rejects(
+    () =>
+      service.updatePreferences(scope, course.id, {
+        ...command(0),
+        preferences: { ...course.preferences, targetLanguageCode: 'de' },
+      }),
+    conflict,
+  );
+  assert.equal((await service.course(scope, course.id)).preferences.targetLanguageCode, 'en');
+});
+
 test('preference edits invalidate approval; stale generation cannot overwrite newer preferences', async () => {
   const { store, service, ai } = setup();
   const course = courseFixture();
@@ -849,10 +903,12 @@ test('homework generation accepts saved report examples and corrected forms as e
     async (_url, options) => {
       const body = JSON.parse(String(options?.body));
       if (body.text.format.name === 'lesson_homework')
-        assert.deepEqual(
-          body.text.format.schema.properties.tasks.items.properties.sourceQuote.enum,
-          ['I am at home.', 'We are at home.', 'Do you drive?', 'Yes, I do.'],
-        );
+        assert.deepEqual(body.text.format.schema.properties.tasks.items.properties.sourceId.enum, [
+          'source_1',
+          'source_2',
+          'source_3',
+          'source_4',
+        ]);
       return Response.json({
         status: 'completed',
         output: [
@@ -865,8 +921,11 @@ test('homework generation accepts saved report examples and corrected forms as e
                     ? { valid: true, feedback: 'Clear and grounded' }
                     : {
                         ...expandedHomeworkContent(),
-                        tasks: expandedHomeworkContent().tasks.map((task, index) =>
-                          index === 0 ? { ...task, sourceQuote: 'Do you drive?' } : task,
+                        tasks: expandedHomeworkContent().tasks.map(
+                          ({ sourceQuote: _quote, ...task }, index) => ({
+                            ...task,
+                            sourceId: index === 0 ? 'source_3' : 'source_1',
+                          }),
                         ),
                       },
                 ),
@@ -885,6 +944,113 @@ test('homework generation accepts saved report examples and corrected forms as e
     (await service.homework(scope, homework.id)).content?.tasks[0]?.sourceQuote,
     'Do you drive?',
   );
+});
+
+for (const shortPractice of [false, true]) {
+  test(`homework uses safe source identifiers and preserves multiline Unicode evidence (${shortPractice ? 'unit' : 'daily'})`, async () => {
+    const store = new MemoryLearningStore();
+    const homework = homeworkFixture();
+    homework.content = null;
+    homework.progress = [];
+    const quote = ' \tI am at home.\nWe are at home.\r\n\tשלום "quoted" \\ text\u0000 \n';
+    homework.source.turns[0]!.text = quote;
+    if (shortPractice) homework.wordPack = { packId: randomUUID(), station: 'supported' };
+    store.seed(homework);
+    let calls = 0;
+    const provider = new OpenAiCourseGenerator(
+      'test-key',
+      'model',
+      'transcriber',
+      async (_url, options) => {
+        calls++;
+        const body = JSON.parse(String(options?.body));
+        const data = JSON.parse(body.input[0].content);
+        const review = body.text.format.name === 'lesson_homework_review';
+        if (!review) {
+          // Simulate the provider's strict-schema boundary, which rejects newlines in enums.
+          const taskSchema = body.text.format.schema.properties.tasks.items;
+          assert.equal(taskSchema.properties.sourceQuote, undefined);
+          assert.deepEqual(taskSchema.properties.sourceId.enum, ['source_1']);
+          assert.ok(!JSON.stringify(body.text.format.schema).includes('I am at home.'));
+          assert.deepEqual(data.source.quotes, [{ id: 'source_1', text: quote }]);
+          assert.match(body.instructions, /select sourceId/u);
+        } else {
+          assert.equal(data.tasks[0].sourceQuote, quote);
+          assert.equal(data.tasks[0].sourceId, undefined);
+        }
+        const full = expandedHomeworkContent();
+        const result = review
+          ? { valid: true, feedback: 'Clear and grounded' }
+          : {
+              ...full,
+              estimatedMinutes: shortPractice ? 3 : 12,
+              tasks: (shortPractice ? full.tasks.slice(0, 3) : full.tasks).map(
+                ({ sourceQuote: _quote, ...task }) => ({ ...task, sourceId: 'source_1' }),
+              ),
+            };
+        return Response.json({
+          status: 'completed',
+          output: [{ content: [{ type: 'output_text', text: JSON.stringify(result) }] }],
+        });
+      },
+    );
+    const service = new CourseService(store, profiles, provider);
+    const input = command(0);
+    const prepared = await service.prepareHomework(scope, homework.id, input);
+    assert.equal(prepared.tasks.length, shortPractice ? 3 : 12);
+    const saved = await service.homework(scope, homework.id);
+    assert.equal(saved.content?.tasks[0]?.sourceQuote, quote);
+    assert.ok(!JSON.stringify(saved.content).includes('sourceId'));
+    assert.equal(
+      (await service.prepareHomework(scope, homework.id, input)).revision,
+      prepared.revision,
+    );
+    assert.equal(calls, 2, 'receipt replay does not regenerate content');
+  });
+}
+
+test('unknown generated source identifiers cannot save homework or consume a command', async () => {
+  const store = new MemoryLearningStore();
+  const homework = homeworkFixture();
+  homework.content = null;
+  homework.progress = [];
+  store.seed(homework);
+  const original = await store.get(scope, homework.id);
+  let calls = 0;
+  const provider = new OpenAiCourseGenerator('test-key', 'model', 'transcriber', async () => {
+    calls++;
+    const content = expandedHomeworkContent();
+    return Response.json({
+      status: 'completed',
+      output: [
+        {
+          content: [
+            {
+              type: 'output_text',
+              text: JSON.stringify({
+                ...content,
+                tasks: content.tasks.map(({ sourceQuote: _quote, ...task }) => ({
+                  ...task,
+                  sourceId: 'source_999',
+                })),
+              }),
+            },
+          ],
+        },
+      ],
+    });
+  });
+  const service = new CourseService(store, profiles, provider);
+  const input = command(0);
+  for (let attempt = 0; attempt < 2; attempt++) {
+    await assert.rejects(
+      service.prepareHomework(scope, homework.id, input),
+      (error: unknown) => error instanceof AppError && error.code === 'COURSE_AI_UNAVAILABLE',
+    );
+    assert.deepEqual(await store.get(scope, homework.id), original);
+    assert.equal(store.receipts.size, 0);
+  }
+  assert.equal(calls, 2);
 });
 
 test('sparse saved excerpts can use taught report grammar without treating future course topics as taught', async () => {
@@ -1121,7 +1287,7 @@ test('course HTTP routes enforce Core identity, entitlement, strict input and pr
               tier: allowed ? 'paid' : 'free',
               access: allowed,
               plan: { key: 'test', name: 'Test', kind: allowed ? 'paid' : 'free' },
-              entitlements: allowed ? ['practice.play'] : [],
+              entitlements: allowed ? ['practice.play', 'curriculum.access'] : [],
               subscription: null,
               trial: null,
             },
@@ -1184,7 +1350,7 @@ test('course HTTP routes enforce Core identity, entitlement, strict input and pr
     .set('Authorization', 'Bearer fixture')
     .expect(204);
   assert.equal(await store.get(scope, course.id), null);
-  assert.equal(API_ROUTES.filter(({ path }) => path.startsWith('/api/v1/courses')).length, 15);
+  assert.equal(API_ROUTES.filter(({ path }) => path.startsWith('/api/v1/courses')).length, 19);
   assert.equal(
     new Set(API_ROUTES.map(({ method, path }) => `${method} ${path}`)).size,
     API_ROUTES.length,
@@ -1197,6 +1363,12 @@ test('course HTTP routes enforce Core identity, entitlement, strict input and pr
   assert.ok(
     API_ROUTES.some(
       ({ method, path }) => method === 'POST' && path === '/api/v1/admin/programs/preview',
+    ),
+  );
+  assert.equal(API_ROUTES.length, 184);
+  assert.ok(
+    API_ROUTES.some(
+      ({ method, path }) => method === 'POST' && path === '/api/v1/learning-items/reading-guides',
     ),
   );
 });

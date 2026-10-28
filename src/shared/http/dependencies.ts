@@ -13,6 +13,7 @@ import type { WordPackRepository } from '../../modules/word-packs/word-packs.rep
 import type { WordPackStudyService } from '../../modules/word-packs/word-pack-study.service.js';
 import type { PrivateLessonService } from '../../modules/private-lessons/private-lesson.service.js';
 import type { CourseService } from '../../modules/courses/course.service.js';
+import type { ProgramArtworkService } from '../../modules/courses/program-artwork.service.js';
 import type { AddonAccessContract } from '../../modules/addons/addon-access.js';
 import type { MinuteWallet } from '../../modules/private-lessons/minute-wallet.js';
 import type { PostgresRealtimeCallGuard } from '../../modules/private-lessons/realtime-call-guard.js';
@@ -20,6 +21,7 @@ import type { NotificationService } from '../../modules/notifications/notificati
 import type { ProductAdminService } from '../../modules/admin/admin.service.js';
 
 export type AppDependencies = {
+  curriculumService?: import('../../modules/curriculum/curriculum.service.js').CurriculumService;
   adminService?: ProductAdminService;
   logger: Logger;
   checkDatabase: () => Promise<void>;
@@ -36,6 +38,7 @@ export type AppDependencies = {
   wordPackStudyService?: WordPackStudyService;
   privateLessonService?: PrivateLessonService;
   courseService?: CourseService;
+  programArtworkService?: ProgramArtworkService;
   addonAccess?: AddonAccessContract;
   minuteWallet?: MinuteWallet;
   realtimeCallGuard?: Pick<PostgresRealtimeCallGuard, 'connect' | 'end'>;

@@ -1,4 +1,10 @@
 import { randomUUID, randomInt } from 'node:crypto';
+import {
+  prepareCurriculumPractice,
+  lockCurriculumPractice,
+  recordCurriculumPractice,
+  type CurriculumPracticeSelection,
+} from '../curriculum/curriculum.practice.js';
 import type { Pool } from 'pg';
 import { sessionReceiptSchema, attemptReceiptSchema } from './practice.receipts.js';
 import { withTransaction, type DatabaseTransaction } from '../../shared/database/transaction.js';
@@ -32,6 +38,8 @@ import {
 } from '../learning/learning.policy.js';
 import { scoreAnswer, type AnswerSpec } from './practice.scoring.js';
 import { practiceLanguagePredicate } from './practice.language.js';
+import { unitLearnedPredicate } from '../word-packs/unit-learning.js';
+import { awardDailyTask } from '../dashboard/daily-task-rewards.js';
 import type {
   SessionInput,
   SessionScope,
@@ -181,10 +189,18 @@ export class PracticeService {
     eligibleIds?: string[],
     languageCode?: string,
     includeNewItems = true,
+    packId?: string,
   ) {
     const rows = (
       await tx.query(
-        `WITH candidates AS(SELECT li.*,
+        `WITH pack_order AS (
+          SELECT link.learning_item_id,min(entry.sort_order) unit_order
+          FROM product_gotit.learning_item_pack_entries link
+          JOIN product_gotit.word_pack_entries entry ON entry.id=link.entry_id AND entry.pack_id=link.pack_id
+          WHERE link.application_id=$1 AND link.application_user_id=$2 AND link.pack_id=$12::uuid
+            AND link.excluded_at IS NULL
+          GROUP BY link.learning_item_id
+        ), candidates AS(SELECT li.*,pack_order.unit_order,
       (SELECT translation_text FROM product_gotit.item_translations t WHERE t.application_id=li.application_id AND t.application_user_id=li.application_user_id AND t.learning_item_id=li.id AND t.is_current AND is_primary) primary_translation,
       (SELECT max(recent.created_at) FROM product_gotit.practice_attempts recent
         WHERE recent.application_id=li.application_id AND recent.application_user_id=li.application_user_id
@@ -224,12 +240,13 @@ export class PracticeService {
                AND EXISTS(SELECT 1 FROM product_gotit.attempt_skill_effects effect
                  WHERE effect.practice_attempt_id=successful.id AND effect.skill_type='recall'))<$7)
          THEN 120 ELSE 0 END) queue_score,
-      row_number() OVER(PARTITION BY learning_status ORDER BY created_at,id) new_rank
-      FROM product_gotit.learning_items li WHERE application_id=$1 AND application_user_id=$2
+      row_number() OVER(PARTITION BY learning_status ORDER BY pack_order.unit_order NULLS LAST,li.created_at,li.id) new_rank
+      FROM product_gotit.learning_items li
+      LEFT JOIN pack_order ON pack_order.learning_item_id=li.id
+      WHERE application_id=$1 AND application_user_id=$2
         AND user_status='active' AND deleted_at IS NULL
         AND ($10::uuid[] IS NULL OR li.id=ANY($10::uuid[]))
         AND ($11::text IS NULL OR li.source_language_code=$11)
-        AND ($12::boolean OR li.learning_status<>'new')
         AND ($10::uuid[] IS NOT NULL OR
           NOT EXISTS(SELECT 1 FROM product_gotit.learning_item_pack_entries catalog_link
             JOIN product_gotit.user_word_packs membership
@@ -251,10 +268,13 @@ export class PracticeService {
        AND (learning_status<>'mastered' OR next_review_at<=now()))
        SELECT * FROM eligible WHERE $11::text IS NOT NULL OR source_language_code=(
          SELECT source_language_code FROM eligible ORDER BY last_matching_success_at NULLS FIRST,queue_score DESC,created_at,id LIMIT 1)
-       ORDER BY last_matching_success_at NULLS FIRST,queue_score DESC,created_at,id LIMIT $9`,
+       ORDER BY
+         CASE WHEN $12::uuid IS NOT NULL THEN CASE WHEN learning_status='new' THEN 1 ELSE 0 END END,
+         CASE WHEN $12::uuid IS NOT NULL THEN unit_order END,
+         last_matching_success_at NULLS FIRST,queue_score DESC,created_at,id LIMIT $9`,
         [
           ...scopeValues(scope),
-          profile.defaultNewItemsPerDay,
+          includeNewItems ? profile.defaultNewItemsPerDay : 0,
           profile.timezone,
           this.policy.minimumScoredAttempts,
           this.policy.minimumActiveRecallSuccesses,
@@ -263,11 +283,54 @@ export class PracticeService {
           count,
           eligibleIds ?? null,
           languageCode ?? null,
-          includeNewItems,
+          packId ?? null,
         ],
       )
     ).rows;
     return rows;
+  }
+  private async curriculumBatch(
+    tx: DatabaseTransaction,
+    scope: ProfileScope,
+    packId: string,
+    ids: string[],
+    count: number,
+    includeNew: boolean,
+  ) {
+    const rows = (
+      await tx.query(
+        `SELECT li.id,li.learning_status,${unitLearnedPredicate('li', '$3::uuid')} AS learned
+       FROM product_gotit.learning_item_pack_entries link
+       JOIN product_gotit.word_pack_entries entry ON entry.id=link.entry_id AND entry.pack_id=link.pack_id
+       JOIN product_gotit.learning_items li ON li.id=link.learning_item_id
+         AND li.application_id=link.application_id AND li.application_user_id=link.application_user_id
+       WHERE link.application_id=$1 AND link.application_user_id=$2 AND link.pack_id=$3
+         AND li.id=ANY($4::uuid[]) AND li.user_status='active' AND li.deleted_at IS NULL
+         AND ${practiceLanguagePredicate()}
+       ORDER BY entry.sort_order,entry.id`,
+        [...scopeValues(scope), packId, ids],
+      )
+    ).rows;
+    const seen = new Set<string>();
+    const ordered = rows.filter((row) => {
+      if (seen.has(row.id)) return false;
+      seen.add(row.id);
+      return true;
+    });
+    const firstUnfinished = ordered.findIndex((row) => !row.learned);
+    // Once the unit is finished, this same entry can revisit its first batch.
+    const start = firstUnfinished < 0 ? 0 : Math.floor(firstUnfinished / count) * count;
+    const currentBatch = ordered
+      .slice(start, start + count)
+      .filter((row) => firstUnfinished < 0 || !row.learned);
+    const selected: string[] = [];
+    for (const row of currentBatch) {
+      // Daily preferences size the batch; they never block another unit session.
+      // An explicit review-only request still stops before introducing a new word.
+      if (!includeNew && row.learning_status === 'new') break;
+      selected.push(row.id);
+    }
+    return selected;
   }
   private async resolveSessionScope(
     tx: DatabaseTransaction,
@@ -345,7 +408,14 @@ export class PracticeService {
       correctCount: row.correct_count,
       xpEarned: row.xp_earned,
       algorithmVersion: row.algorithm_version,
+      curriculumOrder: selection.curriculumOrder === true,
       scope: selection.scope ?? null,
+      ...(selection.curriculum
+        ? {
+            curriculumUnitId: selection.curriculum.unitId,
+            curriculumTitle: selection.curriculum.title,
+          }
+        : {}),
     };
   }
   private async session(tx: DatabaseTransaction, scope: ProfileScope, id: string) {
@@ -361,6 +431,7 @@ export class PracticeService {
   async createSession(scope: ProfileScope, key: string, input: SessionInput) {
     const profile = await this.profiles.getProfile(scope);
     const hash = fingerprint(input);
+    const curriculumOrder = input.sessionType === 'smart_review' && input.scope?.type === 'pack';
     return withTransaction(this.pool, async (tx) => {
       await tx.lock(['practice-session-event', ...scopeValues(scope), key]);
       const prior = (
@@ -378,6 +449,12 @@ export class PracticeService {
         return { session: parsed.data.data, replayed: true };
       }
       let ids = input.learningItemIds;
+      let curriculum: CurriculumPracticeSelection | undefined;
+      if (input.curriculumUnitId) {
+        const prepared = await prepareCurriculumPractice(tx, scope, input.curriculumUnitId);
+        ids = prepared.ids;
+        curriculum = prepared.selection;
+      }
       let scopeSnapshot: { type: string; id: string; title: string } | null = null;
       if (input.readingId) {
         const content = await tx.query(
@@ -399,19 +476,45 @@ export class PracticeService {
         scopeSnapshot = resolved.snapshot;
         ids = resolved.ids;
       }
-      if (!ids)
+      if (input.includeNewItems !== undefined && input.learningItemIds) {
+        const selected = (
+          await tx.query(
+            `SELECT id,source_language_code,${practiceLanguagePredicate()} AS language_matches
+          FROM product_gotit.learning_items li WHERE application_id=$1 AND application_user_id=$2
+          AND id=ANY($3::uuid[]) AND user_status='active' AND deleted_at IS NULL FOR SHARE`,
+            [...scopeValues(scope), input.learningItemIds],
+          )
+        ).rows;
+        if (selected.length !== input.learningItemIds.length) throw itemNotFound();
+        if (
+          selected.some((item) => !item.language_matches) ||
+          new Set(selected.map((item) => item.source_language_code)).size > 1
+        )
+          throw new AppError(400, 'VALIDATION_ERROR', 'A session must contain one source language');
+      }
+      if (curriculumOrder && input.scope?.type === 'pack')
+        ids = await this.curriculumBatch(
+          tx,
+          scope,
+          input.scope.id,
+          ids ?? [],
+          input.count,
+          input.includeNewItems ?? true,
+        );
+      else if (!input.curriculumUnitId && (!ids || input.includeNewItems !== undefined))
         ids = (
           await this.queueRows(
             tx,
             scope,
             profile,
             input.count,
-            undefined,
+            ids,
             input.sourceLanguageCode,
-            input.includeNewItems,
+            input.includeNewItems ?? true,
+            input.scope?.type === 'pack' ? input.scope.id : undefined,
           )
         ).map((r) => r.id);
-      if (!ids.length) throw new AppError(409, 'NO_ELIGIBLE_ITEMS', 'No eligible learning items');
+      if (!ids?.length) throw new AppError(409, 'NO_ELIGIBLE_ITEMS', 'No eligible learning items');
       const items = (
         await tx.query(
           `SELECT id,source_language_code,${practiceLanguagePredicate()} AS language_matches FROM product_gotit.learning_items li WHERE application_id=$1 AND application_user_id=$2 AND id=ANY($3::uuid[]) AND user_status='active' AND deleted_at IS NULL FOR SHARE`,
@@ -456,6 +559,8 @@ export class PracticeService {
               itemIds: ids,
               readingId: input.readingId ?? null,
               scope: scopeSnapshot,
+              curriculumOrder,
+              ...(curriculum ? { curriculum } : {}),
             }),
           ],
         )
@@ -844,6 +949,22 @@ export class PracticeService {
             now,
           );
       }
+      let taskReward = 0;
+      if (
+        status === 'completed' &&
+        row.session_type === 'article_quiz' &&
+        row.selection.readingId
+      ) {
+        const answered = (
+          await tx.query(
+            `SELECT count(DISTINCT learning_item_id)::integer AS count FROM product_gotit.practice_attempts
+           WHERE application_id=$1 AND application_user_id=$2 AND practice_session_id=$3 AND result<>'skipped'`,
+            [...scopeValues(scope), id],
+          )
+        ).rows[0]!.count;
+        if (row.item_count > 0 && answered >= row.item_count)
+          taskReward = await awardDailyTask(tx, scope, 'reading', id, profile.timezone, now);
+      }
       const duration = Math.max(
         0,
         Math.min(
@@ -854,7 +975,7 @@ export class PracticeService {
       const updated = (
         await tx.query(
           `UPDATE product_gotit.practice_sessions SET status=$4,ended_at=$5,duration_seconds=$6,xp_earned=xp_earned+$7,updated_at=now() WHERE application_id=$1 AND application_user_id=$2 AND id=$3 RETURNING *`,
-          [...scopeValues(scope), id, status, now, duration, reward],
+          [...scopeValues(scope), id, status, now, duration, reward + taskReward],
         )
       ).rows[0]!;
       if (status === 'completed') {
@@ -873,6 +994,16 @@ export class PracticeService {
       const session = await this.session(tx, scope, id);
       if (session.status !== 'active')
         throw new AppError(409, 'SESSION_CLOSED', 'Session is closed');
+      if (
+        session.session_type === 'smart_review' &&
+        session.selection.scope?.type === 'pack' &&
+        session.selection.curriculumOrder !== true
+      )
+        throw new AppError(
+          409,
+          'UNIT_SESSION_ORDER_CHANGED',
+          'This unit session predates curriculum ordering. Return to the unit and start a new practice session.',
+        );
       if (session.algorithm_version !== this.version)
         throw new AppError(
           409,
@@ -920,6 +1051,8 @@ export class PracticeService {
         )
       ).rows;
       if (!rows.length) throw new AppError(409, 'NO_ELIGIBLE_ITEMS', 'No eligible learning items');
+      if (session.selection.curriculumOrder)
+        rows.sort((left, right) => ids.indexOf(left.id) - ids.indexOf(right.id));
       const preferUnseen =
         (session.session_type === 'smart_review' || session.session_type === 'matching') &&
         !input.learningItemIds;
@@ -950,7 +1083,9 @@ export class PracticeService {
       }
       const startIndex = preferUnseen ? 0 : issuedCount;
       const choiceRows =
-        session.session_type === 'smart_review'
+        session.session_type === 'smart_review' ||
+        ((input.exerciseType ?? session.session_type) === 'recall' &&
+          input.kind === 'multiple_choice')
           ? [
               ...rows,
               ...(
@@ -963,6 +1098,7 @@ export class PracticeService {
                    FROM product_gotit.learning_items li
                    WHERE li.application_id=$1 AND li.application_user_id=$2
                      AND NOT(li.id=ANY($3::uuid[]))
+                     AND ($4::uuid[] IS NULL OR li.id=ANY($4::uuid[]))
                      AND li.user_status='active' AND li.deleted_at IS NULL
                      AND ${practiceLanguagePredicate()}
                      AND EXISTS(SELECT 1 FROM product_gotit.learning_items target
@@ -972,7 +1108,13 @@ export class PracticeService {
                          AND target.source_language_code=li.source_language_code
                          AND target.translation_language_code=li.translation_language_code)
                    ORDER BY li.created_at,id LIMIT 50`,
-                  [...scopeValues(scope), ids],
+                  [
+                    ...scopeValues(scope),
+                    ids,
+                    session.session_type !== 'smart_review' || session.selection.scope
+                      ? sessionIds
+                      : null,
+                  ],
                 )
               ).rows,
             ]
@@ -1256,7 +1398,11 @@ export class PracticeService {
           expiresAt,
         });
       }
-      if (session.session_type === 'smart_review') {
+      if (session.selection.curriculumOrder) {
+        exercises.sort(
+          (left, right) => ids.indexOf(left.learningItemId) - ids.indexOf(right.learningItemId),
+        );
+      } else if (session.session_type === 'smart_review') {
         const rank = new Map(SMART_LEARNING_ORDER.map((type, index) => [type, index]));
         exercises.sort(
           (left, right) =>
@@ -1316,6 +1462,7 @@ export class PracticeService {
       ).rows[0];
       if (!initial) throw new AppError(404, 'NOT_FOUND', 'Exercise not found');
       const session = await this.session(tx, scope, initial.practice_session_id);
+      if (session.selection?.curriculum) await lockCurriculumPractice(tx, scope);
       if (session.status !== 'active')
         throw new AppError(409, 'SESSION_CLOSED', 'Session is closed');
       if (session.algorithm_version !== this.version)
@@ -1402,6 +1549,21 @@ export class PracticeService {
         ],
       );
       const enabled = this.availableSkills(profile, item.source_language_code);
+      if (session.selection?.curriculum)
+        await recordCurriculumPractice(
+          tx,
+          scope,
+          session.selection.curriculum as CurriculumPracticeSelection,
+          {
+            itemId: String(item.id),
+            type: String(exercise.exercise_type),
+            correct: scored.result === 'correct' && scored.score >= 85,
+            assisted: input.hintsUsed > 0 || input.selfRating !== undefined,
+            cued: spec.kind !== 'typed',
+            skipped: input.skipped,
+            now,
+          },
+        );
       if (!input.skipped && !spec.skills.some((e) => enabled.includes(e.skill)))
         throw new AppError(409, 'SKILL_CHANGED', 'Exercise skill is no longer enabled');
       if (!input.skipped)
@@ -1658,7 +1820,16 @@ export class PracticeService {
             [...scopeValues(scope), day, goalXp],
           );
       }
-      const dailyXpRemaining = Math.max(0, this.policy.dailyXpCap - todayXp);
+      const practiceXp = Number(
+        (
+          await tx.query(
+            `SELECT COALESCE(sum(xp_amount),0)::integer xp FROM product_gotit.xp_events
+         WHERE application_id=$1 AND application_user_id=$2 AND (created_at AT TIME ZONE $4)::date=$3::date AND source_type<>'daily_task'`,
+            [...scopeValues(scope), day, profile.timezone],
+          )
+        ).rows[0]!.xp,
+      );
+      const dailyXpRemaining = Math.max(0, this.policy.dailyXpCap - practiceXp);
       await tx.query(
         'UPDATE product_gotit.practice_sessions SET attempt_count=$4,correct_count=correct_count+$5,xp_earned=xp_earned+$6,updated_at=now() WHERE application_id=$1 AND application_user_id=$2 AND id=$3',
         [
@@ -1738,7 +1909,7 @@ export class PracticeService {
     if (amount <= 0) return 0;
     const daily = (
       await tx.query(
-        'SELECT COALESCE(sum(xp_amount),0)::integer xp FROM product_gotit.xp_events WHERE application_id=$1 AND application_user_id=$2 AND (created_at AT TIME ZONE $4)::date=$3::date',
+        "SELECT COALESCE(sum(xp_amount),0)::integer xp FROM product_gotit.xp_events WHERE application_id=$1 AND application_user_id=$2 AND (created_at AT TIME ZONE $4)::date=$3::date AND source_type<>'daily_task'",
         [...scopeValues(scope), day, timezone],
       )
     ).rows[0]!.xp;
@@ -1779,12 +1950,23 @@ export class PracticeService {
   }
 }
 
-function hideAnswers(context: string | null, answers: string[]) {
+export function hideAnswers(context: string | null, answers: string[]) {
   if (!context) return null;
-  let result = context;
-  for (const answer of answers) {
-    const escaped = answer.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&');
-    result = result.replace(new RegExp(escaped, 'giu'), '_____');
+  const alternatives = [...new Set(answers.filter((answer) => answer.trim()))]
+    .sort((a, b) => b.length - a.length)
+    .map((answer) => answer.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&'));
+  if (!alternatives.length) return context.slice(0, 4000);
+  // Unicode word segmentation also handles contractions, combining marks and
+  // languages without spaces. Never turn a substring of a word into a gap.
+  const boundaries = new Set<number>();
+  for (const segment of new Intl.Segmenter(undefined, { granularity: 'word' }).segment(context)) {
+    boundaries.add(segment.index);
+    boundaries.add(segment.index + segment.segment.length);
   }
+  const result = context.replace(
+    new RegExp(alternatives.join('|'), 'giu'),
+    (match, offset: number) =>
+      boundaries.has(offset) && boundaries.has(offset + match.length) ? '_____' : match,
+  );
   return result.slice(0, 4000);
 }

@@ -37,6 +37,7 @@ export function createApp(dependencies: AppDependencies) {
     app.use('/api/v1', createRateLimit(dependencies.rateLimiter, 'ip', 240));
   app.use('/api/v1/pronunciation/assessments', express.json({ limit: '1mb' }));
   app.use('/api/v1/courses/transcribe', express.json({ limit: '700kb' }));
+  app.use('/api/v1/structured-english/transcriptions', express.json({ limit: '4mb' }));
   app.use(
     [
       '/api/v1/admin/programs',

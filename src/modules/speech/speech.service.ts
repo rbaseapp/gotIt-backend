@@ -21,12 +21,16 @@ export interface SpeechProvider {
     signal: AbortSignal,
   ): Promise<{ score: number; feedback: string; model: string | null }>;
 }
-export function validateWav(audio: Buffer) {
+export function validateWav(audio: Buffer, maximumSeconds = 15) {
+  const bound =
+    Number.isInteger(maximumSeconds) && maximumSeconds >= 1 && maximumSeconds <= 90
+      ? maximumSeconds
+      : 15;
   const invalid = () =>
-    new AppError(400, 'AUDIO_INVALID', 'Audio must be 16 kHz mono PCM WAV, up to 15 seconds');
+    new AppError(400, 'AUDIO_INVALID', `Audio must be 16 kHz mono PCM WAV, up to ${bound} seconds`);
   if (
     audio.length < 44 ||
-    audio.length > 500000 ||
+    audio.length > bound * 32000 + 20000 ||
     audio.toString('ascii', 0, 4) !== 'RIFF' ||
     audio.toString('ascii', 8, 12) !== 'WAVE' ||
     audio.readUInt32LE(4) !== audio.length - 8
@@ -65,7 +69,7 @@ export function validateWav(audio: Buffer) {
     position = end + (size % 2);
     if (position > audio.length) throw invalid();
   }
-  if (!format || !hasData || dataSize < 3200 || dataSize > 480000) throw invalid();
+  if (!format || !hasData || dataSize < 3200 || dataSize > bound * 32000) throw invalid();
   return { durationSeconds: dataSize / 32000 };
 }
 export class SpeechService {

@@ -25,6 +25,13 @@ test(
       const profiles = new ProfileService(new ProfileRepository(db.runtimePool));
       await profiles.getProfile(scope);
       await profiles.patchProfile(scope, { timezone: 'Asia/Jerusalem' });
+      const avatar =
+        'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aZYsAAAAASUVORK5CYII=';
+      await profiles.patchProfile(scope, { displayName: 'Learner', avatarData: avatar });
+      assert.equal((await profiles.getProfile(scope)).avatarData, avatar);
+      assert.equal((await profiles.getProfile(scope)).displayName, 'Learner');
+      await profiles.patchProfile(scope, { avatarData: null });
+      assert.equal((await profiles.getProfile(scope)).avatarData, null);
       const repository = new NotificationRepository(db.runtimePool);
       await repository.patchPreferences(
         scope,
@@ -84,6 +91,27 @@ test(
       );
       assert.equal(await repository.queuePractice(new Date('2026-10-25T00:30:00Z')), 2);
       assert.equal(await repository.queuePractice(new Date('2026-10-25T01:30:00Z')), 0);
+      // Schedule fields survive a reload and control actual enqueueing.
+      await repository.patchPreferences(scope, { enabled: false });
+      assert.equal(await repository.queuePractice(new Date('2026-10-26T18:00:00Z')), 0);
+      await repository.patchPreferences(
+        scope,
+        {
+          enabled: true,
+          reminderHour: 18,
+          reminderMinute: 30,
+          reminderDays: [1],
+          quietEnabled: true,
+          quietStart: 18 * 60,
+          quietEnd: 20 * 60,
+        },
+        'learner@example.test',
+      );
+      assert.deepEqual((await repository.getPreferences(scope)).reminderDays, [1]);
+      assert.equal(await repository.queuePractice(new Date('2026-10-26T17:35:00Z')), 0);
+      await repository.patchPreferences(scope, { quietEnabled: false }, 'learner@example.test');
+      assert.equal(await repository.queuePractice(new Date('2026-10-26T17:35:00Z')), 2);
+      assert.equal(await repository.queuePractice(new Date('2026-10-27T17:00:00Z')), 0);
       await repository.patchPreferences(
         scope,
         { systemEmail: true, systemPush: true },

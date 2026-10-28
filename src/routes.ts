@@ -1,4 +1,5 @@
 import { Router, text as expressText } from 'express';
+import { createCurriculumRoutes } from './modules/curriculum/curriculum.routes.js';
 import {
   createProductAdminRouter,
   createLearnerSupportRouter,
@@ -183,9 +184,22 @@ export function createRoutes(dependencies: AppDependencies) {
           createRequireAddonMiddleware(dependencies.addonAccess!, 'private_lessons'),
         )
       : requirePractice;
-  const requireCourse = dependencies.enforceAddonEntitlements
+  // Programs and the free-conversation teacher are paid (or trial) features; saving words, games
+  // and the onboarding placement stay free.
+  const requireCurriculum = createRequireEntitlementMiddleware(
+    dependencies.coreAuthClient,
+    'curriculum.access',
+    dependencies.enforcePaidEntitlements === true,
+  );
+  const requireTutorSession = createRequireEntitlementMiddleware(
+    dependencies.coreAuthClient,
+    'tutor.session',
+    dependencies.enforcePaidEntitlements === true,
+  );
+  const requireCourseBase = dependencies.enforceAddonEntitlements
     ? requireBoth(requirePractice, createRequireAddonMiddleware(dependencies.addonAccess!, 'ai'))
     : requirePractice;
+  const requireCourse = requireBoth(requireCourseBase, requireCurriculum);
   const requireAiTranslation = dependencies.enforceAddonEntitlements
     ? requireBoth(
         requirePaidAiTranslation,
@@ -265,16 +279,38 @@ export function createRoutes(dependencies: AppDependencies) {
   if (dependencies.privateLessonService) {
     router.use(
       '/api/v1/private-lessons',
-      createPrivateLessonRoutes(dependencies.privateLessonService, requireLesson),
+      createPrivateLessonRoutes(
+        dependencies.privateLessonService,
+        requireLesson,
+        requireTutorSession,
+        requireCurriculum,
+      ),
     );
   }
   if (dependencies.courseService) {
-    router.use('/api/v1/courses', createCourseRoutes(dependencies.courseService, requireCourse));
+    router.use(
+      '/api/v1/courses',
+      createCourseRoutes(
+        dependencies.courseService,
+        requireCourse,
+        dependencies.programArtworkService,
+      ),
+    );
   }
   if (dependencies.dashboardService) {
+    // Other product surfaces keep their existing entitlement and routing contracts.
     router.use('/api/v1/dashboard', createDashboardRoutes(dependencies.dashboardService));
     router.use('/api/v1/gamification', createGamificationRoutes(dependencies.dashboardService));
   }
+  if (dependencies.curriculumService)
+    router.use(
+      '/api/v1/structured-english',
+      createCurriculumRoutes(
+        dependencies.curriculumService,
+        requireBoth(requirePractice, requireCurriculum),
+        requireCourse,
+      ),
+    );
   if (dependencies.readingService)
     router.use('/api/v1/reading', createReadingRoutes(dependencies.readingService, requireAi));
   if (dependencies.speechService) {

@@ -16,6 +16,9 @@ const definitions = [
     'courses/course.provider.ts',
     'admin/admin.service.ts',
     'private-lessons/private-lesson.content.ts',
+    'private-lessons/private-lesson.planner.ts',
+    'private-lessons/private-lesson.activity.ts',
+    'private-lessons/private-lesson.teachers.ts',
   ],
   [
     'lesson-summary',
@@ -27,6 +30,7 @@ const definitions = [
     'התנהגות המורה, שפות, תיקונים וזרימת שיעור בזמן אמת.',
     'private-lessons/private-lesson.prompt.ts',
     'private-lessons/private-lesson.directives.ts',
+    'private-lessons/private-lesson.teachers.ts',
   ],
   ['image-generation', 'יצירת איור לפי המשמעות שנבחרה.', 'practice/openai-study-image.provider.ts'],
   [
@@ -67,9 +71,17 @@ for (const [key, description, ...files] of definitions) {
         add(`${file}: instructions`, node.initializer);
       if (
         ts.isVariableDeclaration(node) &&
-        ['instructions', 'planInstruction', 'prompt', 'privateLessonBriefInstruction'].includes(
-          node.name.getText(ast),
-        )
+        [
+          'instructions',
+          'planInstruction',
+          'prompt',
+          'privateLessonBriefInstruction',
+          'privateLessonIntroductionPolicy',
+          'adaptivePlanInstruction',
+          'adaptiveScopeInstruction',
+          'exitTaskInstruction',
+          'bankSchedulingInstruction',
+        ].includes(node.name.getText(ast))
       )
         add(`${file}: ${node.name.getText(ast)}`, node.initializer);
       if (ts.isFunctionDeclaration(node) && node.name?.text === 'instructions')

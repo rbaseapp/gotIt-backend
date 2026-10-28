@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict';
+import { readdirSync } from 'node:fs';
+import { resolve } from 'node:path';
 import test from 'node:test';
 import { randomUUID } from 'node:crypto';
 import { createTestDatabase } from '../helpers/postgres.js';
@@ -28,6 +30,11 @@ import { AppError } from '../../src/shared/errors/app-error.js';
 import { withTransaction } from '../../src/shared/database/transaction.js';
 import { ensureWordImageConcept } from '../../src/modules/concepts/automatic-word-images.js';
 
+// Migrations from the later (curriculum/settings) line sit after the workload migration; roll them back
+// first so the next `down` targets the concept migration this test exercises.
+const laterMigrations = readdirSync(resolve(import.meta.dirname, '../../migrations')).filter(
+  (file) => file.endsWith('.js') && file > '1792281000000_concept-assignment-workloads.js',
+).length;
 test(
   'automatic concept assignment is durable, semantic, revision-safe and shared across languages',
   { timeout: 150000 },
@@ -830,6 +837,7 @@ test(
       await t.test(
         'the new migration guards resolved work and backfills historical words after a safe disposable rollback',
         async () => {
+          for (let i = 0; i < laterMigrations; i++) await db.migrate('down');
           await db.migrate('down'); // Workload migration is deliberately data-preserving.
           const [historical] = (
             await db.runtimePool.query(
@@ -858,6 +866,7 @@ test(
           assert.equal(released.last_error, null);
           assert.ok(new Date(released.next_attempt_at).getTime() <= Date.now());
           assert.deepEqual(released.descriptor, historical.descriptor);
+          for (let i = 0; i < laterMigrations; i++) await db.migrate('down');
           await db.migrate('down');
           await assert.rejects(db.migrate('down'));
           await db.runtimePool.query(`DELETE FROM product_gotit.learning_item_concepts`);

@@ -2,6 +2,20 @@ import { z } from 'zod';
 
 export const preferencePatchSchema = z
   .object({
+    enabled: z.boolean().optional(),
+    reminderMinute: z.number().int().min(0).max(59).optional(),
+    reminderDays: z
+      .array(z.number().int().min(0).max(6))
+      .max(7)
+      .refine((v) => new Set(v).size === v.length)
+      .optional(),
+    quietEnabled: z.boolean().optional(),
+    quietStart: z.number().int().min(0).max(1439).optional(),
+    quietEnd: z.number().int().min(0).max(1439).optional(),
+    streakEmail: z.boolean().optional(),
+    streakPush: z.boolean().optional(),
+    weeklyEmail: z.boolean().optional(),
+    weeklyPush: z.boolean().optional(),
     practiceEmail: z.boolean().optional(),
     practicePush: z.boolean().optional(),
     systemEmail: z.boolean().optional(),
@@ -12,6 +26,16 @@ export const preferencePatchSchema = z
   .refine((value) => Object.keys(value).length > 0);
 
 export type NotificationPreferences = {
+  enabled?: boolean;
+  reminderMinute?: number;
+  reminderDays?: number[];
+  quietEnabled?: boolean;
+  quietStart?: number;
+  quietEnd?: number;
+  streakEmail?: boolean;
+  streakPush?: boolean;
+  weeklyEmail?: boolean;
+  weeklyPush?: boolean;
   practiceEmail: boolean;
   practicePush: boolean;
   systemEmail: boolean;

@@ -18,6 +18,7 @@ export const authoredTaskSchema = z
   .strict();
 export const lessonMaterialSchema = z
   .object({
+    adaptationPolicy: z.enum(['within_objective', 'authored_only']).optional(),
     words: z
       .array(
         z

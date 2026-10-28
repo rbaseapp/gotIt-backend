@@ -1,3 +1,4 @@
+import { courseLessonSelectionSchema } from '../courses/course.schemas.js';
 import { z } from 'zod';
 import { languageSchema, sameBaseLanguage, textSchema } from '../capture/capture.validation.js';
 import { CEFR_LEVELS } from '../profile/profile.types.js';
@@ -38,10 +39,16 @@ export const privateLessonTeachingLanguages = ['target', 'support'] as const;
 
 export const privateLessonInputSchema = z
   .object({
+    curriculumLessonId: z
+      .string()
+      .regex(/^(?:P\d{2}|A[12]\d{2}|B[12]\d{2}|C1\d{2})-L[12]$/u)
+      .optional(),
     courseId: z.uuid().optional(),
+    courseLesson: courseLessonSelectionSchema.optional(),
     packId: z.uuid().optional(),
     station: z.enum(['supported', 'midpoint', 'review']).optional(),
     interactionMode: z.enum(['guided', 'conversation']).optional(),
+    interactionProtocol: z.literal('adaptive-v1').optional(),
     targetLanguageCode: languageSchema,
     supportLanguageCode: languageSchema.nullable().optional(),
     lessonMode: z.enum(privateLessonModes).optional(),
@@ -66,13 +73,28 @@ export const privateLessonInputSchema = z
   })
   .strict()
   .superRefine((value, context) => {
-    if (value.courseId && value.packId)
-      context.addIssue({ code: 'custom', path: ['packId'], message: 'Choose one lesson scope' });
-    if (value.station && !value.packId)
+    if (value.courseLesson && !value.courseId)
       context.addIssue({
         code: 'custom',
-        path: ['station'],
-        message: 'A station requires a word pack',
+        path: ['courseLesson'],
+        message: 'A selected lesson requires a course',
+      });
+    if (
+      value.interactionMode === 'conversation' &&
+      (value.courseId || value.packId || value.curriculumLessonId)
+    )
+      context.addIssue({
+        code: 'custom',
+        path: ['interactionMode'],
+        message: 'A program lesson uses guided interaction',
+      });
+    if ((value.courseId && value.packId) || (value.station && !value.packId))
+      context.addIssue({ code: 'custom', path: ['packId'], message: 'Choose one lesson context' });
+    if (value.curriculumLessonId && (value.courseId || value.packId))
+      context.addIssue({
+        code: 'custom',
+        path: ['curriculumLessonId'],
+        message: 'Choose one lesson context',
       });
     if (value.lessonMode === 'absolute_beginner' && value.teachingLanguage === 'target')
       context.addIssue({
@@ -93,6 +115,9 @@ export const privateLessonInputSchema = z
   });
 
 export type PrivateLessonInput = z.output<typeof privateLessonInputSchema>;
+export const lessonReplaySchema = z
+  .object({ kind: z.enum(['original', 'translation']), rate: z.enum(['normal', 'slow']) })
+  .strict();
 
 export const privateLessonPreferencesInputSchema = z
   .object({
@@ -152,6 +177,9 @@ export const privateLessonPreferencesInputSchema = z
 export type PrivateLessonPreferencesInput = z.output<typeof privateLessonPreferencesInputSchema>;
 
 export const privateLessonSetupSchema = z.object({ targetLanguageCode: languageSchema }).strict();
+export const privateLessonVoiceSampleSchema = z
+  .object({ teacherVoice: z.enum(['female', 'male']) })
+  .strict();
 export const privateLessonRoadmapInputSchema = z
   .object({
     targetLanguageCode: languageSchema,
@@ -194,6 +222,7 @@ export const privateLessonListSchema = z
     limit: z.coerce.number().int().min(1).max(50).default(20),
     courseId: z.uuid().optional(),
     packId: z.uuid().optional(),
+    targetLanguageCode: languageSchema.optional(),
   })
   .strict();
 

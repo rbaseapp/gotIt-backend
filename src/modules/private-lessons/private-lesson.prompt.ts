@@ -2,7 +2,11 @@ import type { CefrLevel } from '../profile/profile.types.js';
 import type { CourseLessonContext } from '../courses/course.schemas.js';
 import type { PrivateLessonBrief } from './private-lesson.content.js';
 import type { LessonUnit } from '../word-packs/teacher-stations.js';
-import { privateLessonTeachers } from './private-lesson.teachers.js';
+import type { PromptContent } from '../admin/admin.prompt-config.js';
+import {
+  privateLessonIntroductionPolicy,
+  privateLessonTeachers,
+} from './private-lesson.teachers.js';
 import type {
   privateLessonCorrectionModes,
   privateLessonFocusAreas,
@@ -26,10 +30,28 @@ export type PrivateLessonTarget = {
 };
 
 export type PrivateLessonPlan = {
+  curriculum?: {
+    lessonId: string;
+    version: string;
+    cursor: number;
+    title: string;
+    script: Array<Record<string, unknown>>;
+    branches: Record<string, string>;
+  } | null;
+  interactionProtocol?: 'adaptive-v1';
+  learnerStartingLevel?: CefrLevel;
+  evaluationPrompt?: PromptContent & { id: string };
+  learningEvidence?: {
+    activityId: string;
+    family: string;
+    outcome: string;
+    attempts: number;
+    learnerAnswer?: string;
+  }[];
   realtimeContract?: ReturnType<
     typeof import('./private-lesson.realtime.js').buildRealtimeLessonContract
   >;
-  wordPack?: LessonUnit | null;
+  wordPack?: PrivateLessonWordPackContext | null;
   course?: CourseLessonContext | null;
   teachingBrief?: PrivateLessonBrief;
   id: string;
@@ -67,6 +89,29 @@ export type PrivateLessonPlan = {
     evidenceLessonCount: number;
     isFirstMilestoneLesson: boolean;
   } | null;
+};
+
+export type PrivateLessonWordPackContext = {
+  material?: LessonUnit['material'];
+  materials?: LessonUnit['materials'];
+  packId: string;
+  title: string;
+  moduleNumber: number;
+  targetLanguageCode: string;
+  supportLanguageCode: string;
+  level: CefrLevel;
+  station: 'supported' | 'midpoint' | 'review';
+  introduced?: number;
+  teacherStations?: LessonUnit['teacherStations'];
+  completed: number;
+  total: number;
+  words: {
+    learningItemId?: string | null;
+    sourceText: string;
+    translationText: string;
+    exampleText: string | null;
+    introduced: boolean;
+  }[];
 };
 
 export type LessonLanguage = {
@@ -116,7 +161,7 @@ export function buildPrivateLessonPrompt(plan: PrivateLessonPlan) {
 - Use SUPPORT_LANGUAGE only for that single help response. Return to TARGET_LANGUAGE in the next response.`
     : '- No support language is configured. Never speak in a language other than TARGET_LANGUAGE.';
   const languagePolicy = supportTeaching
-    ? `- ${plan.lessonMode === 'absolute_beginner' ? 'This is an ABSOLUTE BEGINNER lesson. The learner has no prior knowledge of TARGET_LANGUAGE.' : 'This is a supported-language lesson.'}
+    ? `- ${plan.lessonMode === 'absolute_beginner' ? 'This is an ABSOLUTE BEGINNER lesson. Assume no background beyond the supplied preparation and actual prior learning evidence. Preparation is familiarity, not mastery.' : 'This is a supported-language lesson.'}
 - TEACHING_LANGUAGE is SUPPORT_LANGUAGE: ${supportLanguage!.promptName}.
 - Speak primarily in TEACHING_LANGUAGE so every instruction and explanation is understandable.
 - Use TEACHING_LANGUAGE for directions, grammar rules, meanings, comprehension questions, hints, corrections, feedback, transitions and recap throughout this lesson, including after a pause.
@@ -131,7 +176,7 @@ ${standardSupportLanguagePolicy}`;
   const beginnerTeachingPolicy =
     plan.lessonMode === 'absolute_beginner'
       ? `- This absolute-beginner method takes precedence over target-language-only lesson-flow instructions below.
-- Absolute-beginner method: teach only 3-5 useful TARGET_LANGUAGE phrases in this lesson.
+- Absolute-beginner method: teach only 3-5 useful TARGET_LANGUAGE phrases as NEW material in this lesson. Previously prepared or taught language can be used in varied meaningful activities; this is not a cap on familiar vocabulary, activity count or independent applications.
 - When today's approved objective or grammarFocus is grammatical, explain in plain TEACHING_LANGUAGE what changes, when each form is used, and why it fits the subject or situation. Contrast two short TARGET_LANGUAGE examples and explain their meanings before an open understanding check. Do not replace the explanation with repetition.
 - For every new phrase use this cycle: explain the situation in TEACHING_LANGUAGE, say the TARGET_LANGUAGE model slowly, give its meaning and useful parts, then ask a short open question in TEACHING_LANGUAGE about its meaning or use. Do not put the answer in the question. Invite a new, simple TARGET_LANGUAGE use only after the learner shows understanding.
 - Use repetition only for a new sound or a specific pronunciation difficulty, with at most one retry of the same model. Repeating a model does not demonstrate understanding.
@@ -180,6 +225,7 @@ ${standardSupportLanguagePolicy}`;
       lessonMode: plan.lessonMode,
       teachingLanguageCode: supportTeaching ? supportLanguage!.code : targetLanguage.code,
       cefrLevel: plan.level,
+      learnerStartingLevel: plan.learnerStartingLevel ?? plan.level,
       topic: plan.topic,
       grammarFocus: plan.grammarFocus,
       focusAreas: plan.focusAreas,
@@ -187,16 +233,17 @@ ${standardSupportLanguagePolicy}`;
       correctionMode: plan.correctionMode,
       vocabularyMode: plan.vocabularyMode,
       teacherVoice: plan.teacherVoice,
+      teacherName: privateLessonTeachers[plan.teacherVoice].name,
       speechRate: plan.speechRate,
       learnerInterests: plan.interests,
       targetVocabulary: plan.targets.map((target) => ({
         text: target.sourceText,
         meaning: target.translationText,
       })),
+      wordPack: plan.wordPack ?? null,
       previousLesson: plan.continuity,
       learningRoadmap: plan.roadmap,
       course: plan.course ?? null,
-      wordPack: plan.wordPack ?? null,
       teachingBrief: plan.teachingBrief ?? null,
     },
     null,
@@ -221,7 +268,8 @@ ${lessonData}
 ${languagePolicy}
 
 # Teaching policy
-${plan.wordPack ? '- The wordPack defines this lesson scope. Use its introduced words in short, level-appropriate sentences. For the review station, recap the unit and check independent use; revisit gaps with brief explanations. For the supported and midpoint stations, guide practice of the familiar words. Do not substitute unrelated roadmap material.' : ''}
+${privateLessonIntroductionPolicy}
+${plan.wordPack ? '- The server-resolved wordPack.words define this lesson scope. Use those words in short, level-appropriate sentences. The introduced flags distinguish preparation from new material; a direct station choice does not prove prior knowledge. Teach unfamiliar words in small supported steps before expecting independent use. For the review station, check actual independent use and teach gaps; for supported and midpoint stations, guide meaningful use. Do not substitute unrelated roadmap or future-unit material.' : ''}
 - Keep conversational feedback to one or two short spoken sentences. When teaching something new, use up to six short sentences for its purpose, rule or pattern, two meaningful examples and one comprehension check. Do not skip the explanation to satisfy a brevity limit; break a larger explanation into understandable steps.
 - Ask exactly one question at a time.
 - Teach, then check understanding: explain the concept and when it applies in plain language, demonstrate it with a short relevant example, and ask an open question that requires the learner to explain, choose a form with a reason, or apply it in a fresh situation. Do not include the expected words or a complete answer in the question, even after modelling a different example. Use a smaller open question when the learner needs support.

@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { policySchema } from '../learning/learning.policy.js';
 import { coursePlanSchema, coursePreferencesSchema } from '../courses/course.schemas.js';
 import { promptContentSchema } from './admin.prompt-config.js';
+import { authoredMaterialIssue } from '../private-lessons/private-lesson.planner.js';
 export const promptKeys = [
   'translation',
   'reading',
@@ -49,6 +50,30 @@ export const contentSchemas = {
   programs: z
     .object({ preferences: coursePreferencesSchema, plan: coursePlanSchema.nullable() })
     .strict()
+    .superRefine((content, ctx) => {
+      content.plan?.units.forEach((unit, unitIndex) =>
+        unit.lessons.forEach((lesson, lessonIndex) => {
+          const issue = authoredMaterialIssue(
+            lesson.material,
+            content.preferences.minutesPerLesson * 60,
+          );
+          if (issue)
+            ctx.addIssue({
+              code: 'custom',
+              path: [
+                'plan',
+                'units',
+                unitIndex,
+                'lessons',
+                lessonIndex,
+                'material',
+                'adaptationPolicy',
+              ],
+              message: issue,
+            });
+        }),
+      );
+    })
     .transform((content) => {
       if (content.plan)
         for (const unit of content.plan.units)

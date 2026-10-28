@@ -2,6 +2,8 @@ import type { Pool } from 'pg';
 import { AppError } from '../../shared/errors/app-error.js';
 import type { ProfileScope } from '../profile/profile.types.js';
 import type { PrivateLessonPlan } from './private-lesson.prompt.js';
+import { withTransaction } from '../../shared/database/transaction.js';
+import { awardDailyTask } from '../dashboard/daily-task-rewards.js';
 import {
   lowConfidenceAssessment,
   privateLessonReportSchema,
@@ -43,6 +45,7 @@ export interface PrivateLessonJournal {
     limit: number,
     courseId?: string,
     packId?: string,
+    targetLanguageCode?: string,
   ): Promise<StoredPrivateLesson[]>;
   claim(scope: ProfileScope, id: string, duration: number): Promise<StoredPrivateLesson | null>;
   complete(
@@ -113,8 +116,8 @@ export class PostgresPrivateLessonJournal implements PrivateLessonJournal {
       `INSERT INTO product_gotit.private_lesson_sessions
        (id,application_id,application_user_id,target_language_code,support_language_code,level,topic,
         grammar_focus,focus_areas,custom_focus,correction_mode,vocabulary_mode,lesson_mode,teaching_language,continuity,teacher_voice,speech_rate,
-        planned_duration_seconds,target_words,roadmap_id,milestone_id,course_context,word_pack_context,realtime_contract)
-       VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10,$11,$12,$13,$14,$15::jsonb,$16,$17,$18,$19::jsonb,$20,$21,$22::jsonb,$23::jsonb,$24::jsonb)`,
+        planned_duration_seconds,target_words,roadmap_id,milestone_id,course_context,word_pack_context,realtime_contract,curriculum_context)
+       VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10,$11,$12,$13,$14,$15::jsonb,$16,$17,$18,$19::jsonb,$20,$21,$22::jsonb,$23::jsonb,$24::jsonb,$25::jsonb)`,
       [
         plan.id,
         scope.applicationId,
@@ -140,6 +143,7 @@ export class PostgresPrivateLessonJournal implements PrivateLessonJournal {
         plan.course ? JSON.stringify(plan.course) : null,
         plan.wordPack ? JSON.stringify(plan.wordPack) : null,
         plan.realtimeContract ? JSON.stringify(plan.realtimeContract) : null,
+        plan.curriculum ? JSON.stringify(plan.curriculum) : null,
       ],
     );
   }
@@ -154,15 +158,29 @@ export class PostgresPrivateLessonJournal implements PrivateLessonJournal {
     return row ? storedLesson(row) : null;
   }
 
-  async list(scope: ProfileScope, limit: number, courseId?: string, packId?: string) {
+  async list(
+    scope: ProfileScope,
+    limit: number,
+    courseId?: string,
+    packId?: string,
+    targetLanguageCode?: string,
+  ) {
     const rows = (
       await this.pool.query(
         `${selectFields} WHERE s.application_id=$1 AND s.application_user_id=$2 AND s.deleted_at IS NULL
            AND s.status<>'active'
            AND ($4::uuid IS NULL OR s.course_context->>'courseId'=$4::text)
            AND ($5::uuid IS NULL OR s.word_pack_context->>'packId'=$5::text)
+           AND ($6::text IS NULL OR lower(split_part(s.target_language_code,'-',1))=$6)
          ORDER BY s.started_at DESC,s.id DESC LIMIT $3`,
-        [scope.applicationId, scope.applicationUserId, limit, courseId ?? null, packId ?? null],
+        [
+          scope.applicationId,
+          scope.applicationUserId,
+          limit,
+          courseId ?? null,
+          packId ?? null,
+          targetLanguageCode ? new Intl.Locale(targetLanguageCode).language.toLowerCase() : null,
+        ],
       )
     ).rows;
     return rows.map(storedLesson);
@@ -183,16 +201,44 @@ export class PostgresPrivateLessonJournal implements PrivateLessonJournal {
   }
 
   async complete(scope: ProfileScope, id: string, report: PrivateLessonReport) {
-    const updated = (
-      await this.pool.query(
-        `UPDATE product_gotit.private_lesson_sessions SET status='completed',report=$4::jsonb,
+    await withTransaction(this.pool, async (tx) => {
+      await tx.lock(['practice-user', scope.applicationId, scope.applicationUserId]);
+      const updated = (
+        await tx.query(
+          `WITH finished AS (UPDATE product_gotit.private_lesson_sessions SET status='completed',report=$4::jsonb,
          report_generated_at=now(),report_error_code=NULL,updated_at=now()
-         WHERE application_id=$1 AND application_user_id=$2 AND id=$3 AND deleted_at IS NULL
-         RETURNING id`,
-        [scope.applicationId, scope.applicationUserId, id, JSON.stringify(report)],
-      )
-    ).rows[0];
-    if (!updated) throw notFound();
+         WHERE application_id=$1 AND application_user_id=$2 AND id=$3 AND deleted_at IS NULL AND status<>'completed'
+         RETURNING id,course_context,word_pack_context,curriculum_context,actual_duration_seconds), purged AS (DELETE FROM product_gotit.private_lesson_activities a USING finished
+           WHERE a.application_id=$1 AND a.application_user_id=$2 AND a.lesson_id=finished.id RETURNING a.lesson_id)
+         SELECT * FROM finished`,
+          [scope.applicationId, scope.applicationUserId, id, JSON.stringify(report)],
+        )
+      ).rows[0];
+      if (
+        updated &&
+        updated.actual_duration_seconds > 0 &&
+        report.assessment.lessonPerformance.evidenceQuality !== 'insufficient'
+      ) {
+        const profile = (
+          await tx.query(
+            'SELECT timezone FROM product_gotit.user_profiles WHERE application_id=$1 AND application_user_id=$2',
+            [scope.applicationId, scope.applicationUserId],
+          )
+        ).rows[0];
+        const now = (await tx.query('SELECT clock_timestamp() AS timestamp')).rows[0]!
+          .timestamp as Date;
+        await awardDailyTask(
+          tx,
+          scope,
+          updated.course_context || updated.word_pack_context || updated.curriculum_context
+            ? 'lesson'
+            : 'conversation',
+          id,
+          profile?.timezone ?? 'UTC',
+          now,
+        );
+      }
+    });
     const lesson = await this.get(scope, id);
     if (!lesson) throw notFound();
     return lesson;
@@ -210,8 +256,11 @@ export class PostgresPrivateLessonJournal implements PrivateLessonJournal {
     return Boolean(
       (
         await this.pool.query(
-          `UPDATE product_gotit.private_lesson_sessions SET deleted_at=now(),updated_at=now()
-           WHERE application_id=$1 AND application_user_id=$2 AND id=$3 AND deleted_at IS NULL RETURNING id`,
+          `WITH removed AS (UPDATE product_gotit.private_lesson_sessions SET deleted_at=now(),updated_at=now()
+           WHERE application_id=$1 AND application_user_id=$2 AND id=$3 AND deleted_at IS NULL RETURNING id),
+           purged AS (DELETE FROM product_gotit.private_lesson_activities a USING removed
+             WHERE a.application_id=$1 AND a.application_user_id=$2 AND a.lesson_id=removed.id RETURNING a.lesson_id)
+           SELECT id FROM removed`,
           [scope.applicationId, scope.applicationUserId, id],
         )
       ).rowCount,
@@ -219,7 +268,7 @@ export class PostgresPrivateLessonJournal implements PrivateLessonJournal {
   }
 }
 
-const selectFields = `SELECT s.id,s.target_language_code,s.support_language_code,s.level,s.topic,s.grammar_focus,
+const selectFields = `SELECT s.id,s.realtime_contract,s.curriculum_context,s.target_language_code,s.support_language_code,s.level,s.topic,s.grammar_focus,
  s.focus_areas,s.custom_focus,s.correction_mode,s.vocabulary_mode,s.lesson_mode,s.teaching_language,s.continuity,s.roadmap_id,s.milestone_id,s.course_context,s.word_pack_context,
  s.teacher_voice,s.speech_rate,s.planned_duration_seconds,s.target_words,s.status,s.started_at,s.ended_at,
  s.actual_duration_seconds,s.report,r.goal_title,m.milestone_key,m.communication_objective,m.grammar_topics,
@@ -235,6 +284,12 @@ function storedLesson(row: Record<string, unknown>): StoredPrivateLesson {
   const rawReport =
     row.report && typeof row.report === 'object' ? (row.report as Record<string, unknown>) : null;
   return {
+    curriculum: (row.curriculum_context as PrivateLessonPlan['curriculum']) ?? null,
+    interactionProtocol:
+      (row.realtime_contract as { protocolVersion?: string } | null)?.protocolVersion ===
+      'adaptive-v1'
+        ? 'adaptive-v1'
+        : undefined,
     course: (row.course_context as PrivateLessonPlan['course']) ?? null,
     wordPack: (row.word_pack_context as PrivateLessonPlan['wordPack']) ?? null,
     id: String(row.id),

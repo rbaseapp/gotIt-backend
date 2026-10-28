@@ -12,6 +12,7 @@ import { saveSchema } from '../../src/modules/capture/capture.validation.js';
 import { EnrichmentRegistry } from '../../src/modules/enrichment/enrichment.registry.js';
 import { SelectionProofs } from '../../src/modules/enrichment/selection-proof.js';
 import { LibraryRepository } from '../../src/modules/library/library.repository.js';
+import { ReadingGuideService } from '../../src/modules/library/reading-guide.js';
 import { PracticeService } from '../../src/modules/practice/practice.service.js';
 import { practiceLanguagePredicate } from '../../src/modules/practice/practice.language.js';
 import { policySchema } from '../../src/modules/learning/learning.policy.js';
@@ -149,6 +150,113 @@ test(
         }).expect(201);
         ids.push(captured.body.capture.learningItemId);
       }
+      await t.test(
+        'smart pace schedules within the selected words, omits new words for review-only, and validates ownership first',
+        async () => {
+          const selected: string[] = [];
+          try {
+            for (const text of ['coffee', 'water', 'tea']) {
+              const captured = await call(
+                'post',
+                '/captures',
+                {
+                  item: {
+                    sourceText: text,
+                    sourceLanguageCode: 'en',
+                    translationLanguageCode: 'he',
+                    itemType: 'word',
+                  },
+                  translation: { text: 'fixture meaning' },
+                  context: { selectedText: text },
+                  senseDecision: { mode: 'auto' },
+                },
+                randomUUID(),
+                1,
+              ).expect(201);
+              selected.push(captured.body.capture.learningItemId);
+            }
+            await db.adminPool.query(
+              "UPDATE product_gotit.learning_items SET learning_status='learning',next_review_at=now()-interval '1 day' WHERE id=$1",
+              [selected[1]],
+            );
+            await db.adminPool.query(
+              "UPDATE product_gotit.learning_items SET learning_status='mastered',overall_mastery_score=100,next_review_at=now()+interval '30 days' WHERE id=$1",
+              [selected[2]],
+            );
+            const review = await call(
+              'post',
+              '/practice/sessions',
+              {
+                sessionType: 'smart_review',
+                learningItemIds: selected,
+                count: 10,
+                includeNewItems: false,
+              },
+              randomUUID(),
+              1,
+            ).expect(201);
+            assert.equal(review.body.session.itemCount, 1);
+            const row = (
+              await db.runtimePool.query(
+                'SELECT selection FROM product_gotit.practice_sessions WHERE id=$1',
+                [review.body.session.id],
+              )
+            ).rows[0];
+            assert.deepEqual(row.selection.itemIds, [selected[1]]);
+            const eventId = randomUUID();
+            const input = {
+              sessionType: 'smart_review',
+              learningItemIds: selected,
+              count: 1,
+              includeNewItems: true,
+            };
+            const first = await call('post', '/practice/sessions', input, eventId, 1).expect(201);
+            assert.equal(first.body.session.itemCount, 1);
+            assert.equal(
+              (await call('post', '/practice/sessions', input, eventId, 1).expect(200)).body.session
+                .id,
+              first.body.session.id,
+            );
+            await call(
+              'post',
+              '/practice/sessions',
+              { ...input, includeNewItems: false },
+              eventId,
+              1,
+            ).expect(409);
+            await call(
+              'post',
+              '/practice/sessions',
+              { ...input, learningItemIds: [selected[1], ids[0]] },
+              randomUUID(),
+              1,
+            ).expect(404);
+            await call(
+              'post',
+              '/practice/sessions',
+              { ...input, sessionType: 'recall' },
+              randomUUID(),
+              1,
+            ).expect(400);
+            await call(
+              'post',
+              '/practice/sessions',
+              { ...input, learningItemIds: [selected[0]], includeNewItems: false },
+              randomUUID(),
+              1,
+            ).expect(409);
+          } finally {
+            await db.adminPool.query(
+              'DELETE FROM product_gotit.practice_sessions WHERE application_id=$1 AND application_user_id=$2',
+              [applicationId, users[1]],
+            );
+            await db.adminPool.query(
+              'DELETE FROM product_gotit.learning_items WHERE application_id=$1 AND application_user_id=$2 AND id=ANY($3::uuid[])',
+              [applicationId, users[1], selected],
+            );
+          }
+        },
+      );
       await t.test(
         'script guard accepts native letters, marks and explicit scripts, and rejects foreign letters',
         async () => {
@@ -303,6 +411,63 @@ test(
             `UPDATE product_gotit.learning_items SET phonetic_text=NULL,phonetic_scheme=NULL
              WHERE application_id=$1 AND application_user_id=$2 AND id=$3`,
             [applicationId, users[0], ids[0]],
+          );
+        },
+      );
+      await t.test(
+        'reading guides are cached, owner scoped and reject stale generation',
+        async () => {
+          const scope = { applicationId, applicationUserId: users[0]! };
+          let calls = 0;
+          const service = new ReadingGuideService(db.runtimePool, {
+            generate: async (items) => {
+              calls++;
+              assert.equal(items[0]!.nativeLanguage, 'he');
+              return items.map((item) => ({ id: item.id, text: 'הֶלוֹ' }));
+            },
+          });
+          const [first, concurrent] = await Promise.all([
+            service.get(scope, [ids[0]!]),
+            service.get(scope, [ids[0]!]),
+          ]);
+          assert.equal(first[0]!.phoneticText, 'הֶלוֹ');
+          assert.deepEqual(first, concurrent);
+          assert.deepEqual(await service.get(scope, [ids[0]!]), first);
+          assert.equal(calls, 1);
+          await assert.rejects(
+            service.get({ applicationId, applicationUserId: users[1]! }, [ids[0]!]),
+            { code: 'NOT_FOUND' },
+          );
+          await assert.rejects(
+            service.get({ applicationId: randomUUID(), applicationUserId: users[0]! }, [ids[0]!]),
+            { code: 'NOT_FOUND' },
+          );
+          assert.equal(calls, 1);
+          await call('post', '/learning-items/reading-guides', { ids: [ids[0]] }).expect(200);
+          await call('post', '/learning-items/reading-guides', { ids: [] }).expect(400);
+          await db.adminPool.query(
+            'UPDATE product_gotit.learning_items SET phonetic_text=NULL,phonetic_scheme=NULL WHERE id=$1',
+            [ids[0]],
+          );
+          const stale = new ReadingGuideService(db.runtimePool, {
+            generate: async (items) => {
+              await db.adminPool.query(
+                'UPDATE product_gotit.learning_items SET learning_revision=learning_revision+1 WHERE id=$1',
+                [ids[0]],
+              );
+              return items.map((item) => ({ id: item.id, text: 'stale' }));
+            },
+          });
+          assert.deepEqual(await stale.get(scope, [ids[0]!]), []);
+          const stored = await db.adminPool.query(
+            'SELECT phonetic_text FROM product_gotit.learning_items WHERE id=$1',
+            [ids[0]],
+          );
+          assert.equal(stored.rows[0].phonetic_text, null);
+          // Restore this disposable fixture for the lifecycle cases that follow.
+          await db.adminPool.query(
+            'UPDATE product_gotit.learning_items SET learning_revision=learning_revision-1 WHERE id=$1',
+            [ids[0]],
           );
         },
       );
@@ -536,7 +701,12 @@ test(
             count: 5,
             scope: { type: 'pack', id: pack.id },
           }).expect(201);
-          assert.equal(scoped.body.session.itemCount, 10);
+          assert.equal(
+            scoped.body.session.itemCount,
+            5,
+            'unit smart practice honors the requested batch count',
+          );
+          assert.equal(scoped.body.session.curriculumOrder, true);
           assert.deepEqual(scoped.body.session.scope, {
             type: 'pack',
             id: pack.id,
@@ -552,7 +722,7 @@ test(
             count: 5,
             scope: { type: 'pack', id: pack.id },
           }).expect(201);
-          assert.equal(restoredScope.body.session.itemCount, 11);
+          assert.equal(restoredScope.body.session.itemCount, 5);
 
           const removed = await packCall(
             'delete',
@@ -564,7 +734,7 @@ test(
             'get',
             `/practice/sessions/${scoped.body.session.id}/study`,
           ).expect(200);
-          assert.equal(activeSnapshot.body.cards.length, 10);
+          assert.equal(activeSnapshot.body.cards.length, 5);
           await packCall('post', '/practice/sessions', {
             sessionType: 'smart_review',
             count: 5,
@@ -1376,6 +1546,64 @@ test(
             exerciseId: exercises.body.exercises[0].id,
             answerText: item.source_text,
           }).expect(201);
+          await call('patch', `/practice/sessions/${quiz.body.session.id}`, {
+            status: 'completed',
+          }).expect(200);
+          const taskBonuses = async () =>
+            Number(
+              (
+                await db.runtimePool.query(
+                  "SELECT COALESCE(sum(xp_amount),0)::integer xp FROM product_gotit.xp_events WHERE application_id=$1 AND application_user_id=$2 AND source_type='daily_task' AND reason_code='reading'",
+                  [applicationId, users[0]],
+                )
+              ).rows[0].xp,
+            );
+          assert.equal(
+            await taskBonuses(),
+            0,
+            'a partially answered article does not earn a completion bonus',
+          );
+          const fullQuiz = (
+            await call('post', '/practice/sessions', {
+              sessionType: 'article_quiz',
+              readingId: id,
+            }).expect(201)
+          ).body.session;
+          const fullExercises = (
+            await call('post', `/practice/sessions/${fullQuiz.id}/exercises`, {
+              count: fullQuiz.itemCount,
+            }).expect(201)
+          ).body.exercises;
+          for (const exercise of fullExercises) {
+            const answer = (
+              await db.runtimePool.query(
+                'SELECT source_text FROM product_gotit.learning_items WHERE id=$1',
+                [exercise.learningItemId],
+              )
+            ).rows[0].source_text;
+            await call('post', '/practice/attempts', {
+              exerciseId: exercise.id,
+              answerText: answer,
+            }).expect(201);
+          }
+          const closed = (
+            await call('patch', `/practice/sessions/${fullQuiz.id}`, {
+              status: 'completed',
+            }).expect(200)
+          ).body.session;
+          assert.equal(await taskBonuses(), 50);
+          const replayedClose = (
+            await call('patch', `/practice/sessions/${fullQuiz.id}`, {
+              status: 'completed',
+            }).expect(200)
+          ).body.session;
+          assert.equal(replayedClose.xpEarned, closed.xpEarned);
+          assert.equal(await taskBonuses(), 50, 'replaying completion does not award twice');
+          const dashboard = (await call('get', '/dashboard').expect(200)).body;
+          assert.deepEqual(dashboard.gamification.dailyTaskRewards.reading, {
+            xp: 50,
+            completed: true,
+          });
           await call('delete', `/reading/${id}`).expect(200);
           await call('get', `/reading/${id}`).expect(404);
           readingClock += 20 * 60000;
@@ -1457,7 +1685,7 @@ test(
           assert.equal(dashboard.body.gamification.dailyXpCap, 200);
           assert.equal(
             dashboard.body.gamification.dailyXpRemaining,
-            200 - dashboard.body.gamification.todayXp,
+            200 - (dashboard.body.gamification.todayXp - 50),
           );
           assert.equal(dashboard.body.gamification.dailyXpCapReached, false);
           assert.equal(
@@ -1525,7 +1753,7 @@ test(
             client.release();
           }
           const inspection = await inspectProduction(db.runtimePool.options.connectionString);
-          assert.equal(inspection.productTableCount, 65);
+          assert.equal(inspection.productTableCount, 70);
           assert.deepEqual(inspection.v1, {
             learningRevision: true,
             captureReceipts: true,
@@ -2331,6 +2559,251 @@ test(
           assert.ok(
             exhausted.body.items.every((item: { id: string }) => !solved.includes(item.id)),
           );
+        },
+      );
+      await t.test(
+        'single-question manual recall keeps distractors from its selected session pool',
+        async () => {
+          const ids: string[] = [];
+          for (const sourceText of ['drag-one', 'drag-two', 'drag-outside']) {
+            const capture = await call('post', '/captures', {
+              item: {
+                sourceText,
+                sourceLanguageCode: 'en',
+                translationLanguageCode: 'he',
+                itemType: 'word',
+              },
+              translation: { text: sourceText + ' meaning' },
+              context: { selectedText: sourceText },
+              senseDecision: { mode: 'auto' },
+            }).expect(201);
+            ids.push(capture.body.capture.learningItemId);
+          }
+          const session = (
+            await call('post', '/practice/sessions', {
+              sessionType: 'recall',
+              learningItemIds: ids.slice(0, 2),
+            }).expect(201)
+          ).body.session;
+          const issued = (
+            await call('post', `/practice/sessions/${session.id}/exercises`, {
+              count: 1,
+              learningItemIds: [ids[0]],
+              exerciseType: 'recall',
+              kind: 'multiple_choice',
+              direction: 'translation_to_source',
+            }).expect(201)
+          ).body.exercises;
+          assert.equal(issued.length, 1);
+          assert.equal(issued[0].learningItemId, ids[0]);
+          assert.deepEqual(
+            new Set(issued[0].prompt.choices.map((choice: { text: string }) => choice.text)),
+            new Set(['drag-one', 'drag-two']),
+          );
+          const choice = issued[0].prompt.choices.find(
+            (choice: { text: string }) => choice.text === 'drag-one',
+          );
+          const receipt = (
+            await call('post', '/practice/attempts', {
+              exerciseId: issued[0].id,
+              choiceId: choice.id,
+            }).expect(201)
+          ).body;
+          assert.equal(receipt.attempt.result, 'correct');
+          const single = (
+            await call('post', '/practice/sessions', {
+              sessionType: 'recall',
+              learningItemIds: [ids[0]],
+            }).expect(201)
+          ).body.session;
+          const denied = await call('post', `/practice/sessions/${single.id}/exercises`, {
+            count: 1,
+            learningItemIds: [ids[0]],
+            kind: 'multiple_choice',
+            direction: 'translation_to_source',
+          }).expect(409);
+          assert.equal(denied.body.error.code, 'INSUFFICIENT_DISTRACTORS');
+        },
+      );
+      await t.test(
+        'DEV word cards include owned context, current evidence, tags and complete server filtering',
+        async () => {
+          const capture = (
+            user: number,
+            sourceText: string,
+            translation: string,
+            sourceType: string,
+          ) =>
+            call(
+              'post',
+              '/captures',
+              {
+                item: {
+                  sourceText,
+                  sourceLanguageCode: 'en',
+                  translationLanguageCode: 'he',
+                  itemType: 'word',
+                  partOfSpeech: 'noun',
+                },
+                translation: { text: translation },
+                context: {
+                  selectedText: sourceText,
+                  sourceType,
+                  sentenceText: `A special sentence about ${sourceText}.`,
+                  pageUrl: 'https://example.test/context',
+                },
+                senseDecision: { mode: 'auto' },
+              },
+              randomUUID(),
+              user,
+            );
+          const own = (
+            await capture(0, 'mywords-card-owned', 'unique translation', 'chrome_extension').expect(
+              201,
+            )
+          ).body.capture.learningItemId;
+          await capture(
+            1,
+            'mywords-card-foreign',
+            'foreign translation',
+            'chrome_extension',
+          ).expect(201);
+          const tag = (await call('post', '/tags', { name: 'mywords category' }).expect(201)).body
+            .tag;
+          await call('put', `/learning-items/${own}/tags`, { tagIds: [tag.id] }).expect(200);
+          const cards = await call(
+            'get',
+            '/learning-items?view=cards&search=mywords-card-&partsOfSpeech=noun,n&origins=chrome_extension&learningStatuses=new,learning&limit=1&page=1',
+          ).expect(200);
+          assert.equal(cards.body.totalCount, 1);
+          assert.equal(cards.body.items[0].id, own);
+          assert.equal(cards.body.items[0].partOfSpeech, 'noun');
+          assert.equal(cards.body.items[0].source.pageUrl, 'https://example.test/context');
+          assert.deepEqual(cards.body.items[0].tags, [{ id: tag.id, name: 'mywords category' }]);
+          assert.deepEqual(cards.body.items[0].answers, { correct: 0, total: 0 });
+          assert.equal(cards.body.summary.tags[tag.id], 1);
+          const unfiltered = await call(
+            'get',
+            '/learning-items?view=cards&sourceLanguageCode=en&limit=1',
+          ).expect(200);
+          assert.equal(unfiltered.body.summary.total, unfiltered.body.totalCount);
+          assert.equal(cards.body.summary.total > cards.body.totalCount, true);
+          assert.equal(cards.body.items[0].program, null);
+          for (const search of [
+            'unique translation',
+            'special sentence about mywords-card-owned',
+          ]) {
+            const result = await call(
+              'get',
+              `/learning-items?view=cards&search=${encodeURIComponent(search)}`,
+            ).expect(200);
+            assert.deepEqual(
+              result.body.items.map((item: { id: string }) => item.id),
+              [own],
+            );
+          }
+          assert.equal(
+            (await call('get', '/learning-items?view=cards&search=%25_').expect(200)).body.items
+              .length,
+            1,
+          );
+          assert.equal(
+            (
+              await call(
+                'get',
+                '/learning-items?view=cards&search=mywords-card-&origins=web_manual',
+              ).expect(200)
+            ).body.items.length,
+            0,
+          );
+          assert.equal(
+            (
+              await call(
+                'get',
+                '/learning-items?view=cards&search=mywords-card-&partsOfSpeech=verb',
+              ).expect(200)
+            ).body.items.length,
+            0,
+          );
+          const legacy = await call('get', '/learning-items?search=mywords-card-owned').expect(200);
+          assert.equal('source' in legacy.body.items[0], false);
+          assert.equal(
+            (await call('get', '/learning-items?view=cards&search=foreign').expect(200)).body.items
+              .length,
+            0,
+          );
+          for (const query of [
+            'origins=unknown',
+            'partsOfSpeech=DROP%20TABLE',
+            'learningStatuses=forged',
+            'view=admin',
+          ])
+            await call('get', `/learning-items?${query}`).expect(400);
+        },
+      );
+      await t.test(
+        'cloze exercise contexts hide complete words and phrases, never parts of names',
+        async () => {
+          const items = [
+            {
+              sourceText: 'no',
+              translation: 'לא',
+              sentence: 'Hello my name is Noa. No, thanks.',
+              expected: 'Hello my name is Noa. _____, thanks.',
+            },
+            {
+              sourceText: 'take it easy',
+              translation: 'קח את זה בקלות',
+              sentence: 'Take it easy today.',
+              expected: '_____ today.',
+            },
+          ];
+          const ids: string[] = [];
+          for (const item of items) {
+            const capture = await call('post', '/captures', {
+              item: {
+                sourceText: item.sourceText,
+                sourceLanguageCode: 'en',
+                translationLanguageCode: 'he',
+                itemType: item.sourceText.includes(' ') ? 'phrase' : 'word',
+              },
+              translation: { text: item.translation },
+              context: { selectedText: item.sourceText, sentenceText: item.sentence },
+              senseDecision: { mode: 'auto' },
+            }).expect(201);
+            ids.push(capture.body.capture.learningItemId);
+          }
+          const session = (
+            await call('post', '/practice/sessions', {
+              sessionType: 'recall',
+              learningItemIds: ids,
+            }).expect(201)
+          ).body.session;
+          const exercises = (
+            await call('post', `/practice/sessions/${session.id}/exercises`, {
+              count: 2,
+              learningItemIds: ids,
+              exerciseType: 'recall',
+              kind: 'multiple_choice',
+              direction: 'translation_to_source',
+            }).expect(201)
+          ).body.exercises;
+          for (const [index, id] of ids.entries()) {
+            const exercise = exercises.find(
+              (entry: { learningItemId: string }) => entry.learningItemId === id,
+            );
+            assert.equal(exercise.prompt.context, items[index]!.expected);
+            const choice = exercise.prompt.choices.find(
+              (entry: { text: string }) => entry.text === items[index]!.sourceText,
+            );
+            const receipt = (
+              await call('post', '/practice/attempts', {
+                exerciseId: exercise.id,
+                choiceId: choice.id,
+              }).expect(201)
+            ).body;
+            assert.equal(receipt.attempt.result, 'correct');
+          }
         },
       );
     } finally {

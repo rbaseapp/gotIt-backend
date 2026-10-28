@@ -21,12 +21,30 @@ export function createNotificationRoutes(service: NotificationService) {
       const parsed = preferencePatchSchema.safeParse(req.body);
       if (!parsed.success)
         throw new AppError(400, 'VALIDATION_ERROR', 'Invalid notification preferences');
-      if ((parsed.data.practiceEmail || parsed.data.systemEmail) && !req.gotitVerifiedEmail)
+      if (
+        (parsed.data.practiceEmail ||
+          parsed.data.systemEmail ||
+          parsed.data.streakEmail ||
+          parsed.data.weeklyEmail) &&
+        !req.gotitVerifiedEmail
+      )
         throw new AppError(409, 'VERIFIED_EMAIL_REQUIRED', 'A verified email is required');
       const config = service.config();
-      if ((parsed.data.practiceEmail || parsed.data.systemEmail) && !config.emailAvailable)
+      if (
+        (parsed.data.practiceEmail ||
+          parsed.data.systemEmail ||
+          parsed.data.streakEmail ||
+          parsed.data.weeklyEmail) &&
+        !config.emailAvailable
+      )
         throw new AppError(503, 'EMAIL_NOT_CONFIGURED', 'Email delivery is unavailable');
-      if ((parsed.data.practicePush || parsed.data.systemPush) && !config.pushAvailable)
+      if (
+        (parsed.data.practicePush ||
+          parsed.data.systemPush ||
+          parsed.data.streakPush ||
+          parsed.data.weeklyPush) &&
+        !config.pushAvailable
+      )
         throw new AppError(503, 'PUSH_NOT_CONFIGURED', 'Push delivery is unavailable');
       const preferences = await service.patchPreferences(
         req.gotitAuth!,
