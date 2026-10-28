@@ -20,9 +20,10 @@ export function createPrivateLessonRoutes(
   service: PrivateLessonService,
   requireLessonAccess: RequestHandler,
   requireTutorSession: RequestHandler = (_request, _response, next) => next(),
+  requireCurriculum: RequestHandler = (_request, _response, next) => next(),
 ) {
   const router = Router();
-  router.post('/units/:id/path-choices', async (req, res) =>
+  router.post('/units/:id/path-choices', requireLessonAccess, requireCurriculum, async (req, res) =>
     res.json({
       path: await service.chooseUnitPath(
         req.gotitAuth!,

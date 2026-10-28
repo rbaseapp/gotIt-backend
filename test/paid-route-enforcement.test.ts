@@ -222,3 +222,92 @@ test('disabled add-on rollout exposes its state without querying grants', async 
     { enabled: false, ai: null, privateLessons: null },
   );
 });
+
+test('placing yourself never opens paid lesson content: free accounts can place but not read units or teacher scripts', async () => {
+  const calls: string[] = [];
+  const coreAuthClient = {
+    async validateAccessToken() {
+      return identity;
+    },
+    async getBillingStatus() {
+      return {
+        tier: 'free',
+        access: true,
+        plan: { key: 'free', name: 'GotIt Free', kind: 'free' },
+        entitlements: ['vocabulary.write', 'practice.play'],
+        subscription: null,
+        trial: null,
+      };
+    },
+  } as unknown as CoreAuthClient;
+  const record = (name: string) => async () => {
+    calls.push(name);
+    return {};
+  };
+  const app = createApp({
+    logger: createLogger('silent'),
+    checkDatabase: async () => {},
+    coreAuthClient,
+    profileService: {} as never,
+    curriculumService: {
+      get: record('get'),
+      place: record('place'),
+      unit: record('unit'),
+      phonics: record('phonics'),
+      unseen: record('unseen'),
+      teacher: record('teacher'),
+      article: record('article'),
+    } as never,
+    enforcePaidEntitlements: true,
+  });
+  const get = (path: string) =>
+    request(app).get(`/api/v1/structured-english${path}`).set('authorization', 'Bearer token');
+
+  for (const path of ['/units/U84', '/phonics/F01', '/unseen/U84', '/teacher/U84-L1', '/attempts/abc', '/articles/abc']) {
+    const response = await get(path);
+    assert.equal(response.status, 402, path);
+    assert.equal(response.body.error.code, 'SUBSCRIPTION_REQUIRED', path);
+  }
+  assert.deepEqual(calls, [], 'no paid content was produced');
+  // The level, the plan and the map stay open to a free account.
+  assert.equal((await get('/')).status, 200);
+});
+
+test('recording a unit path choice needs lesson access like every other lesson write', async () => {
+  let choices = 0;
+  const coreAuthClient = {
+    async validateAccessToken() {
+      return identity;
+    },
+    async getBillingStatus() {
+      return {
+        tier: 'free',
+        access: true,
+        plan: { key: 'free', name: 'GotIt Free', kind: 'free' },
+        entitlements: ['vocabulary.write', 'practice.play'],
+        subscription: null,
+        trial: null,
+      };
+    },
+  } as unknown as CoreAuthClient;
+  const app = createApp({
+    logger: createLogger('silent'),
+    checkDatabase: async () => {},
+    coreAuthClient,
+    profileService: {} as never,
+    privateLessonService: {
+      available: true,
+      chooseUnitPath: async () => {
+        choices++;
+        return {};
+      },
+    } as never,
+    enforcePaidEntitlements: true,
+  });
+  const response = await request(app)
+    .post('/api/v1/private-lessons/units/30000000-0000-4000-8000-000000000001/path-choices')
+    .set('authorization', 'Bearer token')
+    .send({});
+  assert.ok([402, 403].includes(response.status), `status ${response.status}`);
+  assert.equal(choices, 0);
+});

@@ -71,7 +71,9 @@ export function createCurriculumRoutes(
   });
   router.get('/catalog', async (_req, res) => res.json(await service.catalog()));
   router.get('/', async (req, res) => res.json(await service.get(req.gotitAuth!)));
-  // Onboarding placement is open to every signed-in learner, including free accounts.
+  // Placement is open to every signed-in learner, including free accounts. It stores a level and a plan;
+  // the lesson content itself (units, phonics, teacher scripts, articles) is behind the practice and
+  // curriculum entitlements below, so placing yourself never opens paid content.
   router.post('/placement', async (req, res) =>
     res.json(await service.place(req.gotitAuth!, parseInput(placementSchema, req.body))),
   );
@@ -111,7 +113,7 @@ export function createCurriculumRoutes(
       ),
     ),
   );
-  router.get('/units/:id', async (req, res) =>
+  router.get('/units/:id', requirePractice, async (req, res) =>
     res.json(await service.unit(req.gotitAuth!, parseInput(pathId, req.params.id))),
   );
   router.post('/exposures', requirePractice, async (req, res) =>
@@ -155,7 +157,7 @@ export function createCurriculumRoutes(
       ),
     ),
   );
-  router.get('/attempts/:id', async (req, res) =>
+  router.get('/attempts/:id', requirePractice, async (req, res) =>
     res.json(await service.getAttempt(req.gotitAuth!, parseInput(id, req.params.id))),
   );
   router.post('/hints', requirePractice, async (req, res) =>
@@ -234,13 +236,13 @@ export function createCurriculumRoutes(
       ),
     ),
   );
-  router.get('/phonics/:id', async (req, res) =>
+  router.get('/phonics/:id', requirePractice, async (req, res) =>
     res.json(await service.phonics(req.gotitAuth!, parseInput(pathId, req.params.id))),
   );
-  router.get('/unseen/:id', async (req, res) =>
+  router.get('/unseen/:id', requirePractice, async (req, res) =>
     res.json(await service.unseen(req.gotitAuth!, parseInput(pathId, req.params.id))),
   );
-  router.get('/teacher/:id', async (req, res) =>
+  router.get('/teacher/:id', requirePractice, async (req, res) =>
     res.json(await service.teacher(req.gotitAuth!, parseInput(pathId, req.params.id))),
   );
   router.post('/teacher-turns', requireAi, async (req, res) =>
@@ -259,7 +261,7 @@ export function createCurriculumRoutes(
   router.post('/articles', requireAi, async (req, res) =>
     res.json(await service.generateArticle(req.gotitAuth!, parseInput(command.strict(), req.body))),
   );
-  router.get('/articles/:id', async (req, res) =>
+  router.get('/articles/:id', requirePractice, async (req, res) =>
     res.json(await service.article(req.gotitAuth!, parseInput(id, req.params.id))),
   );
   return router;

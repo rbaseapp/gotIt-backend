@@ -283,6 +283,7 @@ export function createRoutes(dependencies: AppDependencies) {
         dependencies.privateLessonService,
         requireLesson,
         requireTutorSession,
+        requireCurriculum,
       ),
     );
   }
