@@ -45,6 +45,8 @@ const placementSchema = z
       .object({ vocabulary: skill, reading: skill.nullable(), listening: skill.nullable() })
       .strict(),
     knownWords: z.array(z.string().regex(/^[A-Za-z]{2,40}$/u)).max(1500),
+    /** The learner chose to move an existing program to this new result. */
+    replace: z.boolean().optional(),
     profile: z
       .object({
         selfLevel: z
