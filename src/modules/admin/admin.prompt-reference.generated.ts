@@ -35,7 +35,7 @@ export const promptReference = {
       },
       {
         name: "courses/course.service.ts: 'course_intake_revision'",
-        text: "`The six-question interview is complete. Apply only the learner's explicitly requested correction to preferences. Keep all other preferences exactly unchanged, including weekly availability unless the learner changes it. Respond with one short acknowledgment in ${intakeLanguageName(course.preferences.supportLanguageCode)} and ask no more questions. ready=true; suggestions=[].`",
+        text: "`The intake interview is complete. Apply only the learner's explicitly requested correction to preferences. Keep all other preferences exactly unchanged, including weekly availability unless the learner changes it. Respond with one short acknowledgment in ${intakeLanguageName(course.preferences.supportLanguageCode)} and ask no more questions. ready=true; suggestions=[].`",
       },
       {
         name: "courses/course.service.ts: 'course_intake'",
