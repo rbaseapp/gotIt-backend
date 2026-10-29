@@ -339,7 +339,8 @@ export class CourseService {
       supportLanguageCode: input.supportLanguageCode,
       path: 'comprehensive',
       goal: '—',
-      experience: facts ? `${facts.startingLevel} (placement check)` : '—',
+      // Shown to the learner for editing, so it stays language-neutral: the tested level only.
+      experience: facts ? facts.startingLevel : '—',
       startingLevel:
         facts?.startingLevel ??
         profile.languages.find((l) => l.languageCode === input.targetLanguageCode)
