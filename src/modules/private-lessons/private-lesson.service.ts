@@ -120,6 +120,10 @@ export type PrivateLessonServiceOptions = {
   dailyQuota?: Pick<AiDailyQuota, 'consume'>;
 };
 
+/** The whole brief of a quick start: the first short chat after the level check. */
+const quickStartFocus =
+  "This is the learner's first short conversation, right after a level check. Keep it warm and easy: talk about things they already know (home, food, a normal day), ask one short question at a time, wait for the answer, keep your sentences short, and do not teach grammar. At the end give at most two small, kind suggestions.";
+
 export class PrivateLessonService {
   private readonly voiceSamples = new Map<string, { expires: number; audioBase64: string }>();
   readonly durationSeconds: number;
@@ -302,7 +306,10 @@ export class PrivateLessonService {
           required: gate.required,
         });
     }
-    const adaptive = input.interactionProtocol === 'adaptive-v1';
+    // A quick start skips the planned task bank and the generated brief: the first sentence is a
+    // short instruction and the voice model replies on its own, so the chat opens in seconds.
+    const quick = input.quickStart === true;
+    const adaptive = input.interactionProtocol === 'adaptive-v1' && !quick;
     if (
       adaptive &&
       (!this.options.activities || !this.options.lessonContentGenerator || !this.options.journal)
@@ -465,23 +472,25 @@ export class PrivateLessonService {
           (Boolean(input.courseId) || lesson.lessonMode === requestedLessonMode) &&
           new Intl.Locale(lesson.targetLanguageCode).language === targetBaseLanguage,
       ) ?? null;
-    const activeRoadmap =
-      loadedRoadmap ??
-      (this.options.roadmaps &&
-      !input.courseId &&
-      !input.packId &&
-      !curriculum &&
-      targetBaseLanguage === 'en'
-        ? await this.options.roadmaps.create(
-            scope,
-            input.targetLanguageCode,
-            'recommended',
-            'recommended-foundation',
-            requestedLessonMode === 'absolute_beginner'
-              ? 'A1'
-              : profileLevel(profile, input.targetLanguageCode),
-          )
-        : null);
+    // A quick start is a plain first chat, not the next grammar lesson of a roadmap.
+    const activeRoadmap = quick
+      ? null
+      : (loadedRoadmap ??
+        (this.options.roadmaps &&
+        !input.courseId &&
+        !input.packId &&
+        !curriculum &&
+        targetBaseLanguage === 'en'
+          ? await this.options.roadmaps.create(
+              scope,
+              input.targetLanguageCode,
+              'recommended',
+              'recommended-foundation',
+              requestedLessonMode === 'absolute_beginner'
+                ? 'A1'
+                : profileLevel(profile, input.targetLanguageCode),
+            )
+          : null));
     const vocabularyMode =
       input.vocabularyMode ??
       preferences?.vocabularyMode ??
@@ -500,6 +509,14 @@ export class PrivateLessonService {
       preferences,
       activeRoadmap,
     );
+    if (quick)
+      plan = {
+        ...plan,
+        roadmap: null,
+        continuity: null,
+        grammarFocus: null,
+        customFocus: quickStartFocus,
+      };
     if (curriculum)
       plan = {
         ...plan,
@@ -596,6 +613,7 @@ export class PrivateLessonService {
       );
       if (
         !adaptive &&
+        !quick &&
         !plan.curriculum &&
         this.options.lessonContentGenerator &&
         !hasAuthoredMaterial
@@ -626,7 +644,7 @@ export class PrivateLessonService {
       }
       timeout = setTimeout(() => controller.abort(), this.requestTimeoutMs);
       const contract = buildRealtimeLessonContract(plan, this.options, runtimePrompt);
-      if (!adaptive && this.options.legacyActivities)
+      if (!adaptive && !quick && this.options.legacyActivities)
         contract.session.audio.input.turn_detection.create_response = false;
       plan = { ...plan, realtimeContract: contract };
       const response = await this.fetchImpl('https://api.openai.com/v1/realtime/client_secrets', {
@@ -652,11 +670,13 @@ export class PrivateLessonService {
             adaptivePlan,
             input.interactionMode ?? 'guided',
           )
-        : ((await this.options.legacyActivities?.create(
-            scope,
-            plan,
-            input.interactionMode ?? 'guided',
-          )) ?? null);
+        : quick
+          ? null
+          : ((await this.options.legacyActivities?.create(
+              scope,
+              plan,
+              input.interactionMode ?? 'guided',
+            )) ?? null);
       if (ticketId) await this.options.realtimeCallGuard!.issue(ticketId, secret.value);
       return {
         lesson: publicPlan(plan),

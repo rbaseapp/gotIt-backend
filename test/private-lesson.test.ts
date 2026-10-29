@@ -757,6 +757,49 @@ test('private lesson prepares Sol teaching content before opening Realtime', asy
   assert.doesNotMatch(JSON.stringify(result), /content-secret|realtime-secret/u);
 });
 
+test('a quick start opens the voice session without generating any content', async () => {
+  let generated = 0;
+  let realtimeRequest:
+    | { session: { audio: { input: { turn_detection: Record<string, unknown> } } } }
+    | undefined;
+  const contentGenerator = new OpenAiCourseGenerator(
+    'content-secret',
+    'gpt-6-sol',
+    'gpt-transcribe-test',
+    async () => {
+      generated++;
+      return Response.json({ status: 'incomplete', output: [] });
+    },
+  );
+  const service = new PrivateLessonService({
+    apiKey: 'realtime-secret',
+    model: 'gpt-realtime-test',
+    voice: 'marin',
+    transcriptionModel: 'gpt-transcribe-test',
+    profiles,
+    vocabulary,
+    lessonContentGenerator: contentGenerator,
+    fetchImpl: async (_url, init) => {
+      realtimeRequest = JSON.parse(String(init?.body));
+      return Response.json({ value: 'ek_demo' });
+    },
+  });
+
+  const result = await service.createSession(identity, {
+    targetLanguageCode: 'en',
+    supportLanguageCode: 'he',
+    interactionMode: 'conversation',
+    interactionProtocol: 'adaptive-v1',
+    quickStart: true,
+  });
+
+  assert.equal(generated, 0);
+  assert.equal(result.activity, null);
+  // The voice model answers on its own instead of waiting for a server-chosen task.
+  assert.equal(realtimeRequest?.session.audio.input.turn_detection.create_response, true);
+  assert.match(JSON.stringify(realtimeRequest?.session), /first short conversation/u);
+});
+
 test('private lesson does not open Realtime when teaching content generation fails', async () => {
   let realtimeCalled = false;
   let reservedLessonId: string | undefined;
