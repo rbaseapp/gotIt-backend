@@ -29,6 +29,7 @@ export class AiDailyQuota {
   constructor(private readonly limiter: RateLimitContract) {}
 
   async consume(scope: ProfileScope, feature: AiDailyFeature) {
+    if (scope.role === 'admin') return;
     const result = await this.limiter.consume(
       `gotit:ai-daily:${scope.applicationId}:${scope.applicationUserId}:${feature}`,
       LIMITS[feature],

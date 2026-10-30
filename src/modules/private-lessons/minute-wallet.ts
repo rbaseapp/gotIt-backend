@@ -10,6 +10,7 @@ export type MinuteBalance = {
   secondsUsed: number;
   secondsRemaining: number;
   expiresAt: string | null;
+  unlimited?: boolean;
 };
 
 export interface MinuteWallet {
@@ -104,6 +105,14 @@ export class PostgresMinuteWallet implements MinuteWallet {
   }
 
   async balance(scope: ProfileScope, accessToken: string): Promise<MinuteBalance> {
+    if (scope.role === 'admin')
+      return {
+        secondsTotal: 0,
+        secondsUsed: 0,
+        secondsRemaining: 0,
+        expiresAt: null,
+        unlimited: true,
+      };
     return this.locked(scope, accessToken, async (_db, grants) => ({
       secondsTotal: grants.reduce((sum, grant) => sum + grant.seconds_total, 0),
       secondsUsed: grants.reduce((sum, grant) => sum + grant.seconds_used, 0),
@@ -123,6 +132,7 @@ export class PostgresMinuteWallet implements MinuteWallet {
   ): Promise<void> {
     if (!Number.isInteger(seconds) || seconds < 1 || seconds > 1800)
       throw new AppError(400, 'PRIVATE_LESSON_DURATION_INVALID', 'Invalid lesson duration');
+    if (scope.role === 'admin') return;
     await this.locked(scope, accessToken, async (db, grants) => {
       if (
         (
