@@ -800,6 +800,9 @@ test('a quick start opens the voice session without generating any content', asy
   // The voice model answers on its own instead of waiting for a server-chosen task.
   assert.equal(realtimeRequest?.session.audio.input.turn_detection.create_response, true);
   assert.match(JSON.stringify(realtimeRequest?.session), /First short chat/u);
+  // The first chat is hosted by Moochi: the voice model is told that name and the client can show it.
+  assert.match(JSON.stringify(realtimeRequest?.session), /Your name is Moochi/u);
+  assert.equal((result.lesson as { teacherName?: string }).teacherName, 'Moochi');
 });
 
 test('private lesson does not open Realtime when teaching content generation fails', async () => {

@@ -1,12 +1,12 @@
 import { describeLessonLanguage, type PrivateLessonPlan } from './private-lesson.prompt.js';
-import { privateLessonTeachers } from './private-lesson.teachers.js';
+import { lessonTeacherName } from './private-lesson.teachers.js';
 
 export function defaultLessonDirectives(plan: PrivateLessonPlan) {
   const targetLanguage = describeLessonLanguage(plan.targetLanguageCode);
   const supportLanguage = plan.supportLanguageCode
     ? describeLessonLanguage(plan.supportLanguageCode)
     : null;
-  const teacher = privateLessonTeachers[plan.teacherVoice];
+  const teacher = { name: lessonTeacherName(plan) };
   const childCourse = plan.course?.preferences.ageGroup === 'child';
   const absoluteBeginner = plan.lessonMode === 'absolute_beginner';
   const supportTeaching = plan.teachingLanguage === 'support';

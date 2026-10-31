@@ -2,6 +2,7 @@ import { z } from 'zod';
 import type { PrivateLessonPlan } from './private-lesson.prompt.js';
 import {
   privateLessonIntroductionPolicy,
+  lessonTeacherName,
   privateLessonTeachers,
 } from './private-lesson.teachers.js';
 
@@ -64,7 +65,7 @@ export const privateLessonBriefInstruction = `Prepare a compact, accurate teachi
 
 export function privateLessonBriefInput(plan: PrivateLessonPlan) {
   return {
-    teacherName: privateLessonTeachers[plan.teacherVoice].name,
+    teacherName: lessonTeacherName(plan),
     targetLanguageCode: plan.targetLanguageCode,
     supportLanguageCode: plan.supportLanguageCode,
     teachingLanguageCode:

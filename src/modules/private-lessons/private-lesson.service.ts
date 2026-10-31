@@ -516,6 +516,7 @@ export class PrivateLessonService {
         continuity: null,
         grammarFocus: null,
         customFocus: quickStartFocus,
+        teacherName: 'Moochi',
       };
     if (curriculum)
       plan = {
@@ -1253,6 +1254,7 @@ function publicPlan(plan: PrivateLessonPlan) {
     vocabularyMode: plan.vocabularyMode,
     continuesFromLessonId: plan.continuity?.previousLessonId ?? null,
     teacherVoice: plan.teacherVoice,
+    ...(plan.teacherName ? { teacherName: plan.teacherName } : {}),
     speechRate: plan.speechRate,
     targetWords: plan.targets,
     roadmap: plan.roadmap,

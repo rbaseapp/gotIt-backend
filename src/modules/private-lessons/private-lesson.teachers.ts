@@ -4,6 +4,12 @@ export const privateLessonTeachers = {
   male: { name: 'Mike', voice: 'cedar' },
 } as const;
 
+/** The name the tutor uses: a lesson may be hosted by a character such as Moochi. */
+export const lessonTeacherName = (plan: {
+  teacherName?: string;
+  teacherVoice: keyof typeof privateLessonTeachers;
+}) => plan.teacherName ?? privateLessonTeachers[plan.teacherVoice].name;
+
 // Rachel already has a matching portrait set and Realtime voice. Keep the
 // child course on that identity until a dedicated child tutor asset exists.
 export const childCourseTeacherVoice = 'female' as const;

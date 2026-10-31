@@ -11,6 +11,7 @@ import {
 import { defaultLessonDirectives } from './private-lesson.directives.js';
 import {
   privateLessonIntroductionPolicy,
+  lessonTeacherName,
   privateLessonTeachers,
 } from './private-lesson.teachers.js';
 import { AppError } from '../../shared/errors/app-error.js';
@@ -48,7 +49,7 @@ export function buildRealtimeLessonContract(
   const variables = {
     targetLanguage: targetLanguage.promptName,
     supportLanguage: supportLanguage?.promptName ?? '',
-    teacherName: privateLessonTeachers[plan.teacherVoice].name,
+    teacherName: lessonTeacherName(plan),
     topic: plan.topic,
     level: plan.level,
     lessonData: JSON.stringify(
