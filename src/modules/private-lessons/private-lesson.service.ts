@@ -514,6 +514,7 @@ export class PrivateLessonService {
         ...plan,
         roadmap: null,
         continuity: null,
+        topic: 'Getting to know each other',
         grammarFocus: null,
         customFocus: quickStartFocus,
         teacherName: 'Moochi',
