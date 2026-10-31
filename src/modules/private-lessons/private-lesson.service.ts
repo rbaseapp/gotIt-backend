@@ -14,7 +14,11 @@ import {
   type LessonActivityCommand,
 } from './private-lesson.activity.js';
 import { createHash, randomUUID } from 'node:crypto';
-import { privateLessonTeachers, childCourseTeacherVoice } from './private-lesson.teachers.js';
+import {
+  privateLessonTeachers,
+  childCourseTeacherVoice,
+  moochiName,
+} from './private-lesson.teachers.js';
 import { z } from 'zod';
 import { AppError } from '../../shared/errors/app-error.js';
 import type { AddonAccessContract } from '../addons/addon-access.js';
@@ -517,7 +521,7 @@ export class PrivateLessonService {
         topic: 'Getting to know each other',
         grammarFocus: null,
         customFocus: quickStartFocus,
-        teacherName: 'Moochi',
+        teacherName: moochiName,
       };
     if (curriculum)
       plan = {
