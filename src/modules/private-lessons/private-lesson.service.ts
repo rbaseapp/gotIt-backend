@@ -122,7 +122,7 @@ export type PrivateLessonServiceOptions = {
 
 /** The whole brief of a quick start: the first short chat after the level check. */
 const quickStartFocus =
-  "This is the learner's first short conversation, right after a level check. Keep it warm and easy: talk about things they already know (home, food, a normal day), ask one short question at a time, wait for the answer, keep your sentences short, and do not teach grammar. At the end give at most two small, kind suggestions.";
+  'First short chat after a level check. Keep it warm and easy: talk about things they already know (home, food, a normal day), one short question at a time, short sentences, no grammar teaching. At the end give at most two kind suggestions.';
 
 export class PrivateLessonService {
   private readonly voiceSamples = new Map<string, { expires: number; audioBase64: string }>();

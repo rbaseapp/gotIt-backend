@@ -795,9 +795,11 @@ test('a quick start opens the voice session without generating any content', asy
 
   assert.equal(generated, 0);
   assert.equal(result.activity, null);
+  // The saved lesson schema caps the focus at 300 characters; a longer one made the request fail.
+  assert.ok((result.lesson.customFocus ?? '').length <= 300);
   // The voice model answers on its own instead of waiting for a server-chosen task.
   assert.equal(realtimeRequest?.session.audio.input.turn_detection.create_response, true);
-  assert.match(JSON.stringify(realtimeRequest?.session), /first short conversation/u);
+  assert.match(JSON.stringify(realtimeRequest?.session), /First short chat/u);
 });
 
 test('private lesson does not open Realtime when teaching content generation fails', async () => {
