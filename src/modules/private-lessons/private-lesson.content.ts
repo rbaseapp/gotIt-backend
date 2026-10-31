@@ -1,10 +1,6 @@
 import { z } from 'zod';
 import type { PrivateLessonPlan } from './private-lesson.prompt.js';
-import {
-  privateLessonIntroductionPolicy,
-  lessonTeacherName,
-  privateLessonTeachers,
-} from './private-lesson.teachers.js';
+import { privateLessonIntroductionPolicy, lessonTeacherName } from './private-lesson.teachers.js';
 
 export const privateLessonBriefSchema = z
   .object({

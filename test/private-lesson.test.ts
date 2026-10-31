@@ -1262,6 +1262,90 @@ test('private lesson persists one structured report and never stores the transcr
   });
 });
 
+test('a hosted first chat keeps its host and leaves the level and later lessons alone', async () => {
+  recordedAssessment = undefined;
+  const rows = new Map<string, StoredPrivateLesson>();
+  const journal: PrivateLessonJournal = {
+    async create(_scope, plan) {
+      rows.set(plan.id, stored(plan));
+    },
+    async get(_scope, id) {
+      return rows.get(id) ?? null;
+    },
+    async list() {
+      return [...rows.values()].reverse();
+    },
+    async claim(_scope, id, duration) {
+      const claimed = {
+        ...rows.get(id)!,
+        status: 'summarizing' as const,
+        actualDurationSeconds: duration,
+      };
+      rows.set(id, claimed);
+      return claimed;
+    },
+    async complete(_scope, id, report) {
+      const completed = { ...rows.get(id)!, status: 'completed' as const, report };
+      rows.set(id, completed);
+      return completed;
+    },
+    async fail() {},
+    async remove(_scope, id) {
+      return rows.delete(id);
+    },
+  };
+  const service = new PrivateLessonService({
+    apiKey: 'server-secret',
+    model: 'gpt-realtime-test',
+    voice: 'marin',
+    transcriptionModel: 'gpt-transcribe-test',
+    profiles,
+    vocabulary,
+    journal,
+    summaryGenerator: {
+      async generate() {
+        return {
+          summary: 'An easy first chat.',
+          assessment,
+          roadmapProgress: null,
+          strengths: ['Said their name'],
+          corrections: [],
+          grammarPoints: [],
+          vocabulary: [],
+          newWordSuggestions: [],
+          nextLessonPlan: 'Start the first unit.',
+          recommendedReviewItemIds: [],
+        };
+      },
+    },
+    fetchImpl: async () => Response.json({ value: 'ek_demo' }),
+  });
+
+  const quick = await service.createSession(identity, {
+    targetLanguageCode: 'en',
+    interactionMode: 'conversation',
+    quickStart: true,
+  });
+  // The first chat is about familiar things: no saved words to drill.
+  assert.deepEqual(quick.lesson.targetWords, []);
+  const done = await service.completeSession(identity, quick.lesson.id, {
+    actualDurationSeconds: 60,
+    completionReason: 'completed',
+    turns: [{ role: 'learner', text: 'My name is Dana.' }],
+  });
+  assert.equal((done as { teacherName?: string }).teacherName, 'Moochi');
+  assert.equal(
+    ((await service.listSessions(identity, 20)).lessons[0] as { teacherName?: string }).teacherName,
+    'Moochi',
+  );
+  // An easy chat is no level measurement.
+  assert.equal(recordedAssessment, undefined);
+
+  const next = await service.createSession(identity, { targetLanguageCode: 'en' });
+  assert.equal(next.lesson.continuesFromLessonId, null);
+  assert.doesNotMatch(next.lesson.customFocus ?? '', /First short chat/u);
+});
+
 test('private lesson report generation is structured, transient and limited to lesson vocabulary', async () => {
   let requestBody: Record<string, unknown> | undefined;
   const generated: PrivateLessonReport = {

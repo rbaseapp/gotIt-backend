@@ -471,6 +471,8 @@ export class PrivateLessonService {
         (lesson) =>
           lesson.status === 'completed' &&
           lesson.report &&
+          // A hosted first chat is not a lesson to continue from; its easy brief must not carry over.
+          !lesson.teacherName &&
           (!input.courseId || lesson.course?.courseId === input.courseId) &&
           (!input.packId || lesson.wordPack?.packId === input.packId) &&
           (Boolean(input.courseId) || lesson.lessonMode === requestedLessonMode) &&
@@ -500,8 +502,9 @@ export class PrivateLessonService {
       preferences?.vocabularyMode ??
       previousLesson?.vocabularyMode ??
       'learned';
+    // A quick start has no word list: the chat is about things the learner already knows.
     const vocabulary =
-      vocabularyMode === 'learned'
+      vocabularyMode === 'learned' && !quick
         ? await this.options.vocabulary.learned(scope, input.targetLanguageCode, 20)
         : { items: [] };
     let plan: PrivateLessonPlan = this.buildPlan(
@@ -665,7 +668,8 @@ export class PrivateLessonService {
       });
       const secret = clientSecretSchema.parse(await readProviderJson(response, controller.signal));
 
-      if (!input.courseId && !input.packId && !curriculum)
+      // A quick start runs on fixed defaults; it must not overwrite the learner's lesson settings.
+      if (!input.courseId && !input.packId && !curriculum && !quick)
         await this.options.roadmaps?.savePreferences(scope, input, plan);
       journalCreated = Boolean(this.options.journal);
       await this.options.journal?.create(scope, { ...plan, realtimeContract: contract });
@@ -801,6 +805,9 @@ export class PrivateLessonService {
       });
       const completed = await journal.complete(scope, id, report);
       await this.options.roadmaps?.recordEvidence(scope, claimed, report).catch(() => undefined);
+      // A hosted first chat is kept deliberately easy, so it is no measure of the learner's level
+      // and must not override the placement they just took.
+      if (claimed.teacherName) return publicStoredLesson(completed);
       if (this.options.proficiency)
         await this.options.proficiency
           .recordLessonEvidence(scope, claimed, report)
@@ -1217,6 +1224,7 @@ function publicStoredLesson(lesson: StoredPrivateLesson) {
     vocabularyMode: lesson.vocabularyMode,
     continuesFromLessonId: lesson.continuity?.previousLessonId ?? null,
     teacherVoice: lesson.teacherVoice,
+    ...(lesson.teacherName ? { teacherName: lesson.teacherName } : {}),
     speechRate: lesson.speechRate,
     plannedDurationSeconds: lesson.durationSeconds,
     actualDurationSeconds: lesson.actualDurationSeconds,

@@ -3,11 +3,7 @@ import type { CourseLessonContext } from '../courses/course.schemas.js';
 import type { PrivateLessonBrief } from './private-lesson.content.js';
 import type { LessonUnit } from '../word-packs/teacher-stations.js';
 import type { PromptContent } from '../admin/admin.prompt-config.js';
-import {
-  privateLessonIntroductionPolicy,
-  lessonTeacherName,
-  privateLessonTeachers,
-} from './private-lesson.teachers.js';
+import { privateLessonIntroductionPolicy, lessonTeacherName } from './private-lesson.teachers.js';
 import type {
   privateLessonCorrectionModes,
   privateLessonFocusAreas,
