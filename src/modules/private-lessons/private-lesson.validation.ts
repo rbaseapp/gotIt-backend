@@ -51,6 +51,8 @@ export const privateLessonInputSchema = z
     interactionProtocol: z.literal('adaptive-v1').optional(),
     /** A free conversation that opens at once: no planned bank of tasks, the voice model answers directly. */
     quickStart: z.boolean().optional(),
+    /** With quickStart: the level check found a beginner, so teach first words in their language. */
+    beginner: z.boolean().optional(),
     targetLanguageCode: languageSchema,
     supportLanguageCode: languageSchema.nullable().optional(),
     lessonMode: z.enum(privateLessonModes).optional(),

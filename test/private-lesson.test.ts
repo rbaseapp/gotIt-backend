@@ -11,6 +11,7 @@ import type { CourseLessonContext } from '../src/modules/courses/course.schemas.
 import { preferences as coursePreferences } from './helpers/course-fixtures.js';
 import {
   PrivateLessonService,
+  quickStartBrief,
   type PrivateLessonVocabularySource,
 } from '../src/modules/private-lessons/private-lesson.service.js';
 import { privateLessonDemoJs } from '../src/modules/private-lessons/private-lesson.demo.js';
@@ -755,6 +756,118 @@ test('private lesson prepares Sol teaching content before opening Realtime', asy
   assert.match(JSON.stringify(realtimeRequest?.session), /I visited my friend yesterday/u);
   assert.match(result.realtime.openingEvent.response.instructions, /teachingBrief/u);
   assert.doesNotMatch(JSON.stringify(result), /content-secret|realtime-secret/u);
+});
+
+test('a quick start brief teaches a beginner first-unit words and uses interests otherwise', () => {
+  const beginner = quickStartBrief({
+    absoluteBeginner: true,
+    interests: ['football'],
+    firstWords: ['hello', 'hi', 'goodbye', 'I', 'you'],
+  });
+  assert.match(beginner, /absolute beginner/u);
+  assert.match(beginner, /Speak their own language/u);
+  assert.match(beginner, /hello, hi, goodbye, I\)/u);
+  const placed = quickStartBrief({
+    absoluteBeginner: false,
+    interests: ['football', 'music'],
+    firstWords: ['work'],
+  });
+  assert.match(placed, /First short chat/u);
+  assert.match(placed, /They enjoy: football, music\./u);
+  // Saved lessons cap the focus at 300 characters: long interests are dropped, not cut.
+  const crowded = quickStartBrief({
+    absoluteBeginner: false,
+    interests: ['x'.repeat(200)],
+    firstWords: [],
+  });
+  assert.ok(crowded.length <= 300);
+  assert.doesNotMatch(crowded, /They enjoy/u);
+  assert.match(quickStartBrief(null), /First short chat/u);
+});
+
+test('the first chat is open to a beginner and follows the level check', async () => {
+  const curriculum = (facts: object) =>
+    ({
+      async tutorGate() {
+        return { unlocked: false, reason: 'progress', done: 0, required: 3 };
+      },
+      async learnerFacts() {
+        return facts;
+      },
+    }) as never;
+  let realtimeRequest: { session: { instructions: string } } | undefined;
+  const service = (facts: object) =>
+    new PrivateLessonService({
+      apiKey: 'realtime-secret',
+      model: 'gpt-realtime-test',
+      voice: 'marin',
+      transcriptionModel: 'gpt-transcribe-test',
+      profiles,
+      vocabulary,
+      curriculum: curriculum(facts),
+      fetchImpl: async (_url, init) => {
+        realtimeRequest = JSON.parse(String(init?.body));
+        return Response.json({ value: 'ek_demo' });
+      },
+    });
+
+  // Free conversation stays locked for a beginner who has not done the first units.
+  await assert.rejects(
+    service({}).createSession(identity, { targetLanguageCode: 'en', supportLanguageCode: 'he' }),
+    { code: 'TUTOR_LOCKED' },
+  );
+
+  const beginner = await service({
+    startingLevel: 'A1',
+    absoluteBeginner: true,
+    interests: [],
+    minutesPerDay: 10,
+    firstWords: ['hello', 'my', 'name'],
+  }).createSession(identity, {
+    targetLanguageCode: 'en',
+    // No language chosen on the page: the beginner is still taught in their own (profile) one.
+    supportLanguageCode: null,
+    interactionMode: 'conversation',
+    quickStart: true,
+  });
+  assert.equal(beginner.lesson.level, 'A1');
+  assert.equal(beginner.lesson.lessonMode, 'absolute_beginner');
+  assert.equal(beginner.lesson.teachingLanguage, 'support');
+  assert.match(beginner.lesson.customFocus ?? '', /hello, my, name/u);
+  assert.match(realtimeRequest?.session.instructions ?? '', /Hebrew/u);
+
+  const placed = await service({
+    startingLevel: 'B1',
+    absoluteBeginner: false,
+    interests: ['travel'],
+    minutesPerDay: 10,
+    firstWords: [],
+  }).createSession(identity, {
+    targetLanguageCode: 'en',
+    supportLanguageCode: 'he',
+    interactionMode: 'conversation',
+    quickStart: true,
+  });
+  assert.equal(placed.lesson.level, 'B1');
+  assert.equal(placed.lesson.lessonMode, 'standard');
+  assert.match(placed.lesson.customFocus ?? '', /They enjoy: travel/u);
+
+  // An A1 learner the level check flags as not ready to converse also gets the beginner chat.
+  const flagged = await service({
+    startingLevel: 'A1',
+    absoluteBeginner: false,
+    interests: [],
+    minutesPerDay: 10,
+    firstWords: ['work', 'home'],
+  }).createSession(identity, {
+    targetLanguageCode: 'en',
+    supportLanguageCode: 'he',
+    interactionMode: 'conversation',
+    quickStart: true,
+    beginner: true,
+  });
+  assert.equal(flagged.lesson.lessonMode, 'absolute_beginner');
+  assert.match(flagged.lesson.customFocus ?? '', /\(work, home\)/u);
 });
 
 test('a quick start opens the voice session without generating any content', async () => {

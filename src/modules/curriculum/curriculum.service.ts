@@ -243,6 +243,8 @@ export class CurriculumService {
       absoluteBeginner: unit.band === 'Pre-A1',
       interests: onboarding.profile?.interests ?? [],
       minutesPerDay: onboarding.minutesPerDay,
+      /** The first words of the unit the learner starts at, for a beginner's first chat. */
+      firstWords: unit.targets.slice(0, 6).map((target) => target.en),
     };
   }
   /** Whether free conversation with the teacher is open for this learner. */

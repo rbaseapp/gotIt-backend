@@ -126,7 +126,35 @@ export type PrivateLessonServiceOptions = {
 
 /** The whole brief of a quick start: the first short chat after the level check. */
 const quickStartFocus =
-  'First short chat after a level check. Keep it warm and easy: talk about things they already know (home, food, a normal day), one short question at a time, short sentences, no grammar teaching. At the end give at most two kind suggestions.';
+  'First short chat after a level check. Keep it warm and easy: one short question at a time about familiar things (home, food, a normal day), short sentences, no grammar teaching. End with at most two kind suggestions.';
+/** Saved lessons cap the custom focus at this length. */
+const MAX_FOCUS_LENGTH = 300;
+
+/**
+ * The brief of a quick start, from what the level check found. An absolute beginner gets a first
+ * lesson in their own language with a few words from the unit they start at; anyone else gets an
+ * easy chat, about their interests when there is room.
+ */
+export function quickStartBrief(
+  facts: { absoluteBeginner: boolean; interests: string[]; firstWords: string[] } | null,
+) {
+  if (facts?.absoluteBeginner) {
+    // Without a placement unit, start where the path starts: greeting and saying your name.
+    const words = (
+      facts.firstWords.length ? facts.firstWords.slice(0, 4) : ['hello', 'my name is', 'goodbye']
+    ).join(', ');
+    const brief =
+      'First chat with an absolute beginner. Speak their own language. ' +
+      `Teach a few English words from their first unit (${words}), one at a time: ` +
+      'say it, explain it, let them repeat it and use it about themselves. End with a short recap.';
+    return brief.slice(0, MAX_FOCUS_LENGTH);
+  }
+  const interests = facts?.interests.slice(0, 3) ?? [];
+  const withInterests = `${quickStartFocus} They enjoy: ${interests.join(', ')}.`;
+  return interests.length && withInterests.length <= MAX_FOCUS_LENGTH
+    ? withInterests
+    : quickStartFocus;
+}
 
 export class PrivateLessonService {
   private readonly voiceSamples = new Map<string, { expires: number; audioBase64: string }>();
@@ -301,8 +329,15 @@ export class PrivateLessonService {
     const runtimePrompt = adminRuntimeContext.getStore()?.prompts['lesson-live'];
     input = { ...runtimePrompt?.realtime?.lessonDefaults, ...input };
     // Free conversation opens once the learner has a base (see curriculum.placement.ts); lessons
-    // that belong to a program, course or unit are not affected.
-    if (this.options.curriculum && !input.courseId && !input.packId && !input.curriculumLessonId) {
+    // that belong to a program, course or unit are not affected. The first chat with Moochi is
+    // open to everyone: a beginner gets it in their own language.
+    if (
+      this.options.curriculum &&
+      !input.courseId &&
+      !input.packId &&
+      !input.curriculumLessonId &&
+      input.quickStart !== true
+    ) {
       const gate = await this.options.curriculum.tutorGate(scope);
       if (!gate.unlocked)
         throw new AppError(409, 'TUTOR_LOCKED', 'Free conversation opens after the first units', {
@@ -351,6 +386,23 @@ export class PrivateLessonService {
         teachingLanguage: ['Pre-A1', 'A1'].includes(curriculum.band) ? 'support' : 'target',
         vocabularyMode: 'none',
         topic: curriculum.title,
+      };
+    // The first chat follows the level check the learner just took, not a default level.
+    const placement = quick
+      ? await this.options.curriculum
+          ?.learnerFacts(scope, input.targetLanguageCode)
+          .catch(() => null)
+      : null;
+    // A beginner (below A1, or not yet able to hold a short conversation) learns first words.
+    const beginner = quick && (placement?.absoluteBeginner === true || input.beginner === true);
+    if (quick && (placement || beginner))
+      input = {
+        ...input,
+        ...(placement ? { requestedLevel: placement.startingLevel } : {}),
+        lessonMode: beginner ? 'absolute_beginner' : 'standard',
+        teachingLanguage: beginner ? 'support' : 'target',
+        // A beginner is taught in their own language: fall back to the saved or profile one.
+        ...(beginner && !input.supportLanguageCode ? { supportLanguageCode: undefined } : {}),
       };
 
     let stationDurationMinutes: number | undefined;
@@ -523,7 +575,11 @@ export class PrivateLessonService {
         continuity: null,
         topic: 'Getting to know each other',
         grammarFocus: null,
-        customFocus: quickStartFocus,
+        customFocus: quickStartBrief({
+          absoluteBeginner: beginner,
+          interests: placement?.interests ?? [],
+          firstWords: placement?.firstWords ?? [],
+        }),
         teacherName: moochiName,
       };
     if (curriculum)
