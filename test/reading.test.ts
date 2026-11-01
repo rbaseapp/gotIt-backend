@@ -299,7 +299,7 @@ test('AI article preview with the public request payload uses automatic vocabula
   const scope = {
     applicationId: 'b6ee48fc-d538-4b49-8d31-f89f399342aa',
     applicationUserId: '455910fe-0d25-4ef8-8674-2bcc80aebf8e',
-    role: 'user',
+    role: 'user' as const,
   };
   const pool = { connect: async () => client } as any;
   const profiles = {
