@@ -1,3 +1,4 @@
+import compression from 'compression';
 import express from 'express';
 import helmet from 'helmet';
 import { pinoHttp } from 'pino-http';
@@ -15,6 +16,15 @@ export function createApp(dependencies: AppDependencies) {
   app.disable('x-powered-by');
   if (dependencies.trustProxyHops) app.set('trust proxy', dependencies.trustProxyHops);
   app.use(helmet());
+  // JSON answers (word lists, lessons, reports) shrink several times when compressed.
+  // Not the realtime session answers: they carry a short-lived secret next to request data.
+  app.use(
+    compression({
+      threshold: 1024,
+      filter: (request, response) =>
+        !request.path.includes('/realtime') && compression.filter(request, response),
+    }),
+  );
   app.use(requestIdMiddleware);
 
   app.use(

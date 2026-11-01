@@ -137,6 +137,8 @@ const coreAuthClient = new CoreAuthClient({
   baseUrl: env.CORE_API_BASE_URL,
   applicationKey: env.CORE_APPLICATION_KEY,
   timeoutMs: env.CORE_AUTH_TIMEOUT_MS,
+  identityCacheMs: env.CORE_IDENTITY_CACHE_MS,
+  billingCacheMs: env.CORE_BILLING_CACHE_MS,
 });
 const minuteWallet = new PostgresMinuteWallet(pool, coreAuthClient);
 const rateLimiter = new PostgresRateLimiter(pool);
@@ -299,6 +301,8 @@ const courseService = new CourseService(
     : undefined,
   new PostgresCourseWordSource(pool),
   new PostgresPrivateLessonJournal(pool),
+  // The curriculum service is created below; this runs only when a course starts.
+  (scope, language) => curriculumService.learnerFacts(scope, language),
 );
 const lessonActivityStore = new PostgresLessonActivityStore(pool);
 const curriculumService = new CurriculumService(

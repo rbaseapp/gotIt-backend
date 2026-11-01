@@ -4,6 +4,28 @@ export const privateLessonTeachers = {
   male: { name: 'Mike', voice: 'cedar' },
 } as const;
 
+/** The name the tutor uses: a lesson may be hosted by a character such as Moochi. */
+export const lessonTeacherName = (plan: {
+  teacherName?: string;
+  teacherVoice: keyof typeof privateLessonTeachers;
+}) => plan.teacherName ?? privateLessonTeachers[plan.teacherVoice].name;
+
+/** Moochi, the brain character who hosts the first chat, with his own Realtime voice. */
+export const moochiName = 'Moochi';
+export const moochiVoice = 'verse';
+
+/**
+ * The Realtime voice a lesson is spoken in. Moochi keeps his own voice; a teacher speaks in the
+ * admin's override when one is set, else in their own.
+ */
+export const lessonTeacherVoice = (
+  plan: { teacherName?: string; teacherVoice: keyof typeof privateLessonTeachers },
+  override?: string,
+) =>
+  plan.teacherName === moochiName
+    ? moochiVoice
+    : (override ?? privateLessonTeachers[plan.teacherVoice].voice);
+
 // Rachel already has a matching portrait set and Realtime voice. Keep the
 // child course on that identity until a dedicated child tutor asset exists.
 export const childCourseTeacherVoice = 'female' as const;

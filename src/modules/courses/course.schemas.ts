@@ -5,6 +5,15 @@ import { lessonMaterialSchema, type LessonMaterial } from './lesson-material.sch
 import type { UnitPathChoices } from '../word-packs/unit-path-choices.js';
 
 const text = (max = 500) => z.string().trim().min(1).max(max);
+export const INTAKE_TOPICS = [
+  'goal',
+  'level',
+  'ageAndLiteracy',
+  'interests',
+  'learningPreferences',
+  'schedule',
+] as const;
+export type IntakeTopic = (typeof INTAKE_TOPICS)[number];
 export const coursePreferencesSchema = z
   .object({
     targetLanguageCode: languageSchema,
@@ -44,7 +53,8 @@ export const intakeQuestionsSchema = z
           })
           .strict(),
       )
-      .length(6),
+      .min(1)
+      .max(6),
   })
   .strict();
 export const courseUnitSchema = z
@@ -133,6 +143,8 @@ export type CourseDocument = {
   intakeQuestions?: z.infer<typeof intakeQuestionsSchema>['questions'];
   intakeClosing?: string;
   intakeStep?: number;
+  /** The topics this intake asks, in order; absent means all six (older courses). */
+  intakeTopics?: IntakeTopic[];
   reportedAvailability?: string;
   versions: CourseVersion[];
   draftVersion: number | null;

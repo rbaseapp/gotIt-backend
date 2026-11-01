@@ -1,5 +1,7 @@
+import { createHash } from 'node:crypto';
 import { z } from 'zod';
 import { AppError } from '../errors/app-error.js';
+import { TtlCache } from './ttl-cache.js';
 
 const coreMeResponseSchema = z
   .object({
@@ -141,16 +143,56 @@ export class CoreAuthClient {
       })
       .parse(await this.adminRequest(accessToken, `users/${id}`, requestId)).data;
   }
+  private readonly identities = new TtlCache<CoreAuthenticatedIdentity>(5_000);
+  private readonly billing = new TtlCache<CoreBillingStatus>(5_000);
+
   constructor(
     private readonly options: {
       baseUrl: string;
       applicationKey: string;
       timeoutMs: number;
       fetchImpl?: FetchLike;
+      /**
+       * How long to reuse Core's answer for the same access token, in milliseconds. Every
+       * product request needs the caller's identity, and asking Core each time adds a network
+       * round trip; a revoked session is honoured after at most this long. Off when 0.
+       */
+      identityCacheMs?: number;
+      /** How long to reuse a billing status that grants access. Denials are always re-checked. */
+      billingCacheMs?: number;
     },
   ) {}
 
   async validateAccessToken(
+    accessToken: string,
+    requestId?: string,
+  ): Promise<CoreAuthenticatedIdentity> {
+    const ttl = this.options.identityCacheMs ?? 0;
+    if (ttl <= 0) return this.fetchIdentity(accessToken, requestId);
+    return this.identities.get(
+      tokenKey(accessToken),
+      () => this.fetchIdentity(accessToken, requestId),
+      // An admin is always re-checked: a demotion or a ban must apply at once.
+      (identity) => (identity.role === 'admin' ? 0 : Math.min(ttl, tokenLifetimeMs(accessToken))),
+    );
+  }
+
+  async getBillingStatus(accessToken: string, requestId?: string): Promise<CoreBillingStatus> {
+    const ttl = this.options.billingCacheMs ?? 0;
+    if (ttl <= 0) return this.fetchBillingStatus(accessToken, requestId);
+    return this.billing.get(
+      tokenKey(accessToken),
+      () => this.fetchBillingStatus(accessToken, requestId),
+      // A learner who just paid must get access at once, so only a status that actually grants
+      // something is reused: a free status (even with access) is asked again every time.
+      (status) =>
+        status.access && status.entitlements.length > 0
+          ? Math.min(ttl, tokenLifetimeMs(accessToken))
+          : 0,
+    );
+  }
+
+  private async fetchIdentity(
     accessToken: string,
     requestId?: string,
   ): Promise<CoreAuthenticatedIdentity> {
@@ -218,7 +260,10 @@ export class CoreAuthClient {
     };
   }
 
-  async getBillingStatus(accessToken: string, requestId?: string): Promise<CoreBillingStatus> {
+  private async fetchBillingStatus(
+    accessToken: string,
+    requestId?: string,
+  ): Promise<CoreBillingStatus> {
     const fetchImpl = this.options.fetchImpl ?? fetch;
     const url = new URL('/api/v1/billing/status', this.options.baseUrl);
     let response: Response;
@@ -282,5 +327,25 @@ export class CoreAuthClient {
         'Billing service returned an invalid response',
       );
     return parsed.data;
+  }
+}
+
+/** Cache key for an access token: its hash, so tokens are never kept in memory as keys. */
+function tokenKey(accessToken: string) {
+  return createHash('sha256').update(accessToken).digest('base64url');
+}
+
+/**
+ * Milliseconds until the token expires, read from its unverified `exp` claim. It only shortens
+ * how long an answer Core already gave is reused, so an unreadable token is simply not cached.
+ */
+function tokenLifetimeMs(accessToken: string) {
+  try {
+    const payload = JSON.parse(
+      Buffer.from(accessToken.split('.')[1] ?? '', 'base64url').toString('utf8'),
+    ) as { exp?: unknown };
+    return typeof payload.exp === 'number' ? payload.exp * 1000 - Date.now() : 0;
+  } catch {
+    return 0;
   }
 }

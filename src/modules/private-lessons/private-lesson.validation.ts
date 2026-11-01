@@ -49,6 +49,10 @@ export const privateLessonInputSchema = z
     station: z.enum(['supported', 'midpoint', 'review']).optional(),
     interactionMode: z.enum(['guided', 'conversation']).optional(),
     interactionProtocol: z.literal('adaptive-v1').optional(),
+    /** A free conversation that opens at once: no planned bank of tasks, the voice model answers directly. */
+    quickStart: z.boolean().optional(),
+    /** With quickStart: the level check found a beginner, so teach first words in their language. */
+    beginner: z.boolean().optional(),
     targetLanguageCode: languageSchema,
     supportLanguageCode: languageSchema.nullable().optional(),
     lessonMode: z.enum(privateLessonModes).optional(),
@@ -87,6 +91,21 @@ export const privateLessonInputSchema = z
         code: 'custom',
         path: ['interactionMode'],
         message: 'A program lesson uses guided interaction',
+      });
+    if (value.quickStart && value.interactionMode !== 'conversation')
+      context.addIssue({
+        code: 'custom',
+        path: ['quickStart'],
+        message: 'A quick start is a free conversation',
+      });
+    if (
+      value.quickStart &&
+      (value.courseId || value.packId || value.curriculumLessonId || value.station)
+    )
+      context.addIssue({
+        code: 'custom',
+        path: ['quickStart'],
+        message: 'A quick start does not belong to a course, unit or program lesson',
       });
     if ((value.courseId && value.packId) || (value.station && !value.packId))
       context.addIssue({ code: 'custom', path: ['packId'], message: 'Choose one lesson context' });

@@ -204,8 +204,10 @@ export class CurriculumService {
   /**
    * Applies the onboarding placement once. Learners who already have lesson progress keep
    * their program unchanged and are told so, so a late claim can never overwrite real work.
+   * Only an explicit `replace` (the learner asked for the new plan) moves such a program;
+   * completed lessons and word progress stay either way.
    */
-  async place(scope: ProfileScope, input: PlacementInput & { eventId: string }) {
+  async place(scope: ProfileScope, input: PlacementInput & { eventId: string; replace?: boolean }) {
     if (!(await this.store.catalog())) throw curriculumMissing();
     const profile = await this.profiles.getProfile(scope);
     return this.store.command<PlacementResponse>(
@@ -215,12 +217,35 @@ export class CurriculumService {
       null,
       async (enrollment) => {
         const state = enrollment?.state ?? initialState(profile.timezone);
-        if (enrollment && hasLearningProgress(state))
+        const moving = Boolean(enrollment && hasLearningProgress(state));
+        if (moving && !input.replace)
           return { state, response: { applied: false, reason: 'existing_progress' } };
+        // A moved program skips only what the new level skips, not what an older check did.
+        if (moving && state.pathChoices) state.pathChoices.units = [];
         const summary = applyPlacement(state, input, this.clock());
         return { state, response: { applied: true, ...summary } };
       },
     );
+  }
+  /**
+   * What the placement check established, for a personal course in English: the tested
+   * level, the chosen interests and the daily time. Null when the learner never took it.
+   */
+  async learnerFacts(scope: ProfileScope, targetLanguageCode: string) {
+    if (new Intl.Locale(targetLanguageCode).language !== 'en') return null;
+    const onboarding = (await this.store.get(scope))?.state.onboarding;
+    if (!onboarding) return null;
+    const unit =
+      content.units[Math.min(Math.max(onboarding.startUnit, 1), content.units.length) - 1]!;
+    return {
+      // Courses start at A1; a Pre-A1 learner is an absolute beginner within it.
+      startingLevel: unit.band === 'Pre-A1' ? ('A1' as const) : unit.band,
+      absoluteBeginner: unit.band === 'Pre-A1',
+      interests: onboarding.profile?.interests ?? [],
+      minutesPerDay: onboarding.minutesPerDay,
+      /** The first words of the unit the learner starts at, for a beginner's first chat. */
+      firstWords: unit.targets.slice(0, 6).map((target) => target.en),
+    };
   }
   /** Whether free conversation with the teacher is open for this learner. */
   async tutorGate(scope: ProfileScope) {

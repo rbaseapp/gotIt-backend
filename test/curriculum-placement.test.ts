@@ -262,6 +262,23 @@ test('a late placement never overwrites a learner who already has progress', asy
   assert.equal(current()!.state.onboarding!.startUnit, 25);
 });
 
+test('a learner who asks for the new plan moves the program and keeps finished work', async () => {
+  const { service: s, current } = service();
+  await s.place(scope, { ...input(), eventId: randomUUID() });
+  current()!.state.completed['gate:P01'] = { at: NOW.toISOString(), independent: true, score: 1 };
+  const result = (await s.place(scope, {
+    ...input({ startUnit: 10, theta: 12 }),
+    eventId: randomUUID(),
+    replace: true,
+  })) as { applied: boolean };
+  assert.equal(result.applied, true);
+  const state = current()!.state;
+  assert.equal(state.onboarding!.startUnit, 10);
+  assert.ok(state.completed['gate:P01'], 'finished lessons stay');
+  // Units the older, higher result skipped are open again.
+  assert.equal(state.pathChoices!.units.length, 9);
+});
+
 test('learning state exposes the onboarding record and the teacher gate', async () => {
   const { service: s } = service();
   await s.place(scope, {
