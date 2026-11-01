@@ -13,6 +13,9 @@ const envSchema = z
     CORE_API_BASE_URL: z.string().url(),
     CORE_APPLICATION_KEY: z.string().min(1).default('gotit'),
     CORE_AUTH_TIMEOUT_MS: z.coerce.number().int().positive().max(30_000).default(3000),
+    // How long to reuse Core's answer for an access token (identity) and a granted billing status.
+    CORE_IDENTITY_CACHE_MS: z.coerce.number().int().min(0).max(300_000).default(60_000),
+    CORE_BILLING_CACHE_MS: z.coerce.number().int().min(0).max(300_000).default(20_000),
     ENFORCE_PAID_ENTITLEMENTS: z
       .enum(['true', 'false'])
       .default('true')

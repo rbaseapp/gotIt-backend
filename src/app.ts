@@ -1,3 +1,4 @@
+import compression from 'compression';
 import express from 'express';
 import helmet from 'helmet';
 import { pinoHttp } from 'pino-http';
@@ -15,6 +16,8 @@ export function createApp(dependencies: AppDependencies) {
   app.disable('x-powered-by');
   if (dependencies.trustProxyHops) app.set('trust proxy', dependencies.trustProxyHops);
   app.use(helmet());
+  // JSON answers (word lists, lessons, reports) shrink several times when compressed.
+  app.use(compression({ threshold: 1024 }));
   app.use(requestIdMiddleware);
 
   app.use(
