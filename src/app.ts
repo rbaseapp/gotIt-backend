@@ -17,7 +17,14 @@ export function createApp(dependencies: AppDependencies) {
   if (dependencies.trustProxyHops) app.set('trust proxy', dependencies.trustProxyHops);
   app.use(helmet());
   // JSON answers (word lists, lessons, reports) shrink several times when compressed.
-  app.use(compression({ threshold: 1024 }));
+  // Not the realtime session answers: they carry a short-lived secret next to request data.
+  app.use(
+    compression({
+      threshold: 1024,
+      filter: (request, response) =>
+        !request.path.includes('/realtime') && compression.filter(request, response),
+    }),
+  );
   app.use(requestIdMiddleware);
 
   app.use(

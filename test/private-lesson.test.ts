@@ -783,6 +783,30 @@ test('a quick start brief teaches a beginner first-unit words and uses interests
   assert.ok(crowded.length <= 300);
   assert.doesNotMatch(crowded, /They enjoy/u);
   assert.match(quickStartBrief(null), /First short chat/u);
+  // Long phrases drop words, never the closing instruction.
+  const phrases = quickStartBrief({
+    absoluteBeginner: true,
+    interests: [],
+    firstWords: [
+      'nice to meet you',
+      'how are you today',
+      'what is your name',
+      'where are you from',
+    ],
+  });
+  assert.ok(phrases.length <= 300);
+  assert.match(phrases, /End with a short recap.$/u);
+});
+
+test('a quick start cannot be combined with a course, unit or program lesson', () => {
+  const base = { targetLanguageCode: 'en', interactionMode: 'conversation', quickStart: true };
+  assert.equal(privateLessonInputSchema.safeParse(base).success, true);
+  for (const extra of [
+    { courseId: '33333333-3333-4333-8333-333333333333' },
+    { packId: '44444444-4444-4444-8444-444444444444' },
+    { curriculumLessonId: 'P01-L1' },
+  ])
+    assert.equal(privateLessonInputSchema.safeParse({ ...base, ...extra }).success, false);
 });
 
 test('the first chat is open to a beginner and follows the level check', async () => {

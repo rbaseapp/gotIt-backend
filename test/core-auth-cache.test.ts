@@ -12,7 +12,12 @@ const user = {
 const token = (expInSeconds: number) =>
   `h.${Buffer.from(JSON.stringify({ exp: Math.floor(Date.now() / 1000) + expInSeconds })).toString('base64url')}.s`;
 
-function client(options: { identityCacheMs?: number; billingCacheMs?: number }, access = true) {
+function client(
+  options: { identityCacheMs?: number; billingCacheMs?: number },
+  access = true,
+  role = 'user',
+  freeWithAccess = false,
+) {
   const calls: string[] = [];
   const core = new CoreAuthClient({
     baseUrl: 'https://core.test',
@@ -24,14 +29,14 @@ function client(options: { identityCacheMs?: number; billingCacheMs?: number }, 
       calls.push(path);
       await new Promise((resolve) => setTimeout(resolve, 5));
       return path.endsWith('/auth/me')
-        ? Response.json({ user })
+        ? Response.json({ user: { ...user, role } })
         : Response.json({
             tier: access ? 'paid' : 'free',
             access,
             plan: access
               ? { key: 'pro', name: 'Pro', kind: 'paid' }
               : { key: 'free', name: 'Free', kind: 'free' },
-            entitlements: access ? ['tutor.session'] : [],
+            entitlements: access && !freeWithAccess ? ['tutor.session'] : [],
             subscription: null,
             trial: null,
           });
@@ -105,4 +110,20 @@ test('the cache expires entries, drops the oldest when full and never keeps fail
     ),
   );
   assert.equal(await cache.get('d', load, () => 100), 6);
+});
+
+test('an admin identity is always checked again, a regular one is reused', async () => {
+  const admin = client({ identityCacheMs: 60_000 }, true, 'admin');
+  const access = token(600);
+  await admin.core.validateAccessToken(access);
+  await admin.core.validateAccessToken(access);
+  assert.equal(admin.calls.length, 2);
+});
+
+test('a free status that has access but no entitlement is not reused', async () => {
+  const free = client({ billingCacheMs: 20_000 }, true, 'user', true);
+  const access = token(600);
+  await free.core.getBillingStatus(access);
+  await free.core.getBillingStatus(access);
+  assert.equal(free.calls.length, 2);
 });

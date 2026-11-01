@@ -98,6 +98,15 @@ export const privateLessonInputSchema = z
         path: ['quickStart'],
         message: 'A quick start is a free conversation',
       });
+    if (
+      value.quickStart &&
+      (value.courseId || value.packId || value.curriculumLessonId || value.station)
+    )
+      context.addIssue({
+        code: 'custom',
+        path: ['quickStart'],
+        message: 'A quick start does not belong to a course, unit or program lesson',
+      });
     if ((value.courseId && value.packId) || (value.station && !value.packId))
       context.addIssue({ code: 'custom', path: ['packId'], message: 'Choose one lesson context' });
     if (value.curriculumLessonId && (value.courseId || value.packId))

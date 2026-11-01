@@ -140,14 +140,17 @@ export function quickStartBrief(
 ) {
   if (facts?.absoluteBeginner) {
     // Without a placement unit, start where the path starts: greeting and saying your name.
-    const words = (
-      facts.firstWords.length ? facts.firstWords.slice(0, 4) : ['hello', 'my name is', 'goodbye']
-    ).join(', ');
-    const brief =
+    const candidates = facts.firstWords.length
+      ? facts.firstWords.slice(0, 4)
+      : ['hello', 'my name is', 'goodbye'];
+    const brief = (words: string[]) =>
       'First chat with an absolute beginner. Speak their own language. ' +
-      `Teach a few English words from their first unit (${words}), one at a time: ` +
+      `Teach a few English words from their first unit (${words.join(', ')}), one at a time: ` +
       'say it, explain it, let them repeat it and use it about themselves. End with a short recap.';
-    return brief.slice(0, MAX_FOCUS_LENGTH);
+    // Long phrases must not push the closing instruction past the limit: drop words, not the recap.
+    let words = candidates;
+    while (words.length > 1 && brief(words).length > MAX_FOCUS_LENGTH) words = words.slice(0, -1);
+    return brief(words).slice(0, MAX_FOCUS_LENGTH);
   }
   const interests = facts?.interests.slice(0, 3) ?? [];
   const withInterests = `${quickStartFocus} They enjoy: ${interests.join(', ')}.`;

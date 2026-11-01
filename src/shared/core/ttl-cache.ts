@@ -33,12 +33,14 @@ export class TtlCache<T> {
     return request;
   }
 
-  delete(key: string) {
-    this.entries.delete(key);
-  }
-
   private set(key: string, value: T, ttl: number) {
     this.entries.delete(key);
+    if (this.entries.size >= this.maxEntries) {
+      // Make room with entries that have already expired before dropping live ones.
+      const now = this.now();
+      for (const [oldKey, entry] of this.entries)
+        if (entry.expiresAt <= now) this.entries.delete(oldKey);
+    }
     while (this.entries.size >= this.maxEntries) {
       const oldest = this.entries.keys().next();
       if (oldest.done) break;

@@ -172,7 +172,8 @@ export class CoreAuthClient {
     return this.identities.get(
       tokenKey(accessToken),
       () => this.fetchIdentity(accessToken, requestId),
-      () => Math.min(ttl, tokenLifetimeMs(accessToken)),
+      // An admin is always re-checked: a demotion or a ban must apply at once.
+      (identity) => (identity.role === 'admin' ? 0 : Math.min(ttl, tokenLifetimeMs(accessToken))),
     );
   }
 
@@ -182,8 +183,12 @@ export class CoreAuthClient {
     return this.billing.get(
       tokenKey(accessToken),
       () => this.fetchBillingStatus(accessToken, requestId),
-      // A learner who just paid must get access at once, so only granted access is reused.
-      (status) => (status.access ? Math.min(ttl, tokenLifetimeMs(accessToken)) : 0),
+      // A learner who just paid must get access at once, so only a status that actually grants
+      // something is reused: a free status (even with access) is asked again every time.
+      (status) =>
+        status.access && status.entitlements.length > 0
+          ? Math.min(ttl, tokenLifetimeMs(accessToken))
+          : 0,
     );
   }
 
