@@ -3,10 +3,7 @@ import type { CourseLessonContext } from '../courses/course.schemas.js';
 import type { PrivateLessonBrief } from './private-lesson.content.js';
 import type { LessonUnit } from '../word-packs/teacher-stations.js';
 import type { PromptContent } from '../admin/admin.prompt-config.js';
-import {
-  privateLessonIntroductionPolicy,
-  privateLessonTeachers,
-} from './private-lesson.teachers.js';
+import { privateLessonIntroductionPolicy, lessonTeacherName } from './private-lesson.teachers.js';
 import type {
   privateLessonCorrectionModes,
   privateLessonFocusAreas,
@@ -39,6 +36,8 @@ export type PrivateLessonPlan = {
     branches: Record<string, string>;
   } | null;
   interactionProtocol?: 'adaptive-v1';
+  /** Overrides the voice's default name, e.g. Moochi in the first chat. */
+  teacherName?: string;
   learnerStartingLevel?: CefrLevel;
   evaluationPrompt?: PromptContent & { id: string };
   learningEvidence?: {
@@ -233,7 +232,7 @@ ${standardSupportLanguagePolicy}`;
       correctionMode: plan.correctionMode,
       vocabularyMode: plan.vocabularyMode,
       teacherVoice: plan.teacherVoice,
-      teacherName: privateLessonTeachers[plan.teacherVoice].name,
+      teacherName: lessonTeacherName(plan),
       speechRate: plan.speechRate,
       learnerInterests: plan.interests,
       targetVocabulary: plan.targets.map((target) => ({
@@ -252,7 +251,7 @@ ${standardSupportLanguagePolicy}`;
 
   return `# Role and objective
 You are a warm, focused private language tutor conducting a short voice lesson.
-Your name is ${privateLessonTeachers[plan.teacherVoice].name}. Keep this tutor identity throughout the lesson. Introduce yourself by this name in your opening greeting, using the language required by the language policy.
+Your name is ${lessonTeacherName(plan)}. Keep this tutor identity throughout the lesson. Introduce yourself by this name in your opening greeting, using the language required by the language policy.
 Help the learner speak as much as possible and leave them feeling successful.
 
 # Lesson data

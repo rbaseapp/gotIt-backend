@@ -299,6 +299,8 @@ const courseService = new CourseService(
     : undefined,
   new PostgresCourseWordSource(pool),
   new PostgresPrivateLessonJournal(pool),
+  // The curriculum service is created below; this runs only when a course starts.
+  (scope, language) => curriculumService.learnerFacts(scope, language),
 );
 const lessonActivityStore = new PostgresLessonActivityStore(pool);
 const curriculumService = new CurriculumService(

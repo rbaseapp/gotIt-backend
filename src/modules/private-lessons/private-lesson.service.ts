@@ -14,7 +14,11 @@ import {
   type LessonActivityCommand,
 } from './private-lesson.activity.js';
 import { createHash, randomUUID } from 'node:crypto';
-import { privateLessonTeachers, childCourseTeacherVoice } from './private-lesson.teachers.js';
+import {
+  privateLessonTeachers,
+  childCourseTeacherVoice,
+  moochiName,
+} from './private-lesson.teachers.js';
 import { z } from 'zod';
 import { AppError } from '../../shared/errors/app-error.js';
 import type { AddonAccessContract } from '../addons/addon-access.js';
@@ -119,6 +123,38 @@ export type PrivateLessonServiceOptions = {
   realtimeCallGuard?: RealtimeCallGuard;
   dailyQuota?: Pick<AiDailyQuota, 'consume'>;
 };
+
+/** The whole brief of a quick start: the first short chat after the level check. */
+const quickStartFocus =
+  'First short chat after a level check. Keep it warm and easy: one short question at a time about familiar things (home, food, a normal day), short sentences, no grammar teaching. End with at most two kind suggestions.';
+/** Saved lessons cap the custom focus at this length. */
+const MAX_FOCUS_LENGTH = 300;
+
+/**
+ * The brief of a quick start, from what the level check found. An absolute beginner gets a first
+ * lesson in their own language with a few words from the unit they start at; anyone else gets an
+ * easy chat, about their interests when there is room.
+ */
+export function quickStartBrief(
+  facts: { absoluteBeginner: boolean; interests: string[]; firstWords: string[] } | null,
+) {
+  if (facts?.absoluteBeginner) {
+    // Without a placement unit, start where the path starts: greeting and saying your name.
+    const words = (
+      facts.firstWords.length ? facts.firstWords.slice(0, 4) : ['hello', 'my name is', 'goodbye']
+    ).join(', ');
+    const brief =
+      'First chat with an absolute beginner. Speak their own language. ' +
+      `Teach a few English words from their first unit (${words}), one at a time: ` +
+      'say it, explain it, let them repeat it and use it about themselves. End with a short recap.';
+    return brief.slice(0, MAX_FOCUS_LENGTH);
+  }
+  const interests = facts?.interests.slice(0, 3) ?? [];
+  const withInterests = `${quickStartFocus} They enjoy: ${interests.join(', ')}.`;
+  return interests.length && withInterests.length <= MAX_FOCUS_LENGTH
+    ? withInterests
+    : quickStartFocus;
+}
 
 export class PrivateLessonService {
   private readonly voiceSamples = new Map<string, { expires: number; audioBase64: string }>();
@@ -293,8 +329,15 @@ export class PrivateLessonService {
     const runtimePrompt = adminRuntimeContext.getStore()?.prompts['lesson-live'];
     input = { ...runtimePrompt?.realtime?.lessonDefaults, ...input };
     // Free conversation opens once the learner has a base (see curriculum.placement.ts); lessons
-    // that belong to a program, course or unit are not affected.
-    if (this.options.curriculum && !input.courseId && !input.packId && !input.curriculumLessonId) {
+    // that belong to a program, course or unit are not affected. The first chat with Moochi is
+    // open to everyone: a beginner gets it in their own language.
+    if (
+      this.options.curriculum &&
+      !input.courseId &&
+      !input.packId &&
+      !input.curriculumLessonId &&
+      input.quickStart !== true
+    ) {
       const gate = await this.options.curriculum.tutorGate(scope);
       if (!gate.unlocked)
         throw new AppError(409, 'TUTOR_LOCKED', 'Free conversation opens after the first units', {
@@ -302,7 +345,10 @@ export class PrivateLessonService {
           required: gate.required,
         });
     }
-    const adaptive = input.interactionProtocol === 'adaptive-v1';
+    // A quick start skips the planned task bank and the generated brief: the first sentence is a
+    // short instruction and the voice model replies on its own, so the chat opens in seconds.
+    const quick = input.quickStart === true;
+    const adaptive = input.interactionProtocol === 'adaptive-v1' && !quick;
     if (
       adaptive &&
       (!this.options.activities || !this.options.lessonContentGenerator || !this.options.journal)
@@ -340,6 +386,23 @@ export class PrivateLessonService {
         teachingLanguage: ['Pre-A1', 'A1'].includes(curriculum.band) ? 'support' : 'target',
         vocabularyMode: 'none',
         topic: curriculum.title,
+      };
+    // The first chat follows the level check the learner just took, not a default level.
+    const placement = quick
+      ? await this.options.curriculum
+          ?.learnerFacts(scope, input.targetLanguageCode)
+          .catch(() => null)
+      : null;
+    // A beginner (below A1, or not yet able to hold a short conversation) learns first words.
+    const beginner = quick && (placement?.absoluteBeginner === true || input.beginner === true);
+    if (quick && (placement || beginner))
+      input = {
+        ...input,
+        ...(placement ? { requestedLevel: placement.startingLevel } : {}),
+        lessonMode: beginner ? 'absolute_beginner' : 'standard',
+        teachingLanguage: beginner ? 'support' : 'target',
+        // A beginner is taught in their own language: fall back to the saved or profile one.
+        ...(beginner && !input.supportLanguageCode ? { supportLanguageCode: undefined } : {}),
       };
 
     let stationDurationMinutes: number | undefined;
@@ -460,35 +523,40 @@ export class PrivateLessonService {
         (lesson) =>
           lesson.status === 'completed' &&
           lesson.report &&
+          // A hosted first chat is not a lesson to continue from; its easy brief must not carry over.
+          !lesson.teacherName &&
           (!input.courseId || lesson.course?.courseId === input.courseId) &&
           (!input.packId || lesson.wordPack?.packId === input.packId) &&
           (Boolean(input.courseId) || lesson.lessonMode === requestedLessonMode) &&
           new Intl.Locale(lesson.targetLanguageCode).language === targetBaseLanguage,
       ) ?? null;
-    const activeRoadmap =
-      loadedRoadmap ??
-      (this.options.roadmaps &&
-      !input.courseId &&
-      !input.packId &&
-      !curriculum &&
-      targetBaseLanguage === 'en'
-        ? await this.options.roadmaps.create(
-            scope,
-            input.targetLanguageCode,
-            'recommended',
-            'recommended-foundation',
-            requestedLessonMode === 'absolute_beginner'
-              ? 'A1'
-              : profileLevel(profile, input.targetLanguageCode),
-          )
-        : null);
+    // A quick start is a plain first chat, not the next grammar lesson of a roadmap.
+    const activeRoadmap = quick
+      ? null
+      : (loadedRoadmap ??
+        (this.options.roadmaps &&
+        !input.courseId &&
+        !input.packId &&
+        !curriculum &&
+        targetBaseLanguage === 'en'
+          ? await this.options.roadmaps.create(
+              scope,
+              input.targetLanguageCode,
+              'recommended',
+              'recommended-foundation',
+              requestedLessonMode === 'absolute_beginner'
+                ? 'A1'
+                : profileLevel(profile, input.targetLanguageCode),
+            )
+          : null));
     const vocabularyMode =
       input.vocabularyMode ??
       preferences?.vocabularyMode ??
       previousLesson?.vocabularyMode ??
       'learned';
+    // A quick start has no word list: the chat is about things the learner already knows.
     const vocabulary =
-      vocabularyMode === 'learned'
+      vocabularyMode === 'learned' && !quick
         ? await this.options.vocabulary.learned(scope, input.targetLanguageCode, 20)
         : { items: [] };
     let plan: PrivateLessonPlan = this.buildPlan(
@@ -500,6 +568,20 @@ export class PrivateLessonService {
       preferences,
       activeRoadmap,
     );
+    if (quick)
+      plan = {
+        ...plan,
+        roadmap: null,
+        continuity: null,
+        topic: 'Getting to know each other',
+        grammarFocus: null,
+        customFocus: quickStartBrief({
+          absoluteBeginner: beginner,
+          interests: placement?.interests ?? [],
+          firstWords: placement?.firstWords ?? [],
+        }),
+        teacherName: moochiName,
+      };
     if (curriculum)
       plan = {
         ...plan,
@@ -596,6 +678,7 @@ export class PrivateLessonService {
       );
       if (
         !adaptive &&
+        !quick &&
         !plan.curriculum &&
         this.options.lessonContentGenerator &&
         !hasAuthoredMaterial
@@ -626,7 +709,7 @@ export class PrivateLessonService {
       }
       timeout = setTimeout(() => controller.abort(), this.requestTimeoutMs);
       const contract = buildRealtimeLessonContract(plan, this.options, runtimePrompt);
-      if (!adaptive && this.options.legacyActivities)
+      if (!adaptive && !quick && this.options.legacyActivities)
         contract.session.audio.input.turn_detection.create_response = false;
       plan = { ...plan, realtimeContract: contract };
       const response = await this.fetchImpl('https://api.openai.com/v1/realtime/client_secrets', {
@@ -641,7 +724,8 @@ export class PrivateLessonService {
       });
       const secret = clientSecretSchema.parse(await readProviderJson(response, controller.signal));
 
-      if (!input.courseId && !input.packId && !curriculum)
+      // A quick start runs on fixed defaults; it must not overwrite the learner's lesson settings.
+      if (!input.courseId && !input.packId && !curriculum && !quick)
         await this.options.roadmaps?.savePreferences(scope, input, plan);
       journalCreated = Boolean(this.options.journal);
       await this.options.journal?.create(scope, { ...plan, realtimeContract: contract });
@@ -652,11 +736,13 @@ export class PrivateLessonService {
             adaptivePlan,
             input.interactionMode ?? 'guided',
           )
-        : ((await this.options.legacyActivities?.create(
-            scope,
-            plan,
-            input.interactionMode ?? 'guided',
-          )) ?? null);
+        : quick
+          ? null
+          : ((await this.options.legacyActivities?.create(
+              scope,
+              plan,
+              input.interactionMode ?? 'guided',
+            )) ?? null);
       if (ticketId) await this.options.realtimeCallGuard!.issue(ticketId, secret.value);
       return {
         lesson: publicPlan(plan),
@@ -775,6 +861,9 @@ export class PrivateLessonService {
       });
       const completed = await journal.complete(scope, id, report);
       await this.options.roadmaps?.recordEvidence(scope, claimed, report).catch(() => undefined);
+      // A hosted first chat is kept deliberately easy, so it is no measure of the learner's level
+      // and must not override the placement they just took.
+      if (claimed.teacherName) return publicStoredLesson(completed);
       if (this.options.proficiency)
         await this.options.proficiency
           .recordLessonEvidence(scope, claimed, report)
@@ -1191,6 +1280,7 @@ function publicStoredLesson(lesson: StoredPrivateLesson) {
     vocabularyMode: lesson.vocabularyMode,
     continuesFromLessonId: lesson.continuity?.previousLessonId ?? null,
     teacherVoice: lesson.teacherVoice,
+    ...(lesson.teacherName ? { teacherName: lesson.teacherName } : {}),
     speechRate: lesson.speechRate,
     plannedDurationSeconds: lesson.durationSeconds,
     actualDurationSeconds: lesson.actualDurationSeconds,
@@ -1233,6 +1323,7 @@ function publicPlan(plan: PrivateLessonPlan) {
     vocabularyMode: plan.vocabularyMode,
     continuesFromLessonId: plan.continuity?.previousLessonId ?? null,
     teacherVoice: plan.teacherVoice,
+    ...(plan.teacherName ? { teacherName: plan.teacherName } : {}),
     speechRate: plan.speechRate,
     targetWords: plan.targets,
     roadmap: plan.roadmap,
