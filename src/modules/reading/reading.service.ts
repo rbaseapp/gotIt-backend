@@ -166,7 +166,7 @@ export class ReadingService {
     scope: ProfileScope,
     policy?: AiQuotaPolicy,
   ): Promise<AiMonthlyQuotaStatus | null> {
-    return this.quota ? this.quota.status(scope, policy) : null;
+    return scope.role !== 'admin' && this.quota ? this.quota.status(scope, policy) : null;
   }
   async preview(scope: ProfileScope, input: ReadingInput, quotaPolicy?: AiQuotaPolicy) {
     if (!this.generator || !this.key)
@@ -215,7 +215,7 @@ export class ReadingService {
     let quotaReserved = false;
     let phase: 'quota' | 'generation' | 'finalization' = 'quota';
     try {
-      if (this.quota) {
+      if (this.quota && scope.role !== 'admin') {
         await this.quota.reserve(scope, quotaPolicy);
         quotaReserved = true;
       }

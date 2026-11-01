@@ -10,6 +10,8 @@ export type TranslationMethodPreference = (typeof TRANSLATION_METHODS)[number];
 export type ProfileScope = {
   applicationId: string;
   applicationUserId: string;
+  /** Server-authenticated Core role; never accepted from a product request body. */
+  role?: 'user' | 'admin';
 };
 
 export type ProfileLanguage = {
