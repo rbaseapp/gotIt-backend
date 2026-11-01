@@ -4,6 +4,12 @@ services:
     runtime: docker
     dockerfilePath: ./Dockerfile
     healthCheckPath: /ready
+    # Run the migrations before every deploy, so new code never starts on an old schema. If a
+    # migration fails the deploy stops and the running version stays live. To switch it on:
+    #   1. add the secret GOTIT_MIGRATION_DATABASE_URL (the schema owner role, not the runtime one);
+    #   2. set the Pre-Deploy Command to: node scripts/migrate.js up
+    # Do both before enabling auto-deploy; a missing secret makes every deploy fail safely.
+    # preDeployCommand: node scripts/migrate.js up
     # Optional on a verified paid service: preDeployCommand: node scripts/preflight.js
     autoDeployTrigger: commit
     maxShutdownDelaySeconds: 90
