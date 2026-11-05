@@ -12,7 +12,7 @@ import {
   type Band,
 } from './curriculum.content.js';
 import { scopeArgs, curriculumMissing, type CurriculumState } from './curriculum.store.js';
-import { introduce, recallEvidence, reviewPriority } from './curriculum.policy.js';
+import { introduce, recallEvidence, reviewPriority, claimedKnown } from './curriculum.policy.js';
 import { curriculumParticipants, curriculumTeacherVoice } from './curriculum.participants.js';
 
 export function curriculumPlacedBelow(state: CurriculumState, band: Band) {
@@ -98,8 +98,11 @@ export async function prepareCurriculumPractice(
   if (!unit || !curriculumUnitUnlocked(state, unitId)) throw curriculumMissing();
   if (JSON.stringify(unit).includes('{{teacherName'))
     unit = curriculumParticipants(unit, await curriculumTeacherVoice(tx, scope));
-  const words = allTargets.filter((target) => target.unit === unitId);
-  if (!words.length || words.length > 100) throw curriculumMissing();
+  const unitWords = allTargets.filter((target) => target.unit === unitId);
+  if (!unitWords.length || unitWords.length > 100) throw curriculumMissing();
+  // Words the learner already knows wait for their review check instead of the games.
+  const toPractise = unitWords.filter((target) => !claimedKnown(state.words[target.id]));
+  const words = toPractise.length ? toPractise : unitWords;
   state.practiceItems ??= {};
   const targets: Record<string, string> = {};
   let changed = false;
