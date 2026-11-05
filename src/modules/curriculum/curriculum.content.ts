@@ -12,6 +12,9 @@ export type Target = {
   unit: string;
   band: Band;
   track: string;
+  // Earlier spellings of `en` (e.g. British "colour" before "color"); practice
+  // items created with them are renamed instead of rejected as stale.
+  former_en?: string[];
 };
 export type Question = {
   number?: number;
@@ -166,6 +169,26 @@ export const normalize = (value: string) =>
     .replace(/[^\p{L}\p{N}'/æɑɒɔəɛɜɪʊʌθðŋʃʒː -]/gu, '')
     .replace(/\s+/gu, ' ')
     .trim();
+// Contracted and full forms are the same answer: "I'm Ben." == "I am Ben.".
+// Ambiguous 's / 'd expand to the more common reading (is / would).
+const CONTRACTIONS: [RegExp, string][] = [
+  [/\bcan't\b/gu, 'cannot'],
+  [/\bcan not\b/gu, 'cannot'],
+  [/\bwon't\b/gu, 'will not'],
+  [/\bshan't\b/gu, 'shall not'],
+  [/\blet's\b/gu, 'let us'],
+  [/\bi'm\b/gu, 'i am'],
+  [/n't\b/gu, ' not'],
+  [/'re\b/gu, ' are'],
+  [/'ll\b/gu, ' will'],
+  [/'ve\b/gu, ' have'],
+  [/'d\b/gu, ' would'],
+  [/\b(it|he|she|that|what|there|where|who|here|how)'s\b/gu, '$1 is'],
+];
+export const expandContractions = (normalized: string) =>
+  CONTRACTIONS.reduce((text, [re, full]) => text.replace(re, full), normalized);
+export const sameEnglish = (a: string, b: string) =>
+  expandContractions(normalize(a)) === expandContractions(normalize(b));
 export function questionAudio(question: Question) {
   const cue = (question.prompt_he ?? '')
     .match(/\[audio:([^\]]*)\]/gu)

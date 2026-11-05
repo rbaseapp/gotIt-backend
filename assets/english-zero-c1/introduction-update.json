@@ -100,11 +100,11 @@
           "text_he": "להתראות."
         }
       ],
-      "passage_en": "Hello. My name is {{teacherName}}. I am {{teacherName}}. Please say hello. Hi. Thank you. Goodbye.",
+      "passage_en": "Hello. My name is {{teacherName}}. I am {{teacherName}}. Please say hello. Hi. Is my name {{teacherName}}? Yes. Is my name Goodbye? No! Thank you. Goodbye.",
       "passage_questions": [
         {
           "question_he": "לפי הקטע, מה שם המורה?",
-          "question_en": "What is the teacher's name?",
+          "question_en": "What's the teacher's name?",
           "answer_en": "{{teacherName}}.",
           "type": "detail"
         },
@@ -166,11 +166,11 @@
       "language_focus": {
         "unit": "P01",
         "rule_he": "כדי להציג את עצמנו אומרים I am ואז את השם שלנו. אפשר לומר אותו פרט גם בעזרת My name is. המורה מדגים בשמו {{teacherNameHe}}, ואתם משתמשים בשם שלכם.",
-        "example_en": "I am {{teacherName}}.",
+        "example_en": "I'm {{teacherName}}.",
         "contrast_en": "My name is {{teacherName}}.",
         "prompt_he": "הציגו את עצמכם באנגלית בשם שלכם והתחילו ב־I am.",
-        "answer_en": "I am {{teacherName}}.",
-        "feedback_he": "I am פותח הצגה עצמית. המורה משתמש בשמו ואתם בשם שלכם; שם שונה מהדוגמה אינו טעות."
+        "answer_en": "I'm {{teacherName}}.",
+        "feedback_he": "I am פותח הצגה עצמית. המורה משתמש בשמו ואתם בשם שלכם; שם שונה מהדוגמה אינו טעות. גם תשובה שמתחילה ב־I'm נכונה: זו אותה תשובה בקיצור, כפי שאומרים בשיחה."
       },
       "input_readiness_he": "לפני הטקסט בודקים מה המשתמש כבר מבין. תמיכות חדשות נחלקות לחבילות של עד 6 לפני המפגש או לטקסט קצר יותר. אין להניח שמילת תמיכה כבר ידועה, ואין לדחוס את כל רשימת הגלוסות לדקות המורה. זו קריאה מונחית; קריאה עצמאית דורשת בדיקת כיסוי אישית.",
       "prerequisite_he": "מיומנות תקשורת מן היחידה הקודמת, או מיון שמראה יכולת מקבילה. קריאה נבדקת בנפרד; אין חסימת שיחה בגלל פענוח.",
@@ -256,7 +256,7 @@
       "dialogue": [
         {
           "speaker": "teacher",
-          "text_en": "Hello. I am Maya. What is your name?",
+          "text_en": "Hello. I'm Maya. What's your name?",
           "text_he": "שלום. אני מאיה. מה שמך?"
         },
         {
@@ -271,7 +271,7 @@
         },
         {
           "speaker": "model",
-          "text_en": "I am from Israel. I live in Haifa.",
+          "text_en": "I'm from Israel. I live in Haifa.",
           "text_he": "אני מישראל. אני גר בחיפה."
         },
         {
@@ -281,7 +281,7 @@
         },
         {
           "speaker": "model",
-          "text_en": "Yes. I am a student. I speak Hebrew.",
+          "text_en": "Yes. I'm a student. I speak Hebrew.",
           "text_he": "כן. אני תלמיד. אני מדבר עברית."
         },
         {
@@ -291,11 +291,11 @@
         },
         {
           "speaker": "model",
-          "text_en": "A little. You are my English teacher.",
+          "text_en": "A little. You're my English teacher.",
           "text_he": "קצת. את המורה שלי לאנגלית."
         }
       ],
-      "passage_en": "My name is Tom. I am from Israel, and I live in Haifa. Haifa is a city. I am a student. My friend Maya is a teacher. She is from Israel too. We speak Hebrew. I speak a little English, but Maya speaks English at work. We meet in a small class. My book is blue, and her book is red. Maya says, \"Hello, Tom. Nice to meet you.\" I say, \"Hello, Maya. I am ready.\"",
+      "passage_en": "My name is Tom. I am from Israel, and I live in Haifa. Haifa is a city. Israel is a country. I am a student. My friend Maya is a teacher. She is from Israel too. We speak Hebrew. I speak a little English, but Maya speaks English at work. We meet in a small class. My book is blue, and her book is red. Maya says, \"Hello, Tom. Nice to meet you.\" I say, \"Hello, Maya. I am ready.\"",
       "passage_questions": [
         {
           "question_he": "באיזו עיר תום גר?",
@@ -305,8 +305,8 @@
         },
         {
           "question_he": "מה העבודה של מאיה?",
-          "question_en": "What is Maya?",
-          "answer_en": "She is a teacher.",
+          "question_en": "What's Maya?",
+          "answer_en": "She's a teacher.",
           "type": "detail"
         },
         {
@@ -323,7 +323,7 @@
         },
         {
           "question_he": "מה מטרת הטקסט?",
-          "question_en": "What is the text mainly about?",
+          "question_en": "What's the text mainly about?",
           "answer_en": "Tom introduces himself and Maya.",
           "type": "gist"
         },
@@ -335,7 +335,7 @@
         }
       ],
       "roleplay_prompt_he": "פגשו את {{teacherNameHe}} בקבוצת לימוד. הציגו את עצמכם בשמכם, ציינו את עיר המגורים והשפות שלכם ושאלו את המורה מה שמו ומאיפה הוא.",
-      "model_response_en": "Hello. My name is {{teacherName}}. I speak English. What is your name?",
+      "model_response_en": "Hello. My name is {{teacherName}}. I speak English. What's your name?",
       "writing_prompt_he": "כתבו פרופיל שלכם בן 4 משפטים: השם שלכם, מקום מגורים, תפקיד ושפות.",
       "coverage_targets": [
         {
@@ -823,7 +823,7 @@
       "language_focus": {
         "unit": "A101",
         "rule_he": "באמירות על זהות משתמשים ב־am אחרי I וב־is אחרי he או she. בשאלה מעבירים את am/is/are להתחלה, ולכן You are a student הופך ל־Are you a student. בתשובה קצרה שומרים את אותה צורה, למשל Yes, I am.",
-        "example_en": "You are a student.",
+        "example_en": "You're a student.",
         "contrast_en": "Are you a student?",
         "prompt_he": "אתם רוצים לברר אם בת השיח מורה. שאלו באנגלית שאלה מלאה עם Are you.",
         "answer_en": "Are you a teacher?",
@@ -872,12 +872,12 @@
         {
           "phase": "opening",
           "say_he": "היום נעבוד על: שלום, מציגים את עצמנו. המטרה היא לברך, לומר שם ולזהות שם שנאמר באיטיות. אפשר לבקש הסבר קצר בעברית או לחלק את המפגש.",
-          "say_en": "We will practise a useful task step by step. You can ask me to repeat or explain. At the end, you will try a new version without the model."
+          "say_en": "We'll practice a useful task step by step. You can ask me to repeat or explain. At the end, you'll try a new version without the model."
         },
         {
           "phase": "teach_target",
           "say_he": "הקשב: hello. במשמעות של היום: שלום. אמור את הצורה, ואז הסבר את המשמעות או בחר את המצב שמתאים לה.",
-          "say_en": "Listen: hello. We are learning this expression with a specific meaning. Say it, then explain when you would use it.",
+          "say_en": "Listen: hello. We're learning this expression with a specific meaning. Say it, then explain when you would use it.",
           "target_en": "hello",
           "meaning_he": "שלום",
           "correct_response_en": "hello",
@@ -886,7 +886,7 @@
         {
           "phase": "teach_target",
           "say_he": "הקשב: hi. במשמעות של היום: היי. אמור את הצורה, ואז הסבר את המשמעות או בחר את המצב שמתאים לה.",
-          "say_en": "Listen: hi. We are learning this expression with a specific meaning. Say it, then explain when you would use it.",
+          "say_en": "Listen: hi. We're learning this expression with a specific meaning. Say it, then explain when you would use it.",
           "target_en": "hi",
           "meaning_he": "היי",
           "correct_response_en": "hi",
@@ -895,7 +895,7 @@
         {
           "phase": "teach_target",
           "say_he": "הקשב: goodbye. במשמעות של היום: להתראות. אמור את הצורה, ואז הסבר את המשמעות או בחר את המצב שמתאים לה.",
-          "say_en": "Listen: goodbye. We are learning this expression with a specific meaning. Say it, then explain when you would use it.",
+          "say_en": "Listen: goodbye. We're learning this expression with a specific meaning. Say it, then explain when you would use it.",
           "target_en": "goodbye",
           "meaning_he": "להתראות",
           "correct_response_en": "goodbye",
@@ -904,7 +904,7 @@
         {
           "phase": "teach_target",
           "say_he": "הקשב: I. במשמעות של היום: אני. אמור את הצורה, ואז הסבר את המשמעות או בחר את המצב שמתאים לה.",
-          "say_en": "Listen: I. We are learning this expression with a specific meaning. Say it, then explain when you would use it.",
+          "say_en": "Listen: I. We're learning this expression with a specific meaning. Say it, then explain when you would use it.",
           "target_en": "I",
           "meaning_he": "אני",
           "correct_response_en": "I",
@@ -913,7 +913,7 @@
         {
           "phase": "teach_target",
           "say_he": "הקשב: you. במשמעות של היום: אתה או את. אמור את הצורה, ואז הסבר את המשמעות או בחר את המצב שמתאים לה.",
-          "say_en": "Listen: you. We are learning this expression with a specific meaning. Say it, then explain when you would use it.",
+          "say_en": "Listen: you. We're learning this expression with a specific meaning. Say it, then explain when you would use it.",
           "target_en": "you",
           "meaning_he": "אתה או את",
           "correct_response_en": "you",
@@ -922,7 +922,7 @@
         {
           "phase": "teach_target",
           "say_he": "הקשב: am. במשמעות של היום: צורת הווה של להיות אחרי I. אמור את הצורה, ואז הסבר את המשמעות או בחר את המצב שמתאים לה.",
-          "say_en": "Listen: am. We are learning this expression with a specific meaning. Say it, then explain when you would use it.",
+          "say_en": "Listen: am. We're learning this expression with a specific meaning. Say it, then explain when you would use it.",
           "target_en": "am",
           "meaning_he": "צורת הווה של להיות אחרי I",
           "correct_response_en": "am",
@@ -931,11 +931,11 @@
         {
           "phase": "language_focus",
           "say_he": "כדי להציג את עצמנו אומרים I am ואז את השם שלנו. אפשר לומר אותו פרט גם בעזרת My name is. המורה מדגים בשמו {{teacherNameHe}}, ואתם משתמשים בשם שלכם.",
-          "text_en": "I am {{teacherName}}.",
+          "text_en": "I'm {{teacherName}}.",
           "contrast_en": "My name is {{teacherName}}.",
           "task_he": "הציגו את עצמכם באנגלית בשם שלכם והתחילו ב־I am.",
-          "answer_anchor_en": "I am {{teacherName}}.",
-          "note_he": "I am פותח הצגה עצמית. המורה משתמש בשמו ואתם בשם שלכם; שם שונה מהדוגמה אינו טעות."
+          "answer_anchor_en": "I'm {{teacherName}}.",
+          "note_he": "I am פותח הצגה עצמית. המורה משתמש בשמו ואתם בשם שלכם; שם שונה מהדוגמה אינו טעות. גם תשובה שמתחילה ב־I'm נכונה: זו אותה תשובה בקיצור, כפי שאומרים בשיחה."
         },
         {
           "phase": "support_bridge",
@@ -1164,7 +1164,7 @@
         {
           "phase": "opening",
           "say_he": "היום נעבוד על: שלום, מציגים את עצמנו. המטרה היא לברך, לומר שם ולזהות שם שנאמר באיטיות. אפשר לבקש הסבר קצר בעברית או לחלק את המפגש.",
-          "say_en": "We will practise a useful task step by step. You can ask me to repeat or explain. At the end, you will try a new version without the model."
+          "say_en": "We'll practice a useful task step by step. You can ask me to repeat or explain. At the end, you'll try a new version without the model."
         },
         {
           "phase": "retrieval",
@@ -1175,7 +1175,7 @@
         {
           "phase": "teach_target",
           "say_he": "הקשב: my. במשמעות של היום: שלי. אמור את הצורה, ואז הסבר את המשמעות או בחר את המצב שמתאים לה.",
-          "say_en": "Listen: my. We are learning this expression with a specific meaning. Say it, then explain when you would use it.",
+          "say_en": "Listen: my. We're learning this expression with a specific meaning. Say it, then explain when you would use it.",
           "target_en": "my",
           "meaning_he": "שלי",
           "correct_response_en": "my",
@@ -1184,7 +1184,7 @@
         {
           "phase": "teach_target",
           "say_he": "הקשב: name. במשמעות של היום: שם. אמור את הצורה, ואז הסבר את המשמעות או בחר את המצב שמתאים לה.",
-          "say_en": "Listen: name. We are learning this expression with a specific meaning. Say it, then explain when you would use it.",
+          "say_en": "Listen: name. We're learning this expression with a specific meaning. Say it, then explain when you would use it.",
           "target_en": "name",
           "meaning_he": "שם",
           "correct_response_en": "name",
@@ -1193,7 +1193,7 @@
         {
           "phase": "teach_target",
           "say_he": "הקשב: yes. במשמעות של היום: כן. אמור את הצורה, ואז הסבר את המשמעות או בחר את המצב שמתאים לה.",
-          "say_en": "Listen: yes. We are learning this expression with a specific meaning. Say it, then explain when you would use it.",
+          "say_en": "Listen: yes. We're learning this expression with a specific meaning. Say it, then explain when you would use it.",
           "target_en": "yes",
           "meaning_he": "כן",
           "correct_response_en": "yes",
@@ -1202,7 +1202,7 @@
         {
           "phase": "teach_target",
           "say_he": "הקשב: no. במשמעות של היום: לא. אמור את הצורה, ואז הסבר את המשמעות או בחר את המצב שמתאים לה.",
-          "say_en": "Listen: no. We are learning this expression with a specific meaning. Say it, then explain when you would use it.",
+          "say_en": "Listen: no. We're learning this expression with a specific meaning. Say it, then explain when you would use it.",
           "target_en": "no",
           "meaning_he": "לא",
           "correct_response_en": "no",
@@ -1211,7 +1211,7 @@
         {
           "phase": "teach_target",
           "say_he": "הקשב: thank you. במשמעות של היום: תודה. אמור את הצורה, ואז הסבר את המשמעות או בחר את המצב שמתאים לה.",
-          "say_en": "Listen: thank you. We are learning this expression with a specific meaning. Say it, then explain when you would use it.",
+          "say_en": "Listen: thank you. We're learning this expression with a specific meaning. Say it, then explain when you would use it.",
           "target_en": "thank you",
           "meaning_he": "תודה",
           "correct_response_en": "thank you",
@@ -1220,7 +1220,7 @@
         {
           "phase": "teach_target",
           "say_he": "הקשב: please. במשמעות של היום: בבקשה. אמור את הצורה, ואז הסבר את המשמעות או בחר את המצב שמתאים לה.",
-          "say_en": "Listen: please. We are learning this expression with a specific meaning. Say it, then explain when you would use it.",
+          "say_en": "Listen: please. We're learning this expression with a specific meaning. Say it, then explain when you would use it.",
           "target_en": "please",
           "meaning_he": "בבקשה",
           "correct_response_en": "please",
@@ -1232,8 +1232,8 @@
           "text_en": "",
           "contrast_en": "My name is {{teacherName}}.",
           "task_he": "הציגו את עצמכם באנגלית בשם שלכם והתחילו ב־I am.",
-          "answer_anchor_en": "I am {{teacherName}}.",
-          "note_he": "I am פותח הצגה עצמית. המורה משתמש בשמו ואתם בשם שלכם; שם שונה מהדוגמה אינו טעות."
+          "answer_anchor_en": "I'm {{teacherName}}.",
+          "note_he": "I am פותח הצגה עצמית. המורה משתמש בשמו ואתם בשם שלכם; שם שונה מהדוגמה אינו טעות. גם תשובה שמתחילה ב־I'm נכונה: זו אותה תשובה בקיצור, כפי שאומרים בשיחה."
         },
         {
           "phase": "support_bridge",
@@ -1294,13 +1294,13 @@
         {
           "phase": "input",
           "say_he": "כעת נקשיב לקטע. נסה לזהות את המצב המרכזי. אפשר לשמוע שוב. במצב קריאה נפתח את הכתב; אם בודקים האזנה עצמאית משאירים תמלול סגור בניסיון הראשון.",
-          "text_en": "Hello. My name is {{teacherName}}. I am {{teacherName}}. Please say hello. Hi. Thank you. Goodbye.",
+          "text_en": "Hello. My name is {{teacherName}}. I am {{teacherName}}. Please say hello. Hi. Is my name {{teacherName}}? Yes. Is my name Goodbye? No! Thank you. Goodbye.",
           "note_he": "זהו חומר הוראה מוכר, לא unseen לאחר הצגתו."
         },
         {
           "phase": "comprehension",
           "say_he": "לפי הקטע, מה שם המורה?",
-          "say_en": "What is the teacher's name?",
+          "say_en": "What's the teacher's name?",
           "answer_anchor_en": "{{teacherName}}.",
           "accept_he": "יש לקבל פרפרזה נכונה, תשובה קצרה מתאימה ופרטים תומכים מן הטקסט. לא חייבים להעתיק את הדגם."
         },
@@ -1321,7 +1321,7 @@
         {
           "phase": "independent_reconstruction",
           "say_he": "פגשתם את {{teacherNameHe}} לראשונה. ברכו את המורה בשמו, הציגו את עצמכם בשם שלכם והיפרדו.",
-          "say_en": "Try the practised task without reading the model. Explain your choice or ask for clarification when needed.",
+          "say_en": "Try the practiced task without reading the model. Explain your choice or ask for clarification when needed.",
           "model_en": "Hello. My name is {{teacherName}}. Goodbye.",
           "model_visibility_he": "זהו דגם של המורה המציג את עצמו. הלומד משתמש בשמו שלו; אין לדרוש את שם המורה או שם דמיוני בתשובת הלומד."
         },
@@ -1414,7 +1414,7 @@
           "answer_en": "No.",
           "hint_he": "מצא או שמע את החלק הרלוונטי בקטע. שימוש חוזר בקטע הוא תרגול הבנה, לא מבחן זכירה ללא תמיכה.",
           "feedback_he": "השווה את תשובתך למידע בקטע. פרפרזה נכונה מתקבלת; ידע חיצוני שאינו מופיע בקטע אינו נדרש.",
-          "passage_en": "Hello. My name is {{teacherName}}. I am {{teacherName}}. Please say hello. Hi. Thank you. Goodbye."
+          "passage_en": "Hello. My name is {{teacherName}}. I am {{teacherName}}. Please say hello. Hi. Is my name {{teacherName}}? Yes. Is my name Goodbye? No! Thank you. Goodbye."
         },
         {
           "number": 8,
@@ -1424,7 +1424,7 @@
           "answer_en": "Thank you.",
           "hint_he": "מצא או שמע את החלק הרלוונטי בקטע. שימוש חוזר בקטע הוא תרגול הבנה, לא מבחן זכירה ללא תמיכה.",
           "feedback_he": "השווה את תשובתך למידע בקטע. פרפרזה נכונה מתקבלת; ידע חיצוני שאינו מופיע בקטע אינו נדרש.",
-          "passage_en": "Hello. My name is {{teacherName}}. I am {{teacherName}}. Please say hello. Hi. Thank you. Goodbye."
+          "passage_en": "Hello. My name is {{teacherName}}. I am {{teacherName}}. Please say hello. Hi. Is my name {{teacherName}}? Yes. Is my name Goodbye? No! Thank you. Goodbye."
         },
         {
           "number": 9,
@@ -1434,7 +1434,7 @@
           "answer_en": "Hello, {{teacherName}}.",
           "hint_he": "מצא או שמע את החלק הרלוונטי בקטע. שימוש חוזר בקטע הוא תרגול הבנה, לא מבחן זכירה ללא תמיכה.",
           "feedback_he": "השווה את תשובתך למידע בקטע. פרפרזה נכונה מתקבלת; ידע חיצוני שאינו מופיע בקטע אינו נדרש.",
-          "passage_en": "Hello. My name is {{teacherName}}. I am {{teacherName}}. Please say hello. Hi. Thank you. Goodbye."
+          "passage_en": "Hello. My name is {{teacherName}}. I am {{teacherName}}. Please say hello. Hi. Is my name {{teacherName}}? Yes. Is my name Goodbye? No! Thank you. Goodbye."
         },
         {
           "number": 10,
@@ -1508,7 +1508,7 @@
         {
           "phase": "opening",
           "say_he": "היום נעבוד על: מכירים אנשים. המטרה היא להציג שם, מקום מגורים ושפות ולשאול בן שיח על עצמו. אפשר לבקש הסבר קצר בעברית או לחלק את המפגש.",
-          "say_en": "We will practise a useful task step by step. You can ask me to repeat or explain. At the end, you will try a new version without the model."
+          "say_en": "We'll practice a useful task step by step. You can ask me to repeat or explain. At the end, you'll try a new version without the model."
         },
         {
           "phase": "retrieval",
@@ -1519,7 +1519,7 @@
         {
           "phase": "teach_target",
           "say_he": "הקשב: from. במשמעות של היום: מ־ לציון מוצא. אמור את הצורה, ואז הסבר את המשמעות או בחר את המצב שמתאים לה.",
-          "say_en": "Listen: from. We are learning this expression with a specific meaning. Say it, then explain when you would use it.",
+          "say_en": "Listen: from. We're learning this expression with a specific meaning. Say it, then explain when you would use it.",
           "target_en": "from",
           "meaning_he": "מ־ לציון מוצא",
           "correct_response_en": "from",
@@ -1528,7 +1528,7 @@
         {
           "phase": "teach_target",
           "say_he": "הקשב: live. במשמעות של היום: לגור. אמור את הצורה, ואז הסבר את המשמעות או בחר את המצב שמתאים לה.",
-          "say_en": "Listen: live. We are learning this expression with a specific meaning. Say it, then explain when you would use it.",
+          "say_en": "Listen: live. We're learning this expression with a specific meaning. Say it, then explain when you would use it.",
           "target_en": "live",
           "meaning_he": "לגור",
           "correct_response_en": "live",
@@ -1537,7 +1537,7 @@
         {
           "phase": "teach_target",
           "say_he": "הקשב: city. במשמעות של היום: עיר. אמור את הצורה, ואז הסבר את המשמעות או בחר את המצב שמתאים לה.",
-          "say_en": "Listen: city. We are learning this expression with a specific meaning. Say it, then explain when you would use it.",
+          "say_en": "Listen: city. We're learning this expression with a specific meaning. Say it, then explain when you would use it.",
           "target_en": "city",
           "meaning_he": "עיר",
           "correct_response_en": "city",
@@ -1546,7 +1546,7 @@
         {
           "phase": "teach_target",
           "say_he": "הקשב: country. במשמעות של היום: מדינה. אמור את הצורה, ואז הסבר את המשמעות או בחר את המצב שמתאים לה.",
-          "say_en": "Listen: country. We are learning this expression with a specific meaning. Say it, then explain when you would use it.",
+          "say_en": "Listen: country. We're learning this expression with a specific meaning. Say it, then explain when you would use it.",
           "target_en": "country",
           "meaning_he": "מדינה",
           "correct_response_en": "country",
@@ -1555,7 +1555,7 @@
         {
           "phase": "teach_target",
           "say_he": "הקשב: English. במשמעות של היום: אנגלית. אמור את הצורה, ואז הסבר את המשמעות או בחר את המצב שמתאים לה.",
-          "say_en": "Listen: English. We are learning this expression with a specific meaning. Say it, then explain when you would use it.",
+          "say_en": "Listen: English. We're learning this expression with a specific meaning. Say it, then explain when you would use it.",
           "target_en": "English",
           "meaning_he": "אנגלית",
           "correct_response_en": "English",
@@ -1564,7 +1564,7 @@
         {
           "phase": "teach_target",
           "say_he": "הקשב: Hebrew. במשמעות של היום: עברית. אמור את הצורה, ואז הסבר את המשמעות או בחר את המצב שמתאים לה.",
-          "say_en": "Listen: Hebrew. We are learning this expression with a specific meaning. Say it, then explain when you would use it.",
+          "say_en": "Listen: Hebrew. We're learning this expression with a specific meaning. Say it, then explain when you would use it.",
           "target_en": "Hebrew",
           "meaning_he": "עברית",
           "correct_response_en": "Hebrew",
@@ -1573,7 +1573,7 @@
         {
           "phase": "language_focus",
           "say_he": "באמירות על זהות משתמשים ב־am אחרי I וב־is אחרי he או she. בשאלה מעבירים את am/is/are להתחלה, ולכן You are a student הופך ל־Are you a student. בתשובה קצרה שומרים את אותה צורה, למשל Yes, I am.",
-          "text_en": "You are a student.",
+          "text_en": "You're a student.",
           "contrast_en": "Are you a student?",
           "task_he": "אתם רוצים לברר אם בת השיח מורה. שאלו באנגלית שאלה מלאה עם Are you.",
           "answer_anchor_en": "Are you a teacher?",
@@ -1607,7 +1607,7 @@
           "turns": [
             {
               "speaker": "teacher",
-              "text_en": "Hello. I am Maya. What is your name?",
+              "text_en": "Hello. I'm Maya. What's your name?",
               "text_he": "שלום. אני מאיה. מה שמך?"
             },
             {
@@ -1622,7 +1622,7 @@
             },
             {
               "speaker": "model",
-              "text_en": "I am from Israel. I live in Haifa.",
+              "text_en": "I'm from Israel. I live in Haifa.",
               "text_he": "אני מישראל. אני גר בחיפה."
             }
           ]
@@ -1631,7 +1631,7 @@
           "phase": "guided_production",
           "say_he": "פגשו את {{teacherNameHe}} בקבוצת לימוד. הציגו את עצמכם בשמכם, ציינו את עיר המגורים והשפות שלכם ושאלו את המורה מה שמו ומאיפה הוא.",
           "task_he": "פגשו את {{teacherNameHe}} בקבוצת לימוד. הציגו את עצמכם בשמכם, ציינו את עיר המגורים והשפות שלכם ושאלו את המורה מה שמו ומאיפה הוא.",
-          "model_en": "Hello. My name is {{teacherName}}. I speak English. What is your name?",
+          "model_en": "Hello. My name is {{teacherName}}. I speak English. What's your name?",
           "model_visibility_he": "זהו דגם של המורה המציג את עצמו. הלומד משתמש בשמו שלו; אין לדרוש את שם המורה או שם דמיוני בתשובת הלומד."
         },
         {
@@ -1755,7 +1755,7 @@
           "number": 11,
           "kind": "roleplay_rehearsal",
           "prompt_he": "פגשו את {{teacherNameHe}} בקבוצת לימוד. הציגו את עצמכם בשמכם, ציינו את עיר המגורים והשפות שלכם ושאלו את המורה מה שמו ומאיפה הוא.",
-          "answer_anchor_en": "Hello. My name is {{teacherName}}. I speak English. What is your name?",
+          "answer_anchor_en": "Hello. My name is {{teacherName}}. I speak English. What's your name?",
           "rubric_he": "מילוי הכוונה, מובנות, התאמה למצב, שימוש עצמאי לפחות באחד מיעדי הפגישה. תשובה אחרת נכונה מתקבלת. זו משימה מתורגלת, לא הוכחת העברה לנושא חדש. יש לקבל כל שם שבו הלומד מציג את עצמו. בדקו ברכה, הצגה עצמית מובנת ושפה המתאימה ליעד; אין לדרוש שם או פרטים זהים לדגם של המורה.",
           "hint_he": "בחר משפט פתיחה מדגם השיחה; לאחר מכן נסה ללא הדגם.",
           "feedback_he": "בחר נקודת יעד אחת לתיקון והפק שוב. בדיקת העברה נפרדת משתמשת בטופס חדש אחרי שלוש יחידות.",
@@ -1766,7 +1766,7 @@
           "kind": "writing_plan",
           "prompt_he": "תכנן את המשימה הבאה; בשלב הזה כתוב רק פתיחה ושני פרטים, או אמור אותם בקול: כתבו פרופיל שלכם בן 4 משפטים: השם שלכם, מקום מגורים, תפקיד ושפות.",
           "rubric_he": "מילוי הכוונה, מובנות, התאמה למצב, שימוש עצמאי לפחות באחד מיעדי הפגישה. תשובה אחרת נכונה מתקבלת. זו משימה מתורגלת, לא הוכחת העברה לנושא חדש. יש לקבל כל שם שבו הלומד מציג את עצמו. בדקו ברכה, הצגה עצמית מובנת ושפה המתאימה ליעד; אין לדרוש שם או פרטים זהים לדגם של המורה.",
-          "answer_anchor_en": "Hello. My name is {{teacherName}}. I speak English. What is your name?",
+          "answer_anchor_en": "Hello. My name is {{teacherName}}. I speak English. What's your name?",
           "anchor_note_he": "זהו דגם של המורה המציג את עצמו. הלומד משתמש בשמו שלו; אין לדרוש את שם המורה או שם דמיוני בתשובת הלומד.",
           "planned_minutes": "3–5",
           "hint_he": "תכנן כוונה, שני פרטים וסיום. במתחיל גם משפט אחד או אמירה בעל פה יכולים להיות שלב לימוד.",
@@ -1812,7 +1812,7 @@
         {
           "phase": "opening",
           "say_he": "היום נעבוד על: מכירים אנשים. המטרה היא להציג שם, מקום מגורים ושפות ולשאול בן שיח על עצמו. אפשר לבקש הסבר קצר בעברית או לחלק את המפגש.",
-          "say_en": "We will practise a useful task step by step. You can ask me to repeat or explain. At the end, you will try a new version without the model."
+          "say_en": "We'll practice a useful task step by step. You can ask me to repeat or explain. At the end, you'll try a new version without the model."
         },
         {
           "phase": "retrieval",
@@ -1823,7 +1823,7 @@
         {
           "phase": "teach_target",
           "say_he": "הקשב: speak. במשמעות של היום: לדבר. אמור את הצורה, ואז הסבר את המשמעות או בחר את המצב שמתאים לה.",
-          "say_en": "Listen: speak. We are learning this expression with a specific meaning. Say it, then explain when you would use it.",
+          "say_en": "Listen: speak. We're learning this expression with a specific meaning. Say it, then explain when you would use it.",
           "target_en": "speak",
           "meaning_he": "לדבר",
           "correct_response_en": "speak",
@@ -1832,7 +1832,7 @@
         {
           "phase": "teach_target",
           "say_he": "הקשב: student. במשמעות של היום: תלמיד או סטודנט. אמור את הצורה, ואז הסבר את המשמעות או בחר את המצב שמתאים לה.",
-          "say_en": "Listen: student. We are learning this expression with a specific meaning. Say it, then explain when you would use it.",
+          "say_en": "Listen: student. We're learning this expression with a specific meaning. Say it, then explain when you would use it.",
           "target_en": "student",
           "meaning_he": "תלמיד או סטודנט",
           "correct_response_en": "student",
@@ -1841,7 +1841,7 @@
         {
           "phase": "teach_target",
           "say_he": "הקשב: teacher. במשמעות של היום: מורה. אמור את הצורה, ואז הסבר את המשמעות או בחר את המצב שמתאים לה.",
-          "say_en": "Listen: teacher. We are learning this expression with a specific meaning. Say it, then explain when you would use it.",
+          "say_en": "Listen: teacher. We're learning this expression with a specific meaning. Say it, then explain when you would use it.",
           "target_en": "teacher",
           "meaning_he": "מורה",
           "correct_response_en": "teacher",
@@ -1850,7 +1850,7 @@
         {
           "phase": "teach_target",
           "say_he": "הקשב: work. במשמעות של היום: לעבוד. אמור את הצורה, ואז הסבר את המשמעות או בחר את המצב שמתאים לה.",
-          "say_en": "Listen: work. We are learning this expression with a specific meaning. Say it, then explain when you would use it.",
+          "say_en": "Listen: work. We're learning this expression with a specific meaning. Say it, then explain when you would use it.",
           "target_en": "work",
           "meaning_he": "לעבוד",
           "correct_response_en": "work",
@@ -1859,7 +1859,7 @@
         {
           "phase": "teach_target",
           "say_he": "הקשב: nice to meet you. במשמעות של היום: נעים להכיר. אמור את הצורה, ואז הסבר את המשמעות או בחר את המצב שמתאים לה.",
-          "say_en": "Listen: nice to meet you. We are learning this expression with a specific meaning. Say it, then explain when you would use it.",
+          "say_en": "Listen: nice to meet you. We're learning this expression with a specific meaning. Say it, then explain when you would use it.",
           "target_en": "nice to meet you",
           "meaning_he": "נעים להכיר",
           "correct_response_en": "nice to meet you",
@@ -1868,7 +1868,7 @@
         {
           "phase": "teach_target",
           "say_he": "הקשב: where. במשמעות של היום: איפה. אמור את הצורה, ואז הסבר את המשמעות או בחר את המצב שמתאים לה.",
-          "say_en": "Listen: where. We are learning this expression with a specific meaning. Say it, then explain when you would use it.",
+          "say_en": "Listen: where. We're learning this expression with a specific meaning. Say it, then explain when you would use it.",
           "target_en": "where",
           "meaning_he": "איפה",
           "correct_response_en": "where",
@@ -1905,7 +1905,7 @@
           "turns": [
             {
               "speaker": "teacher",
-              "text_en": "Hello. I am Maya. What is your name?",
+              "text_en": "Hello. I'm Maya. What's your name?",
               "text_he": "שלום. אני מאיה. מה שמך?"
             },
             {
@@ -1920,7 +1920,7 @@
             },
             {
               "speaker": "model",
-              "text_en": "I am from Israel. I live in Haifa.",
+              "text_en": "I'm from Israel. I live in Haifa.",
               "text_he": "אני מישראל. אני גר בחיפה."
             },
             {
@@ -1930,7 +1930,7 @@
             },
             {
               "speaker": "model",
-              "text_en": "Yes. I am a student. I speak Hebrew.",
+              "text_en": "Yes. I'm a student. I speak Hebrew.",
               "text_he": "כן. אני תלמיד. אני מדבר עברית."
             },
             {
@@ -1940,7 +1940,7 @@
             },
             {
               "speaker": "model",
-              "text_en": "A little. You are my English teacher.",
+              "text_en": "A little. You're my English teacher.",
               "text_he": "קצת. את המורה שלי לאנגלית."
             }
           ]
@@ -1948,7 +1948,7 @@
         {
           "phase": "input",
           "say_he": "כעת נקשיב לקטע. נסה לזהות את המצב המרכזי. אפשר לשמוע שוב. במצב קריאה נפתח את הכתב; אם בודקים האזנה עצמאית משאירים תמלול סגור בניסיון הראשון.",
-          "text_en": "My name is Tom. I am from Israel, and I live in Haifa. Haifa is a city. I am a student. My friend Maya is a teacher. She is from Israel too. We speak Hebrew. I speak a little English, but Maya speaks English at work. We meet in a small class. My book is blue, and her book is red. Maya says, \"Hello, Tom. Nice to meet you.\" I say, \"Hello, Maya. I am ready.\"",
+          "text_en": "My name is Tom. I am from Israel, and I live in Haifa. Haifa is a city. Israel is a country. I am a student. My friend Maya is a teacher. She is from Israel too. We speak Hebrew. I speak a little English, but Maya speaks English at work. We meet in a small class. My book is blue, and her book is red. Maya says, \"Hello, Tom. Nice to meet you.\" I say, \"Hello, Maya. I am ready.\"",
           "note_he": "זהו חומר הוראה מוכר, לא unseen לאחר הצגתו."
         },
         {
@@ -1961,8 +1961,8 @@
         {
           "phase": "comprehension",
           "say_he": "מה העבודה של מאיה?",
-          "say_en": "What is Maya?",
-          "answer_anchor_en": "She is a teacher.",
+          "say_en": "What's Maya?",
+          "answer_anchor_en": "She's a teacher.",
           "accept_he": "יש לקבל פרפרזה נכונה, תשובה קצרה מתאימה ופרטים תומכים מן הטקסט. לא חייבים להעתיק את הדגם."
         },
         {
@@ -1975,8 +1975,8 @@
         {
           "phase": "independent_reconstruction",
           "say_he": "פגשו את {{teacherNameHe}} בקבוצת לימוד. הציגו את עצמכם בשמכם, ציינו את עיר המגורים והשפות שלכם ושאלו את המורה מה שמו ומאיפה הוא.",
-          "say_en": "Try the practised task without reading the model. Explain your choice or ask for clarification when needed.",
-          "model_en": "Hello. My name is {{teacherName}}. I speak English. What is your name?",
+          "say_en": "Try the practiced task without reading the model. Explain your choice or ask for clarification when needed.",
+          "model_en": "Hello. My name is {{teacherName}}. I speak English. What's your name?",
           "model_visibility_he": "זהו דגם של המורה המציג את עצמו. הלומד משתמש בשמו שלו; אין לדרוש את שם המורה או שם דמיוני בתשובת הלומד."
         },
         {
@@ -2073,7 +2073,7 @@
           "number": 8,
           "kind": "reading_or_listening_comprehension",
           "prompt_he": "מה מטרת הטקסט?",
-          "prompt_en": "What is the text mainly about?",
+          "prompt_en": "What's the text mainly about?",
           "answer_en": "Tom introduces himself and Maya.",
           "hint_he": "מצא או שמע את החלק הרלוונטי בקטע. שימוש חוזר בקטע הוא תרגול הבנה, לא מבחן זכירה ללא תמיכה.",
           "feedback_he": "השווה את תשובתך למידע בקטע. פרפרזה נכונה מתקבלת; ידע חיצוני שאינו מופיע בקטע אינו נדרש."
@@ -2102,7 +2102,7 @@
           "number": 11,
           "kind": "roleplay_rehearsal",
           "prompt_he": "פגשו את {{teacherNameHe}} בקבוצת לימוד. הציגו את עצמכם בשמכם, ציינו את עיר המגורים והשפות שלכם ושאלו את המורה מה שמו ומאיפה הוא.",
-          "answer_anchor_en": "Hello. My name is {{teacherName}}. I speak English. What is your name?",
+          "answer_anchor_en": "Hello. My name is {{teacherName}}. I speak English. What's your name?",
           "rubric_he": "מילוי הכוונה, מובנות, התאמה למצב, שימוש עצמאי לפחות באחד מיעדי הפגישה. תשובה אחרת נכונה מתקבלת. זו משימה מתורגלת, לא הוכחת העברה לנושא חדש. יש לקבל כל שם שבו הלומד מציג את עצמו. בדקו ברכה, הצגה עצמית מובנת ושפה המתאימה ליעד; אין לדרוש שם או פרטים זהים לדגם של המורה.",
           "hint_he": "בחר משפט פתיחה מדגם השיחה; לאחר מכן נסה ללא הדגם.",
           "feedback_he": "בחר נקודת יעד אחת לתיקון והפק שוב. בדיקת העברה נפרדת משתמשת בטופס חדש אחרי שלוש יחידות.",
@@ -2113,7 +2113,7 @@
           "kind": "writing_or_recording_project",
           "prompt_he": "כתבו פרופיל שלכם בן 4 משפטים: השם שלכם, מקום מגורים, תפקיד ושפות.",
           "rubric_he": "מילוי משימה, מסר ברור, סדר מתאים לרמה ודיוק ביעדים שנלמדו; אין תשובה יחידה. יש לקבל כל שם שבו הלומד מציג את עצמו. בדקו ברכה, הצגה עצמית מובנת ושפה המתאימה ליעד; אין לדרוש שם או פרטים זהים לדגם של המורה.",
-          "answer_anchor_en": "Hello. My name is {{teacherName}}. I speak English. What is your name?",
+          "answer_anchor_en": "Hello. My name is {{teacherName}}. I speak English. What's your name?",
           "anchor_note_he": "זהו דגם של המורה המציג את עצמו. הלומד משתמש בשמו שלו; אין לדרוש את שם המורה או שם דמיוני בתשובת הלומד.",
           "planned_minutes": "8–15",
           "hint_he": "תכנן כוונה, שני פרטים וסיום. במתחיל גם משפט אחד או אמירה בעל פה יכולים להיות שלב לימוד.",

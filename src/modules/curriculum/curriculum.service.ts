@@ -32,6 +32,8 @@ import {
   lessonById,
   targetById,
   normalize,
+  sameEnglish,
+  expandContractions,
   questionView,
   questionAudio,
   exitAssessment,
@@ -1337,7 +1339,7 @@ export class CurriculumService {
         modality,
       };
     const exact =
-      (anchor && normalize(answer) === normalize(anchor)) ||
+      (anchor && sameEnglish(answer, anchor)) ||
       (question.kind === 'listening' &&
         question.answer_he &&
         normalize(answer) === normalize(question.answer_he));
@@ -1350,6 +1352,10 @@ export class CurriculumService {
       'sound_to_grapheme',
       'direction',
       'blending',
+      'phoneme_deletion',
+      'visual_discrimination',
+      'vowel_discrimination',
+      'voicing_discrimination',
     ].includes(question.kind ?? '');
     const isChoice = ['recognition', 'picture_choice', 'sound_choice'].includes(
       question.kind ?? '',
@@ -1823,10 +1829,10 @@ export class CurriculumService {
     );
   }
   private noteExposure(state: CurriculumState, text: string) {
-    const normalized = ` ${normalize(text)} `;
+    const normalized = ` ${expandContractions(normalize(text))} `;
     for (const [id, word] of Object.entries(state.words)) {
       const target = targetById.get(id);
-      if (target && normalized.includes(` ${normalize(target.en)} `))
+      if (target && normalized.includes(` ${expandContractions(normalize(target.en))} `))
         word.lastExposureAt = this.clock().toISOString();
     }
   }

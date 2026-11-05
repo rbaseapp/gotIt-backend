@@ -108,14 +108,21 @@ export async function prepareCurriculumPractice(
     if (id) {
       const item = (
         await tx.query(
-          `SELECT id FROM product_gotit.learning_items li WHERE application_id=$1 AND application_user_id=$2
+          `SELECT id,source_text FROM product_gotit.learning_items li WHERE application_id=$1 AND application_user_id=$2
         AND id=$3 AND deleted_at IS NULL AND user_status='active' AND source_language_code='en' AND translation_language_code='he'
-        AND source_text=$4 AND EXISTS(SELECT 1 FROM product_gotit.item_translations t WHERE t.learning_item_id=li.id
+        AND source_text=ANY($4::text[]) AND EXISTS(SELECT 1 FROM product_gotit.item_translations t WHERE t.learning_item_id=li.id
           AND t.application_id=li.application_id AND t.application_user_id=li.application_user_id AND t.is_current AND t.is_primary AND t.translation_text=$5)`,
-          [...scopeArgs(scope), id, word.en, word.he],
+          [...scopeArgs(scope), id, [word.en, ...(word.former_en ?? [])], word.he],
         )
       ).rows[0];
       if (!item) throw new AppError(409, 'EXERCISE_STALE', 'Curriculum practice word changed');
+      // A spelling revision (colour -> color) keeps the learner's progress.
+      if (item.source_text !== word.en)
+        await tx.query(
+          `UPDATE product_gotit.learning_items SET source_text=$4,normalized_source_text=$5,updated_at=now()
+          WHERE application_id=$1 AND application_user_id=$2 AND id=$3`,
+          [...scopeArgs(scope), id, word.en, lookupText(word.en)],
+        );
     } else {
       const item = (
         await tx.query(

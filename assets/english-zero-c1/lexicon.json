@@ -1655,7 +1655,7 @@
     },
     {
       "id": "A104-T11",
-      "en": "I would like",
+      "en": "I'd like",
       "he": "הייתי רוצה",
       "unit": "A104",
       "band": "A1",
@@ -1665,7 +1665,10 @@
       "counting_note": "Target slot; repeated spelling is not a new unique word.",
       "first_text_encounter_unit": null,
       "exposure_note_he": "חשיפה נתמכת מוקדמת אינה רכישה עצמאית. מועד ההוראה הפעילה מופיע בשדה היחידה; כל גלוסה דורשת בדיקת משמעות בהקשר.",
-      "display_unit": "A104"
+      "display_unit": "A104",
+      "former_en": [
+        "I would like"
+      ]
     },
     {
       "id": "A104-T12",
@@ -1697,7 +1700,7 @@
     },
     {
       "id": "A105-T02",
-      "en": "trousers",
+      "en": "pants",
       "he": "מכנסיים",
       "unit": "A105",
       "band": "A1",
@@ -1707,7 +1710,10 @@
       "counting_note": "Target slot; repeated spelling is not a new unique word.",
       "first_text_encounter_unit": null,
       "exposure_note_he": "חשיפה נתמכת מוקדמת אינה רכישה עצמאית. מועד ההוראה הפעילה מופיע בשדה היחידה; כל גלוסה דורשת בדיקת משמעות בהקשר.",
-      "display_unit": "A105"
+      "display_unit": "A105",
+      "former_en": [
+        "trousers"
+      ]
     },
     {
       "id": "A105-T03",
@@ -1739,7 +1745,7 @@
     },
     {
       "id": "A105-T05",
-      "en": "colour",
+      "en": "color",
       "he": "צבע",
       "unit": "A105",
       "band": "A1",
@@ -1749,7 +1755,10 @@
       "counting_note": "Target slot; repeated spelling is not a new unique word.",
       "first_text_encounter_unit": null,
       "exposure_note_he": "חשיפה נתמכת מוקדמת אינה רכישה עצמאית. מועד ההוראה הפעילה מופיע בשדה היחידה; כל גלוסה דורשת בדיקת משמעות בהקשר.",
-      "display_unit": "A105"
+      "display_unit": "A105",
+      "former_en": [
+        "colour"
+      ]
     },
     {
       "id": "A105-T06",
@@ -2285,7 +2294,7 @@
     },
     {
       "id": "A108-T08",
-      "en": "football",
+      "en": "soccer",
       "he": "כדורגל",
       "unit": "A108",
       "band": "A1",
@@ -2295,7 +2304,10 @@
       "counting_note": "Target slot; repeated spelling is not a new unique word.",
       "first_text_encounter_unit": "A108",
       "exposure_note_he": "חשיפה נתמכת מוקדמת אינה רכישה עצמאית. מועד ההוראה הפעילה מופיע בשדה היחידה; כל גלוסה דורשת בדיקת משמעות בהקשר.",
-      "display_unit": "A108"
+      "display_unit": "A108",
+      "former_en": [
+        "football"
+      ]
     },
     {
       "id": "A108-T09",
@@ -2831,7 +2843,7 @@
     },
     {
       "id": "A111-T11",
-      "en": "return ticket",
+      "en": "round-trip ticket",
       "he": "כרטיס הלוך ושוב",
       "unit": "A111",
       "band": "A1",
@@ -2841,7 +2853,10 @@
       "counting_note": "Target slot; repeated spelling is not a new unique word.",
       "first_text_encounter_unit": null,
       "exposure_note_he": "חשיפה נתמכת מוקדמת אינה רכישה עצמאית. מועד ההוראה הפעילה מופיע בשדה היחידה; כל גלוסה דורשת בדיקת משמעות בהקשר.",
-      "display_unit": "A111"
+      "display_unit": "A111",
+      "former_en": [
+        "return ticket"
+      ]
     },
     {
       "id": "A111-T12",
@@ -4483,7 +4498,7 @@
     },
     {
       "id": "A209-T09",
-      "en": "practise",
+      "en": "practice",
       "he": "לתרגל",
       "unit": "A209",
       "band": "A2",
@@ -4493,7 +4508,10 @@
       "counting_note": "Target slot; repeated spelling is not a new unique word.",
       "first_text_encounter_unit": null,
       "exposure_note_he": "חשיפה נתמכת מוקדמת אינה רכישה עצמאית. מועד ההוראה הפעילה מופיע בשדה היחידה; כל גלוסה דורשת בדיקת משמעות בהקשר.",
-      "display_unit": "A209"
+      "display_unit": "A209",
+      "former_en": [
+        "practise"
+      ]
     },
     {
       "id": "A209-T10",
@@ -6219,7 +6237,7 @@
     },
     {
       "id": "B108-T01",
-      "en": "neighbourhood",
+      "en": "neighborhood",
       "he": "שכונה",
       "unit": "B108",
       "band": "B1",
@@ -6229,7 +6247,10 @@
       "counting_note": "Target slot; repeated spelling is not a new unique word.",
       "first_text_encounter_unit": null,
       "exposure_note_he": "חשיפה נתמכת מוקדמת אינה רכישה עצמאית. מועד ההוראה הפעילה מופיע בשדה היחידה; כל גלוסה דורשת בדיקת משמעות בהקשר.",
-      "display_unit": "B108"
+      "display_unit": "B108",
+      "former_en": [
+        "neighbourhood"
+      ]
     },
     {
       "id": "B108-T02",
@@ -8501,7 +8522,7 @@
     },
     {
       "id": "B203-T08",
-      "en": "prioritise",
+      "en": "prioritize",
       "he": "לתעדף",
       "unit": "B203",
       "band": "B2",
@@ -8511,7 +8532,10 @@
       "counting_note": "Target slot; repeated spelling is not a new unique word.",
       "first_text_encounter_unit": null,
       "exposure_note_he": "חשיפה נתמכת מוקדמת אינה רכישה עצמאית. מועד ההוראה הפעילה מופיע בשדה היחידה; כל גלוסה דורשת בדיקת משמעות בהקשר.",
-      "display_unit": "B203"
+      "display_unit": "B203",
+      "former_en": [
+        "prioritise"
+      ]
     },
     {
       "id": "B203-T09",
@@ -8697,7 +8721,7 @@
     },
     {
       "id": "B204-T10",
-      "en": "realise",
+      "en": "realize",
       "he": "להבין לפתע",
       "unit": "B204",
       "band": "B2",
@@ -8707,7 +8731,10 @@
       "counting_note": "Target slot; repeated spelling is not a new unique word.",
       "first_text_encounter_unit": null,
       "exposure_note_he": "חשיפה נתמכת מוקדמת אינה רכישה עצמאית. מועד ההוראה הפעילה מופיע בשדה היחידה; כל גלוסה דורשת בדיקת משמעות בהקשר.",
-      "display_unit": "B204"
+      "display_unit": "B204",
+      "former_en": [
+        "realise"
+      ]
     },
     {
       "id": "B204-T11",
@@ -9397,7 +9424,7 @@
     },
     {
       "id": "B208-T12",
-      "en": "take offence",
+      "en": "take offense",
       "he": "להיעלב",
       "unit": "B208",
       "band": "B2",
@@ -9407,7 +9434,10 @@
       "counting_note": "Target slot; repeated spelling is not a new unique word.",
       "first_text_encounter_unit": null,
       "exposure_note_he": "חשיפה נתמכת מוקדמת אינה רכישה עצמאית. מועד ההוראה הפעילה מופיע בשדה היחידה; כל גלוסה דורשת בדיקת משמעות בהקשר.",
-      "display_unit": "B208"
+      "display_unit": "B208",
+      "former_en": [
+        "take offence"
+      ]
     },
     {
       "id": "B209-T01",
@@ -9635,7 +9665,7 @@
     },
     {
       "id": "B210-T05",
-      "en": "summarise",
+      "en": "summarize",
       "he": "לסכם",
       "unit": "B210",
       "band": "B2",
@@ -9645,7 +9675,10 @@
       "counting_note": "Target slot; repeated spelling is not a new unique word.",
       "first_text_encounter_unit": null,
       "exposure_note_he": "חשיפה נתמכת מוקדמת אינה רכישה עצמאית. מועד ההוראה הפעילה מופיע בשדה היחידה; כל גלוסה דורשת בדיקת משמעות בהקשר.",
-      "display_unit": "B210"
+      "display_unit": "B210",
+      "former_en": [
+        "summarise"
+      ]
     },
     {
       "id": "B210-T06",
@@ -11245,7 +11278,7 @@
     },
     {
       "id": "C101-T12",
-      "en": "withhold judgement",
+      "en": "withhold judgment",
       "he": "להימנע בינתיים מקביעה",
       "unit": "C101",
       "band": "C1",
@@ -11255,7 +11288,10 @@
       "counting_note": "Target slot; repeated spelling is not a new unique word.",
       "first_text_encounter_unit": null,
       "exposure_note_he": "חשיפה נתמכת מוקדמת אינה רכישה עצמאית. מועד ההוראה הפעילה מופיע בשדה היחידה; כל גלוסה דורשת בדיקת משמעות בהקשר.",
-      "display_unit": "C101"
+      "display_unit": "C101",
+      "former_en": [
+        "withhold judgement"
+      ]
     },
     {
       "id": "C102-T01",
@@ -11469,7 +11505,7 @@
     },
     {
       "id": "C103-T04",
-      "en": "patronising",
+      "en": "patronizing",
       "he": "מתנשא",
       "unit": "C103",
       "band": "C1",
@@ -11479,7 +11515,10 @@
       "counting_note": "Target slot; repeated spelling is not a new unique word.",
       "first_text_encounter_unit": null,
       "exposure_note_he": "חשיפה נתמכת מוקדמת אינה רכישה עצמאית. מועד ההוראה הפעילה מופיע בשדה היחידה; כל גלוסה דורשת בדיקת משמעות בהקשר.",
-      "display_unit": "C103"
+      "display_unit": "C103",
+      "former_en": [
+        "patronising"
+      ]
     },
     {
       "id": "C103-T05",
@@ -12827,7 +12866,7 @@
     },
     {
       "id": "C111-T05",
-      "en": "optimise",
+      "en": "optimize",
       "he": "לייעל למטרה נתונה",
       "unit": "C111",
       "band": "C1",
@@ -12837,7 +12876,10 @@
       "counting_note": "Target slot; repeated spelling is not a new unique word.",
       "first_text_encounter_unit": null,
       "exposure_note_he": "חשיפה נתמכת מוקדמת אינה רכישה עצמאית. מועד ההוראה הפעילה מופיע בשדה היחידה; כל גלוסה דורשת בדיקת משמעות בהקשר.",
-      "display_unit": "C111"
+      "display_unit": "C111",
+      "former_en": [
+        "optimise"
+      ]
     },
     {
       "id": "C111-T06",
@@ -13597,7 +13639,7 @@
     },
     {
       "id": "C115-T12",
-      "en": "contextualise",
+      "en": "contextualize",
       "he": "למקם בהקשר",
       "unit": "C115",
       "band": "C1",
@@ -13607,7 +13649,10 @@
       "counting_note": "Target slot; repeated spelling is not a new unique word.",
       "first_text_encounter_unit": null,
       "exposure_note_he": "חשיפה נתמכת מוקדמת אינה רכישה עצמאית. מועד ההוראה הפעילה מופיע בשדה היחידה; כל גלוסה דורשת בדיקת משמעות בהקשר.",
-      "display_unit": "C115"
+      "display_unit": "C115",
+      "former_en": [
+        "contextualise"
+      ]
     },
     {
       "id": "C116-T01",
@@ -13737,7 +13782,7 @@
     },
     {
       "id": "C116-T10",
-      "en": "contingent judgement",
+      "en": "contingent judgment",
       "he": "שיפוט המותנה בנסיבות",
       "unit": "C116",
       "band": "C1",
@@ -13747,7 +13792,10 @@
       "counting_note": "Target slot; repeated spelling is not a new unique word.",
       "first_text_encounter_unit": null,
       "exposure_note_he": "חשיפה נתמכת מוקדמת אינה רכישה עצמאית. מועד ההוראה הפעילה מופיע בשדה היחידה; כל גלוסה דורשת בדיקת משמעות בהקשר.",
-      "display_unit": "C116"
+      "display_unit": "C116",
+      "former_en": [
+        "contingent judgement"
+      ]
     },
     {
       "id": "C116-T11",
@@ -58438,7 +58486,7 @@
     },
     {
       "en": "psychology",
-      "definition_en": "the study of the mind and how it affects behaviour",
+      "definition_en": "the study of the mind and how it affects behavior",
       "pos": "n",
       "track": "academic_elective",
       "required_for_C1": false,
@@ -61768,7 +61816,7 @@
     },
     {
       "en": "niche",
-      "definition_en": "a small area; a specialised business, job or activity",
+      "definition_en": "a small area; a specialized business, job or activity",
       "pos": "n",
       "track": "academic_elective",
       "required_for_C1": false,
@@ -63424,7 +63472,7 @@
     },
     {
       "en": "breakdown",
-      "definition_en": "when normal activity or behaviour stops",
+      "definition_en": "when normal activity or behavior stops",
       "pos": "n",
       "track": "academic_elective",
       "required_for_C1": false,
@@ -63667,7 +63715,7 @@
     },
     {
       "en": "headquarter",
-      "definition_en": "the main office of a company or organisation",
+      "definition_en": "the main office of a company or organization",
       "pos": "n",
       "track": "academic_elective",
       "required_for_C1": false,
