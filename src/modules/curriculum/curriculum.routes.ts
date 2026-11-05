@@ -133,6 +133,14 @@ export function createCurriculumRoutes(
       ),
     ),
   );
+  router.post('/known-words', requirePractice, async (req, res) =>
+    res.json(
+      await service.markKnown(
+        req.gotitAuth!,
+        parseInput(command.extend({ targetId: pathId, known: z.boolean() }).strict(), req.body),
+      ),
+    ),
+  );
   router.post('/work', requirePractice, async (req, res) =>
     res.json(
       await service.saveWork(

@@ -52,6 +52,8 @@ import {
   type Grade,
 } from './curriculum.store.js';
 import {
+  claimKnown,
+  claimedKnown,
   introduce,
   recallEvidence,
   reviewPriority,
@@ -507,7 +509,9 @@ export class CurriculumService {
             (target) =>
               target.unit === id && (state.words[target.id]?.practiceModes?.[mode] ?? 0) > 0,
           ).length,
-          eligible: allTargets.filter((target) => target.unit === id).length,
+          eligible: allTargets.filter(
+            (target) => target.unit === id && !claimedKnown(state.words[target.id]),
+          ).length,
         })),
         lessons: content.lessons
           .filter((lesson) => lesson.unit === id)
@@ -548,6 +552,45 @@ export class CurriculumService {
       }
       return { state, response: { introduced: input.targetIds.length } };
     });
+  }
+  /**
+   * "I already know this word": the word leaves the new-word games and gets one delayed
+   * recall check in review (claimKnown). `known: false` undoes a claim that has not been
+   * checked yet. Words already being learned cannot be claimed.
+   */
+  async markKnown(
+    scope: ProfileScope,
+    input: { eventId: string; revision: number; targetId: string; known: boolean },
+  ) {
+    return this.store.command(
+      scope,
+      input.eventId,
+      ['known', input],
+      input.revision,
+      async (enrollment) => {
+        const state = requireEnrollment(enrollment).state;
+        const target = targetById.get(input.targetId);
+        if (!target || !this.unitUnlocked(state, target.unit)) throw curriculumMissing();
+        const word = state.words[target.id];
+        const untouched =
+          !word ||
+          (word.independentDays.length === 0 &&
+            word.failures.length === 0 &&
+            Object.keys(word.practiceModes ?? {}).length === 0);
+        if (input.known) {
+          if (!claimedKnown(word)) {
+            if (!untouched || word?.source)
+              throw new AppError(
+                409,
+                'CURRICULUM_WORD_IN_PROGRESS',
+                'This word is already part of your practice',
+              );
+            state.words[target.id] = claimKnown(this.clock());
+          }
+        } else if (claimedKnown(word) && untouched) delete state.words[target.id];
+        return { state, response: { known: claimedKnown(state.words[target.id]) } };
+      },
+    );
   }
   async saveWork(
     scope: ProfileScope,
@@ -772,12 +815,11 @@ export class CurriculumService {
       const sequence = ['recognition', 'matching', 'recall', 'listening', 'context'];
       const position = sequence.indexOf(mode ?? 'recognition');
       if (position < 0) throw curriculumMissing();
-      const introduced = allTargets.filter(
-        (target) => target.unit === id && state.words[target.id],
-      );
-      const targets = introduced.length
-        ? introduced
-        : allTargets.filter((target) => target.unit === id);
+      // Words the learner already knows wait for their review check instead of games.
+      const unitTargets = allTargets.filter((target) => target.unit === id);
+      const toPractise = unitTargets.filter((target) => !claimedKnown(state.words[target.id]));
+      const introduced = toPractise.filter((target) => state.words[target.id]);
+      const targets = introduced.length ? introduced : toPractise.length ? toPractise : unitTargets;
       const selected = shuffle(targets)
         .sort(
           (a, b) =>

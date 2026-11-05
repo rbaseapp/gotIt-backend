@@ -55,8 +55,8 @@ export function unitAssignment(
 export type WordOutcome = 'retained' | 'not_retained' | 'pending' | 'excluded';
 
 export function wordOutcome(experiment: Experiment, word: WordEvidence, now: Date): WordOutcome {
-  // Words known from placement were not taught here.
-  if (word.source === 'placement') return 'excluded';
+  // Words known from placement or marked as already known were not taught here.
+  if (word.source) return 'excluded';
   const introduced = Date.parse(word.introducedAt);
   if (introduced < Date.parse(experiment.startsAt)) return 'excluded';
   if (+now - introduced < OUTCOME_AFTER_DAYS * DAY) return 'pending';

@@ -15,8 +15,11 @@ export type WordEvidence = {
   failures: number[];
   dimensions: Partial<Record<Dimension, number>>;
   status: 'introduced' | 'acquiring' | 'usable' | 'retained' | 'maintenance';
-  /** Present when the word came from the onboarding placement rather than from a lesson. */
-  source?: 'placement';
+  /**
+   * Present when the word was not taught by a lesson: `placement` came from the onboarding
+   * check, `self_reported` from the learner marking it as already known.
+   */
+  source?: 'placement' | 'self_reported';
 };
 const DAY = 86_400_000;
 export function introduce(now: Date): WordEvidence {
@@ -36,6 +39,22 @@ export function introduce(now: Date): WordEvidence {
     status: 'introduced',
   };
 }
+/** A word the learner says they know is checked once in review after this many days. */
+export const KNOWN_CHECK_DAYS = 2;
+/**
+ * The learner's own "I already know this" claim. It skips the new-word games but is not
+ * evidence: the word starts at a long interval and gets one delayed recall check. A miss
+ * turns it back into an ordinary new word (see recallEvidence).
+ */
+export function claimKnown(now: Date): WordEvidence {
+  return {
+    ...introduce(now),
+    stage: 2,
+    dueAt: new Date(+now + KNOWN_CHECK_DAYS * DAY).toISOString(),
+    source: 'self_reported',
+  };
+}
+export const claimedKnown = (word: WordEvidence | undefined) => word?.source === 'self_reported';
 export function recallEvidence(
   previous: WordEvidence,
   input: {
@@ -52,6 +71,11 @@ export function recallEvidence(
   const day = new Intl.DateTimeFormat('en-CA', { timeZone: input.timezone }).format(now);
   next.failures = [...next.failures, input.correct ? 0 : 1].slice(-3);
   if (!input.correct) {
+    // A missed "I already know this" word is learned like any new word.
+    if (next.source === 'self_reported') {
+      delete next.source;
+      next.stage = 0;
+    }
     // Repair one skill; previous successful evidence is retained.
     next.dueAt = new Date(+now + 10 * 60_000).toISOString();
     return next;
