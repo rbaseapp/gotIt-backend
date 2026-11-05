@@ -4014,6 +4014,24 @@
           "he": "חינם",
           "definition_en": "costing no money",
           "status": "support_only_not_independent_mastery"
+        },
+        {
+          "en": "cafe",
+          "he": "בית קפה",
+          "definition_en": "a small restaurant that sells drinks and simple food",
+          "status": "support_only_not_independent_mastery"
+        },
+        {
+          "en": "waiter",
+          "he": "מלצר",
+          "definition_en": "a person who brings food and drinks to the tables in a restaurant",
+          "status": "support_only_not_independent_mastery"
+        },
+        {
+          "en": "shekel",
+          "he": "שקל",
+          "definition_en": "the money used in Israel",
+          "status": "support_only_not_independent_mastery"
         }
       ],
       "language_focus": {
@@ -10214,7 +10232,7 @@
           "text_he": "כן. למרבה המזל, אישה מצאה אותו מתחת לכיסא."
         }
       ],
-      "passage_en": "Yesterday afternoon, Noa was waiting for a bus at the station. She was talking to her brother on the phone. Her blue bag was on the chair next to her. When the bus arrived, she stood up quickly and went outside. Suddenly, she remembered the bag. She went back into the station, but it was not on the chair. Noa was worried because her keys were inside. She looked for the bag under the chairs. Then she asked a woman near the door for help. The woman was carrying the blue bag to the station office. She gave it to Noa and said, \"I found it on the chair.\" Luckily, nothing was missing. Noa thanked the woman and called her brother. She was safe, but she needed to wait for the next bus.",
+      "passage_en": "Yesterday afternoon, Noa was waiting for a bus at the station. She was talking to her brother on the phone. Her blue bag was on the chair next to her. When the bus arrived, she stood up quickly and went outside. Suddenly, she remembered the bag. She went back into the station, but it was not on the chair. Noa was worried because her keys were inside. She did not want to lose them. She looked for the bag under the chairs. Did it fall on the floor? Her phone almost fell too, but it did not break. Then she asked a woman near the door for help. The woman was carrying the blue bag to the station office. She gave it to Noa and said, \"I found it on the chair.\" Luckily, nothing was missing. Noa thanked the woman and called her brother. She was safe, but she needed to wait for the next bus.",
       "passage_questions": [
         {
           "question_he": "מה נועה עשתה כשהאוטובוס הגיע?",
@@ -11036,7 +11054,7 @@
           "he": "לתכנן"
         },
         {
-          "en": "holiday",
+          "en": "vacation",
           "he": "חופשה"
         },
         {
@@ -11153,7 +11171,7 @@
           "text_he": "בגדים, נעליים ומפה."
         }
       ],
-      "passage_en": "Next month, Tom and his sister are going to have a short holiday. They are going to travel by train because they do not have a car. They plan to stay in a small hotel for three nights. The hotel is near the beach, but it is not in the city center. On the first day, they are going to walk by the sea. On the second day, they are going to visit a museum. Tom wants to buy tickets before the trip, so they do not need to wait outside. His sister is going to book the room this week. Tom is going to pack one small suitcase. He needs warm clothes because the evenings can be cold. They are not going to take many things. They want an easy holiday.",
+      "passage_en": "Next month, Tom and his sister are going to have a short vacation. They are going to travel by train because they do not have a car. They plan to stay in a small hotel for three nights. The hotel is near the beach, but it is not in the city center. On the first day, they are going to walk by the sea. On the second day, they are going to visit a museum. Tom wants to buy tickets before the trip, so they do not need to wait outside. His sister is going to book the room this week. Tom is going to pack one small suitcase. He needs warm clothes because the evenings can be cold. They are not going to take many things. They want an easy vacation.",
       "passage_questions": [
         {
           "question_he": "איך הם מתכננים לנסוע?",
@@ -12056,7 +12074,7 @@
           "text_he": "תודה. נתראה בשבת."
         }
       ],
-      "passage_en": "Maya invites her friends to dinner at her home on Friday evening. Ben would like to come, but he has a work appointment at seven. He asks Maya if they can meet on Saturday instead. Maya is available then, but another friend, Noa, is visiting her parents on Saturday afternoon. Maya calls Noa and asks about the evening. Noa can come after six. They agree to meet at half past seven on Saturday. Ben is bringing a salad, and Noa is bringing juice. Maya is going to cook rice and chicken. She sends one message with the new day, time, and address. She writes, \"Please let me know if you cannot come.\" The friends reply that the plan sounds good. They are happy they found a time for everyone.",
+      "passage_en": "Maya invites her friends to dinner at her home on Friday evening. Ben would like to come, but he has a work appointment at seven. He does not want to cancel, so he asks Maya if they can change the day and meet on Saturday instead. Maya is available then, but another friend, Noa, is visiting her parents on Saturday afternoon. Maya calls Noa and asks about the evening. Noa can come after six. They agree to meet at half past seven on Saturday. Ben is bringing a salad, and Noa is bringing juice. Maya is going to cook rice and chicken. She sends one message with the new day, time, and address. She writes, \"Please let me know if you cannot come.\" The friends reply that the plan sounds good. They are happy they found a time for everyone.",
       "passage_questions": [
         {
           "question_he": "למה בן אינו יכול לבוא ביום שישי?",
@@ -12996,12 +13014,12 @@
           "text_he": "במלון הירוק, כי המחיר והמיקום מתאימים לנו יותר."
         }
       ],
-      "passage_en": "Tom and Maya need a hotel for two nights. They look at two options. The Green Hotel is near the station. A room costs sixty pounds a night. The room is small, but it is big enough for two people. The Blue Hotel costs ninety pounds a night. Its rooms are bigger and more comfortable. It has a cafe, but the cafe is often crowded. It is also far from the station. Tom likes the Blue Hotel because he wants a comfortable room. Maya prefers the Green Hotel because it is cheaper and they can walk there. They are going to spend most of their time outside, so a large room is not important. After talking, they choose the Green Hotel. They can use the extra money for food and museum tickets.",
+      "passage_en": "Tom and Maya need a hotel for two nights. They look at two options. The Green Hotel is near the station. A room costs sixty dollars a night. The room is small, but it is big enough for two people. The Blue Hotel costs ninety dollars a night, so it is more expensive. Its rooms are bigger and more comfortable. It has a cafe, but the cafe is often crowded. Its location is also worse because it is far from the station. Tom likes the Blue Hotel because he wants a comfortable room. Maya prefers the Green Hotel because it is cheaper and they can walk there. They are going to spend most of their time outside, so a large room is not important. After talking, they choose the Green Hotel. They can use the extra money for food and museum tickets.",
       "passage_questions": [
         {
           "question_he": "כמה עולה לילה במלון הירוק?",
           "question_en": "How much is a night at the Green Hotel?",
-          "answer_en": "Sixty pounds.",
+          "answer_en": "Sixty dollars.",
           "type": "detail"
         },
         {
@@ -13938,7 +13956,7 @@
           "text_he": "כן. יש לי כאב ראש ושיעול. אני לא מרגיש טוב."
         }
       ],
-      "passage_en": "Ben does not feel well on Monday morning. He has a headache and a cough. He calls the health center and asks for an appointment. The woman on the phone asks when the problem started. Ben says he started feeling ill on Sunday evening. She gives him an appointment at three in the afternoon. Ben sends a message to his manager. He says he cannot come to work today because he is ill. At the appointment, the doctor asks about his cough and checks his temperature. Ben listens carefully and writes down the instructions the doctor gives him. He asks the doctor to explain one word again because it is new to him. After the appointment, he goes home. He tells his sister that he hopes to get better soon.",
+      "passage_en": "Ben does not feel well on Monday morning. He has a headache, a cough and a fever. He also has a stomach ache, and his throat hurts. He calls the health center and asks for an appointment. The woman on the phone asks when the problem started. Ben says he started feeling ill on Sunday evening. She gives him an appointment at three in the afternoon. Ben sends a message to his manager. He says he cannot come to work today because he is ill. At the appointment, the doctor asks about his cough and checks his temperature. She says he should rest at home for two days and take some medicine. Ben listens carefully and writes down the instructions the doctor gives him. He asks the doctor to explain one word again because it is new to him. After the appointment, he buys the medicine at the pharmacy and goes home. He tells his sister that he hopes to get better soon.",
       "passage_questions": [
         {
           "question_he": "אילו שני תסמינים בן מתאר?",
@@ -15725,7 +15743,7 @@
           "he": "שלט"
         },
         {
-          "en": "queue",
+          "en": "line",
           "he": "תור של אנשים"
         },
         {
@@ -15808,7 +15826,7 @@
           "text_he": "עקוב אחרי השלטים הירוקים."
         }
       ],
-      "passage_en": "Tom visits a small museum on Sunday. There is a queue outside, so he waits behind the other visitors. At the entrance, a worker asks to see his ticket. Tom shows the ticket on his phone. The worker explains the museum rules. Visitors must keep food and drinks in their bags. They must not eat in the rooms. They can take pictures, but they must not use a flash. Small bags are allowed, so Tom does not have to leave his bag at the entrance. He follows the signs to the first room. Later, he wants to call his sister. He reads a sign that asks visitors not to make calls inside. He goes outside before he calls her. When he finishes his visit, he follows the green signs to the exit.",
+      "passage_en": "Tom visits a small museum on Sunday. There is a line outside, so he waits behind the other visitors. At the entrance, a worker asks to see his ticket. Tom shows the ticket on his phone. The worker explains the museum rules. Visitors must keep food and drinks in their bags. They must not eat in the rooms. They can take pictures, but they must not use a flash. Small bags are allowed, so Tom does not have to leave his bag at the entrance. He follows the signs to the first room. Later, he wants to call his sister. He reads a sign that asks visitors not to make calls inside. He goes outside before he calls her. When he finishes his visit, he follows the green signs to the exit.",
       "passage_questions": [
         {
           "question_he": "מה תום מציג בכניסה?",
@@ -16723,7 +16741,7 @@
           "text_he": "אני משתתפת בקורס ומתרגלת שיחה קצרה בכל יום."
         }
       ],
-      "passage_en": "Noa has a new job in a small office. She works with four colleagues and a manager. In the morning, she reads messages and answers simple questions from customers. Sometimes a customer speaks English. Noa can explain prices and opening times, but she finds longer questions difficult. She asks her manager for help when she needs it. Her manager tells her that asking a clear question is a useful skill. Noa decides to take an English course after work. She practices for twenty minutes every evening. This week, her task is to explain how to find the office from the station. First, she writes the directions. Then she practices saying them without reading. On Friday, she gives the directions to a visitor. The visitor understands and finds the office without calling again.",
+      "passage_en": "Noa has a new job in a small office. She works with four colleagues and a manager. Every Monday, the team has a short meeting. In the morning, she reads messages and answers simple questions from customers. Sometimes a customer speaks English. Noa can explain prices and opening times, but she finds longer questions difficult. She asks her manager for help when she needs it. Her manager tells her that asking a clear question is a useful skill. Noa decides to take an English course after work. She practices for twenty minutes every evening when she finishes dinner. This week, her task is to explain how to find the office from the station. First, she writes the directions. Then she practices saying them without reading. On Friday, she gives the directions to a visitor. The visitor understands and finds the office without calling again.",
       "passage_questions": [
         {
           "question_he": "איפה נועה עובדת?",
@@ -17638,7 +17656,7 @@
           "text_he": "תודה. הראה לי בבקשה איך להפעיל אותה."
         }
       ],
-      "passage_en": "Tom bought a small lamp for his desk yesterday. When he got home, he plugged it in and tried to turn it on. Nothing happened. He checked the plug and tried another wall socket, but the lamp still did not work. Today, he takes the lamp and the receipt back to the shop. He explains the problem calmly to a customer service worker. The worker checks the lamp and says it is broken. She offers to replace it or give him a refund. Tom still needs a lamp, so he asks for a replacement. Before he leaves the shop, the worker plugs in the new lamp and shows him that it works. Tom thanks her. He keeps the receipt in his bag in case he needs it again.",
+      "passage_en": "Tom bought a small lamp for his desk yesterday. When he got home, he plugged it in and tried to turn it on. Nothing happened. He checked the plug and tried another wall socket, but the lamp still did not work. Today, he takes the lamp and the receipt back to the shop. He explains the problem calmly to a customer service worker. The worker checks the lamp and says it is broken. She cannot repair it in the shop, so she offers to replace it or give him a refund. Tom still needs a lamp, so he asks for a replacement. Before he leaves the shop, the worker plugs in the new lamp and shows him that it works. Then she shows him how to turn it off. Tom thanks her. He keeps the receipt in his bag in case he needs it again.",
       "passage_questions": [
         {
           "question_he": "מתי תום קנה את המנורה?",
@@ -18402,6 +18420,30 @@
           "he": "שולחן כתיבה",
           "definition_en": "a piece of furniture like a table often with drawers",
           "status": "support_only_not_independent_mastery"
+        },
+        {
+          "en": "lamp",
+          "he": "מנורה",
+          "definition_en": "a small light that you use on a desk or table",
+          "status": "support_only_not_independent_mastery"
+        },
+        {
+          "en": "socket",
+          "he": "שקע חשמל",
+          "definition_en": "the place in a wall where you connect electrical things",
+          "status": "support_only_not_independent_mastery"
+        },
+        {
+          "en": "replacement",
+          "he": "החלפה; מוצר חלופי",
+          "definition_en": "a new thing that you get instead of a broken one",
+          "status": "support_only_not_independent_mastery"
+        },
+        {
+          "en": "calmly",
+          "he": "בשקט וברוגע",
+          "definition_en": "in a quiet way, without getting angry",
+          "status": "support_only_not_independent_mastery"
         }
       ],
       "language_focus": {
@@ -18548,7 +18590,7 @@
           "text_he": "נבדוק את התחזית ונחליט בבוקר."
         }
       ],
-      "passage_en": "Maya and her friends are planning a picnic for tomorrow. They want to meet in the park at twelve. Maya will prepare sandwiches, Ben will bring water, and Noa will bring fruit. They are going to share the food. However, the weather forecast says it may rain in the morning. The friends make a second plan. If it rains, they will meet at Maya's home and eat indoors. If the weather is sunny, they will go to the park. Maya has a large table, so there is enough space for everyone at home. They agree to check the forecast again at nine tomorrow morning. Maya will then send a message with the meeting place. Nobody needs to leave home before they get her message. They can enjoy time together in either place.",
+      "passage_en": "Maya and her friends are planning a picnic for tomorrow. They want to meet in the park at twelve. Maya will prepare sandwiches, Ben will bring water, and Noa will bring fruit. They are going to share the food. However, the weather forecast says it may rain in the morning. The friends make a second plan. If it rains, they will meet at Maya's home and eat indoors. If the weather is sunny, they will eat outdoors in the park. Maya has a large table, so there is enough space for everyone at home. Noa will bring an umbrella in case it rains on the way. They agree to check the forecast again at nine tomorrow morning. Maya will then send a message with the meeting place. They will not leave home before they get her message. They can enjoy time together in either place.",
       "passage_questions": [
         {
           "question_he": "באיזו שעה מתוכנן הפיקניק?",
@@ -19454,7 +19496,7 @@
         },
         {
           "speaker": "teacher",
-          "text_en": "The ticket is ten pounds, and the museum opens at ten.",
+          "text_en": "The ticket is ten dollars, and the museum opens at ten.",
           "text_he": "הכרטיס עולה עשרה פאונד, והמוזיאון נפתח בעשר."
         },
         {
@@ -19473,7 +19515,7 @@
           "text_he": "אני מסכימה. אשלח הודעה ברורה לכולם."
         }
       ],
-      "passage_en": "Last Saturday, Noa planned a day out with two friends. They had two options: a free picnic in the park or a museum visit with tickets costing ten pounds each. The forecast said rain, so Noa suggested the museum. Before buying tickets, she checked the opening time and asked whether they could bring small bags. The museum opened at ten, and small bags were allowed. The friends agreed to meet at the station at nine and take the train together. Noa sent a message with all the important details. One friend asked her to confirm the platform number because it was not in the message. Noa checked it and replied. In the end, they had a good day. They stayed indoors while it rained and talked about their favorite pictures on the train home.",
+      "passage_en": "Last Saturday, Noa planned a day out with two friends. They had two options: a free picnic in the park or a museum visit with tickets costing ten dollars each. The forecast said rain, so Noa made a suggestion: the museum. The weather was her main reason. Before buying tickets, she checked the opening time and asked whether it was possible to bring small bags. The museum opened at ten, and small bags were allowed. The friends agreed to meet at the station at nine and take the train together. Noa sent a useful message with all the important details. One friend asked her to confirm the platform number because it was not in the message. Noa checked it and replied. In the end, they had a good day. They stayed indoors while it rained and talked about their favorite pictures on the train home.",
       "passage_questions": [
         {
           "question_he": "אילו שתי אפשרויות היו?",
@@ -19484,7 +19526,7 @@
         {
           "question_he": "מה מחיר כרטיס יחיד למוזיאון?",
           "question_en": "How much was one museum ticket?",
-          "answer_en": "Ten pounds.",
+          "answer_en": "Ten dollars.",
           "type": "detail"
         },
         {
@@ -19508,7 +19550,7 @@
         {
           "question_he": "אשרו לחברים את פרטי המפגש הנתונים בלבד.",
           "question_en": "Confirm the meeting using only the details in the text.",
-          "answer_en": "We are meeting at the station at nine and taking the train to the museum. Tickets cost ten pounds each.",
+          "answer_en": "We are meeting at the station at nine and taking the train to the museum. Tickets cost ten dollars each.",
           "type": "transfer"
         }
       ],
@@ -20342,7 +20384,7 @@
           "text_he": "אשלח. אני שמח שמצאנו אפשרות אחרת במקום לבטל הכול."
         }
       ],
-      "passage_en": "Last month, Maya planned to visit a friend in another city. She had bought a train ticket, but on the morning of the trip the railway company canceled several services. At first, she was upset. She had not seen her friend for months and had already prepared a small gift. Instead of staying home, she checked the bus timetable. The next bus was full, so she called her friend and suggested meeting halfway. They eventually found a town that both could reach. Neither had visited it before. They walked around a market, shared lunch and took photos by the river. Maya has traveled there twice since that day. She now checks more than one transport option before a journey. The experience did not make her enjoy canceled trains, but it showed her that changing a plan can sometimes lead to something worthwhile.",
+      "passage_en": "Last month, Maya planned to visit a friend in another city. She had bought a train ticket, but on the morning of the trip the railway company canceled several services. At first, she was upset. She had not seen her friend for months and had already prepared a small gift. Instead of staying home, she checked the bus schedule. The next bus was full, so she called her friend and suggested meeting halfway. They eventually found a town that both could reach. Neither had visited it before. They walked around a market, shared lunch and took photos by the river. Maya has traveled there twice since that day. She now checks more than one transport option before a journey. The experience did not make her enjoy canceled trains, but it showed her that changing a plan can sometimes lead to something worthwhile.",
       "passage_questions": [
         {
           "question_he": "מדוע התוכנית השתנתה?",
@@ -21287,7 +21329,7 @@
       "dialogue": [
         {
           "speaker": "teacher",
-          "text_en": "I found a hotel for our holiday. The room costs 240 each.",
+          "text_en": "I found a hotel for our vacation. The room costs 240 each.",
           "text_he": "מצאתי מלון לחופשה שלנו. החדר עולה 240 לכל אחד."
         },
         {
@@ -21302,7 +21344,7 @@
         },
         {
           "speaker": "model",
-          "text_en": "Then 370 is too expensive. Is the flat near the lake still available?",
+          "text_en": "Then 370 is too expensive. Is the apartment near the lake still available?",
           "text_he": "אז 370 זה יקר מדי. האם הדירה ליד האגם עדיין פנויה?"
         },
         {
@@ -21326,7 +21368,7 @@
           "text_he": "נוכל לאכול ארוחת בוקר בחוץ פעם אחת. האם זו פשרה סבירה?"
         }
       ],
-      "passage_en": "Three friends want to spend a weekend together. Amir suggests a hotel near the beach, while Lior would prefer to rent a small flat. Dana has a limited budget because she is saving up for a course. They compare the total cost rather than just the price of a room. The hotel includes breakfast, but travel to the beach town is expensive. The flat is cheaper, although they would need to buy food. At first, Amir thinks that choosing a flat means giving up everything he wants. Then Dana asks everyone to name one priority. Amir wants to swim, Lior wants somewhere quiet, and Dana needs to control her expenses. They find a flat near a lake that they can reach by bus. It is not anyone’s original choice, but everyone can afford it. They agree to share food costs and decide on a spending limit before booking.",
+      "passage_en": "Three friends want to spend a weekend together. Amir suggests a hotel near the beach, while Lior would prefer to rent a small apartment. Dana has a limited budget because she is saving up for a course. They compare the total cost rather than just the price of a room. The hotel includes breakfast, but travel to the beach town is expensive. The apartment is cheaper, although they would need to buy food. At first, Amir thinks that choosing an apartment means giving up everything he wants. Then Dana asks everyone to name one priority. Amir wants to swim, Lior wants somewhere quiet, and Dana needs to control her expenses. They find an apartment near a lake that they can reach by bus. It is not anyone’s original choice, but everyone can afford it. They agree to share food costs and decide on a spending limit before booking.",
       "passage_questions": [
         {
           "question_he": "למה דנה מגבילה הוצאות?",
@@ -21354,7 +21396,7 @@
         },
         {
           "question_he": "למה הדירה ליד האגם היא פשרה?",
-          "question_en": "Why is the flat near the lake a compromise?",
+          "question_en": "Why is the apartment near the lake a compromise?",
           "answer_en": "It meets their main priorities even though it was not anyone’s first choice.",
           "type": "inference"
         },
@@ -21366,12 +21408,12 @@
         }
       ],
       "roleplay_prompt_he": "בחר חופשה עם המורה בתקציב 300 יחידות כסף לאדם. בקש עלויות נסיעה ואוכל, השווה שתי אפשרויות והסכם על פשרה.",
-      "model_response_en": "The hotel looks comfortable, but the total cost is too high for me. I would prefer the flat near the lake. We could cook some meals and use the bus. My priority is spending time together without worrying about money.",
+      "model_response_en": "The hotel looks comfortable, but the total cost is too high for me. I would prefer the apartment near the lake. We could cook some meals and use the bus. My priority is spending time together without worrying about money.",
       "writing_prompt_he": "כתוב הודעה לקבוצה ובה שתי אפשרויות, השוואת עלויות והמלצה מנומקת. השתמש לפחות בנימוק אחד שאינו מחיר.",
       "language_focus": {
         "rule_he": "too לפני שם תואר מציין יותר מהמידה הרצויה, ולכן too expensive אינו רק very expensive. enough לפני שם עצם מציין כמות מספקת, למשל enough money. אחרי שם תואר נציב enough, למשל cheap enough. בבחירת חופשה צריך לבדוק אם נשאר מספיק כסף לכל ההוצאות, ולא רק אם מחיר החדר נמוך.",
-        "example_en": "The hotel is too expensive, but the flat leaves enough money for food.",
-        "contrast_en": "The flat is cheap enough for us. We do not have enough money for the hotel.",
+        "example_en": "The hotel is too expensive, but the apartment leaves enough money for food.",
+        "contrast_en": "The apartment is cheap enough for us. We do not have enough money for the hotel.",
         "prompt_he": "אמרו שהמלון יקר מדי ושאין לכם מספיק כסף בשבילו.",
         "answer_en": "The hotel is too expensive, and we do not have enough money for it.",
         "feedback_he": "נכון: too expensive מתאר מחיר העולה על המותר בתקציב, ו־enough money מציב את enough לפני שם העצם money."
@@ -23305,7 +23347,7 @@
           "text_he": "התנצלתי והסברתי את אי־ההבנה. הם צחקו, והעמיתה שלי הגיעה כעבור דקה."
         }
       ],
-      "passage_en": "While Eitan was waiting outside a café, a woman waved at him. He recognized her as a neighbor he had met only once. He smiled and walked over, but she seemed surprised when he began talking about their building. A few seconds later, another man arrived behind him. The woman had been waving at that man. Eitan had mistaken her for someone else. He apologized and stepped aside. Later that day, he met his real neighbor in the lift. He told her the story, and they both laughed. She explained that people sometimes confused her with her sister, who lived nearby. Eitan realized that the woman at the café might actually have been the sister. He still did not know for certain. Next time, he decided, he would check someone’s name before starting a detailed conversation. The mistake was harmless, but it reminded him how quickly a reasonable assumption can turn out to be wrong.",
+      "passage_en": "While Eitan was waiting outside a café, a woman waved at him. He recognized her as a neighbor he had met only once. He smiled and walked over, but she seemed surprised when he began talking about their building. A few seconds later, another man arrived behind him. The woman had been waving at that man. Eitan had mistaken her for someone else. He apologized and stepped aside. Later that day, he met his real neighbor in the elevator. He told her the story, and they both laughed. She explained that people sometimes confused her with her sister, who lived nearby. Eitan realized that the woman at the café might actually have been the sister. He still did not know for certain. Next time, he decided, he would check someone’s name before starting a detailed conversation. The mistake was harmless, but it reminded him how quickly a reasonable assumption can turn out to be wrong.",
       "passage_questions": [
         {
           "question_he": "מה עשה איתן כשזה קרה?",
@@ -23322,7 +23364,7 @@
         {
           "question_he": "את מי פגש מאוחר יותר?",
           "question_en": "Who did Eitan meet later?",
-          "answer_en": "His real neighbor in the lift.",
+          "answer_en": "His real neighbor in the elevator.",
           "type": "detail"
         },
         {
@@ -27080,12 +27122,12 @@
         },
         {
           "speaker": "teacher",
-          "text_en": "Is there anything I should check before choosing a flat?",
+          "text_en": "Is there anything I should check before choosing an apartment?",
           "text_he": "יש משהו שכדאי לבדוק לפני בחירת דירה?"
         },
         {
           "speaker": "model",
-          "text_en": "Yes. The main road is noisy, so visit the flat at different times.",
+          "text_en": "Yes. The main road is noisy, so visit the apartment at different times.",
           "text_he": "כן. הכביש הראשי רועש, לכן בקר בדירה בשעות שונות."
         },
         {
@@ -27099,7 +27141,7 @@
           "text_he": "היא יכולה להיות התחלה שימושית. זו קבוצה שבה תושבים חדשים יכולים לפגוש תושבים מקומיים."
         }
       ],
-      "passage_en": "When Sam moved to a new neighborhood, he chose it mainly because it was close to work. The flat was small, but he could walk to the office in fifteen minutes. During the first week, he missed the shops and familiar faces in his old area. He decided to explore one new place every few days. He found a library that stayed open late, a park where people exercised and a café that displayed notices about local events. Through one of those notices, he joined a weekend gardening group. The group included people of different ages who had lived in the area for different lengths of time. They showed him where to buy inexpensive plants and told him about the neighborhood. After a month, Sam still had practical problems to solve, including a noisy road outside his window. Yet he was beginning to feel that he belonged somewhere, rather than simply sleeping near his workplace.",
+      "passage_en": "When Sam moved to a new neighborhood, he chose it mainly because it was close to work. The apartment was small, but he could walk to the office in fifteen minutes. During the first week, he missed the shops and familiar faces in his old area. He decided to explore one new place every few days. He found a library that stayed open late, a park where people exercised and a café that displayed notices about local events. Through one of those notices, he joined a weekend gardening group. The group included people of different ages who had lived in the area for different lengths of time. They showed him where to buy inexpensive plants and told him about the neighborhood. After a month, Sam still had practical problems to solve, including a noisy road outside his window. Yet he was beginning to feel that he belonged somewhere, rather than simply sleeping near his workplace.",
       "passage_questions": [
         {
           "question_he": "למה בחר באזור?",
@@ -27139,7 +27181,7 @@
         }
       ],
       "roleplay_prompt_he": "המלץ על שכונה לאדם חדש בעיר. שאל מה חשוב לו, תאר שני יתרונות וחיסרון, ואל תמציא נתוני בטיחות או מחירים אמיתיים.",
-      "model_response_en": "This neighborhood would suit someone who wants to walk to work. There's a library that stays open late and a group where newcomers can meet people. The main drawback is the noisy road, so I would check the flat at different times.",
+      "model_response_en": "This neighborhood would suit someone who wants to walk to work. There's a library that stays open late and a group where newcomers can meet people. The main drawback is the noisy road, so I would check the apartment at different times.",
       "writing_prompt_he": "כתוב תיאור שכונה בדויה או מוכרת. כלול שני משפטי זיקה והמלצה המתאימה לאדם מסוים.",
       "language_focus": {
         "rule_he": "פסוקית זיקה מוסיפה מידע על שם עצם ומסייעת להסביר למי או למה מתכוונים. who מתייחס לאנשים, ו־which או that יכולים להתייחס לדברים. where מתייחס למקום שבו מתרחשת פעולה. בפסוקית זיקה שמתחילה ב־who כנושא אין צורך להוסיף שוב he או she.",
@@ -34706,12 +34748,12 @@
           "text_he": "הייתי מנסה במשך חודש ואז בודק גם את ההשתתפות וגם את ההתקדמות בדיבור."
         }
       ],
-      "passage_en": "Mika received two offers for a short training course. One course was near home and had a fixed timetable. The other was online and allowed learners to choose when to study. Her brother said she should choose the flexible option because she worked irregular hours. A friend recommended the local course because Mika often postponed tasks when nobody expected her to attend. Both pieces of advice were reasonable, but they focused on different parts of her situation. Mika listed the times she could realistically study and asked each provider about support. The online course offered a weekly live meeting, while the local course allowed one missed session to be replaced. She chose the online option and arranged to attend the live meeting regularly. The decision was not risk-free. She planned to review her progress after a month and change her routine if she was falling behind. Good advice helped her ask better questions rather than making the choice for her.",
+      "passage_en": "Mika received two offers for a short training course. One course was near home and had a fixed schedule. The other was online and allowed learners to choose when to study. Her brother said she should choose the flexible option because she worked irregular hours. A friend recommended the local course because Mika often postponed tasks when nobody expected her to attend. Both pieces of advice were reasonable, but they focused on different parts of her situation. Mika listed the times she could realistically study and asked each provider about support. The online course offered a weekly live meeting, while the local course allowed one missed session to be replaced. She chose the online option and arranged to attend the live meeting regularly. The decision was not risk-free. She planned to review her progress after a month and change her routine if she was falling behind. Good advice helped her ask better questions rather than making the choice for her.",
       "passage_questions": [
         {
           "question_he": "מה ההבדל המרכזי בין הקורסים?",
           "question_en": "How did the courses differ in scheduling?",
-          "answer_en": "One had a fixed local timetable; the online course allowed flexible study.",
+          "answer_en": "One had a fixed local schedule; the online course allowed flexible study.",
           "type": "detail"
         },
         {
@@ -38415,7 +38457,7 @@
           "text_he": "בעיות גישה חוזרות שהנתיב המוגן אינו פותר."
         }
       ],
-      "passage_en": "At a neighborhood meeting, residents discussed closing one street to cars for three hours every Sunday. Parents expected children to gain a safe place to play. Several shopkeepers hoped extra visitors would benefit their businesses. Others objected to the proposal because delivery vehicles and accessible taxis used the street.\n\nThe first ten minutes produced little common ground. Each group repeated its concern more loudly. Then a resident named Daniel suggested separating the aim from the arrangement. Almost everyone supported safer public space; they disagreed about how to create it.\n\nDaniel acknowledged that even a temporary closure could cause real disruption. He asked whether a protected access route and a delivery window before ten would address the main objections. A shopkeeper raised another issue: visitors might leave rubbish behind. The committee added bins and a cleaning rota to the trial plan.\n\nThe residents approved four Sunday events, followed by a review. They would collect delivery delays, complaints and visitor numbers. On balance, the possible benefits justified testing the idea, but approval was not a promise to continue indefinitely. Daniel had not persuaded everyone to share his opinion. He had helped the group turn disagreement into questions that experience could answer.",
+      "passage_en": "At a neighborhood meeting, residents discussed closing one street to cars for three hours every Sunday. Parents expected children to gain a safe place to play. Several shopkeepers hoped extra visitors would benefit their businesses. Others objected to the proposal because delivery vehicles and accessible taxis used the street.\n\nThe first ten minutes produced little common ground. Each group repeated its concern more loudly. Then a resident named Daniel suggested separating the aim from the arrangement. Almost everyone supported safer public space; they disagreed about how to create it.\n\nDaniel acknowledged that even a temporary closure could cause real disruption. He asked whether a protected access route and a delivery window before ten would address the main objections. A shopkeeper raised another issue: visitors might leave trash behind. The committee added trash cans and a cleaning schedule to the trial plan.\n\nThe residents approved four Sunday events, followed by a review. They would collect delivery delays, complaints and visitor numbers. On balance, the possible benefits justified testing the idea, but approval was not a promise to continue indefinitely. Daniel had not persuaded everyone to share his opinion. He had helped the group turn disagreement into questions that experience could answer.",
       "passage_questions": [
         {
           "type": "gist",
@@ -38433,7 +38475,7 @@
           "type": "detail",
           "question_he": "איזה חשש נוסף העלה בעל החנות?",
           "question_en": "What further issue did a shopkeeper raise?",
-          "answer_en": "Visitors leaving rubbish behind."
+          "answer_en": "Visitors leaving trash behind."
         },
         {
           "type": "reference",
@@ -40236,7 +40278,7 @@
           "text_he": "לא. לא ראיתי אותו לוקח דבר."
         }
       ],
-      "passage_en": "I was walking home when I noticed a bicycle lying beside the community center. Its front wheel was bent, and the entrance door was open. A young man hurried past me carrying a large bag. Apparently, something serious had happened. I called the center and told the receptionist that I thought I had witnessed a theft.\n\nBy the time she came outside, the young man had disappeared. She asked me to describe the sequence carefully. Had I seen him touch the bicycle? No. Had I seen him leave the building? I realized that I had only seen him on the pavement.\n\nThe receptionist then explained that the bicycle had been damaged the previous evening. Its owner had left it there while collecting a repair tool. The door was open because a volunteer was moving chairs. The young man turned out to be a music teacher carrying instruments to a lesson nearby.\n\nI felt embarrassed, but she reassured me that calling with a concern was reasonable. The mistake was presenting my assumptions almost as facts. When I later described the incident to a friend, I separated what I had actually observed from what I had imagined. A reliable account, I learned, can begin with uncertainty.",
+      "passage_en": "I was walking home when I noticed a bicycle lying beside the community center. Its front wheel was bent, and the entrance door was open. A young man hurried past me carrying a large bag. Apparently, something serious had happened. I called the center and told the receptionist that I thought I had witnessed a theft.\n\nBy the time she came outside, the young man had disappeared. She asked me to describe the sequence carefully. Had I seen him touch the bicycle? No. Had I seen him leave the building? I realized that I had only seen him on the sidewalk.\n\nThe receptionist then explained that the bicycle had been damaged the previous evening. Its owner had left it there while collecting a repair tool. The door was open because a volunteer was moving chairs. The young man turned out to be a music teacher carrying instruments to a lesson nearby.\n\nI felt embarrassed, but she reassured me that calling with a concern was reasonable. The mistake was presenting my assumptions almost as facts. When I later described the incident to a friend, I separated what I had actually observed from what I had imagined. A reliable account, I learned, can begin with uncertainty.",
       "passage_questions": [
         {
           "type": "gist",
@@ -69287,7 +69329,7 @@
         {
           "phase": "input",
           "say_he": "כעת נקשיב לקטע. נסה לזהות את המצב המרכזי. אפשר לשמוע שוב. במצב קריאה נפתח את הכתב; אם בודקים האזנה עצמאית משאירים תמלול סגור בניסיון הראשון.",
-          "text_en": "Yesterday afternoon, Noa was waiting for a bus at the station. She was talking to her brother on the phone. Her blue bag was on the chair next to her. When the bus arrived, she stood up quickly and went outside. Suddenly, she remembered the bag. She went back into the station, but it was not on the chair. Noa was worried because her keys were inside. She looked for the bag under the chairs. Then she asked a woman near the door for help. The woman was carrying the blue bag to the station office. She gave it to Noa and said, \"I found it on the chair.\" Luckily, nothing was missing. Noa thanked the woman and called her brother. She was safe, but she needed to wait for the next bus.",
+          "text_en": "Yesterday afternoon, Noa was waiting for a bus at the station. She was talking to her brother on the phone. Her blue bag was on the chair next to her. When the bus arrived, she stood up quickly and went outside. Suddenly, she remembered the bag. She went back into the station, but it was not on the chair. Noa was worried because her keys were inside. She did not want to lose them. She looked for the bag under the chairs. Did it fall on the floor? Her phone almost fell too, but it did not break. Then she asked a woman near the door for help. The woman was carrying the blue bag to the station office. She gave it to Noa and said, \"I found it on the chair.\" Luckily, nothing was missing. Noa thanked the woman and called her brother. She was safe, but she needed to wait for the next bus.",
           "note_he": "זהו חומר הוראה מוכר, לא unseen לאחר הצגתו."
         },
         {
@@ -69473,7 +69515,7 @@
           "he": "לתכנן"
         },
         {
-          "en": "holiday",
+          "en": "vacation",
           "he": "חופשה"
         },
         {
@@ -69519,11 +69561,11 @@
         },
         {
           "phase": "teach_target",
-          "say_he": "הקשב: holiday. במשמעות של היום: חופשה. אמור את הצורה, ואז הסבר את המשמעות או בחר את המצב שמתאים לה.",
-          "say_en": "Listen: holiday. We're learning this expression with a specific meaning. Say it, then explain when you would use it.",
-          "target_en": "holiday",
+          "say_he": "הקשב: vacation. במשמעות של היום: חופשה. אמור את הצורה, ואז הסבר את המשמעות או בחר את המצב שמתאים לה.",
+          "say_en": "Listen: vacation. We're learning this expression with a specific meaning. Say it, then explain when you would use it.",
+          "target_en": "vacation",
           "meaning_he": "חופשה",
-          "correct_response_en": "holiday",
+          "correct_response_en": "vacation",
           "note_he": "חזרה אחרי דגם היא תרגול נתמך. אם אין עדיין יכולת קריאה, לא דורשים הקלדה."
         },
         {
@@ -69655,10 +69697,10 @@
           "number": 2,
           "kind": "meaning_to_english",
           "prompt_he": "אמור באנגלית ואז, אם הקריאה כבר מתאימה, הקלד: חופשה. השתמש במשמעות שנלמדה.",
-          "answer_en": "holiday",
+          "answer_en": "vacation",
           "accepted_note_he": "זו תשובת היעד. תשובה טבעית אחרת יכולה למלא את המשימה אך אינה ראיה לפריט היעד; יש לבקש גם שימוש ביעד. הקלדה אינה חובה לפני ביסוס פענוח.",
           "hint_he": "הצורה מתחילה ב־h. חשיפת הרמז מסמנת ניסיון נתמך.",
-          "feedback_he": "יעד השיעור הוא holiday במשמעות חופשה. אחרי תיקון ננסה שוב במצב חדש, ולא נספור את התיקון כשליפה עצמאית."
+          "feedback_he": "יעד השיעור הוא vacation במשמעות חופשה. אחרי תיקון ננסה שוב במצב חדש, ולא נספור את התיקון כשליפה עצמאית."
         },
         {
           "number": 3,
@@ -69709,9 +69751,9 @@
         {
           "number": 8,
           "kind": "meaning_and_context",
-          "prompt_he": "מה המשמעות של holiday כאן? הסבר בעברית או באנגלית, ואז אמור תור קצר שבו הכוונה הזו שימושית.",
+          "prompt_he": "מה המשמעות של vacation כאן? הסבר בעברית או באנגלית, ואז אמור תור קצר שבו הכוונה הזו שימושית.",
           "answer_he": "חופשה",
-          "answer_anchor_en": "holiday",
+          "answer_anchor_en": "vacation",
           "rubric_he": "משמעות מתאימה ליעד + תור קצר שממלא כוונה; במתחיל מותר להיעזר במסגרת הדגם. זו אינה שאלת הבנה של טקסט היחידה שטרם נלמד.",
           "hint_he": "חזור למשמעות העברית בדגם; שימוש בה הוא תמיכה.",
           "feedback_he": "בדוק שהכוונה נשמרה. תרגום נכון לבדו אינו מוכיח יכולת הפקה בהקשר."
@@ -69804,7 +69846,7 @@
           "say_he": "לפני הדגם, נסה לומר באנגלית שתי כוונות שכבר פגשנו: לתכנן; חופשה.",
           "expected_en": [
             "plan",
-            "holiday"
+            "vacation"
           ],
           "note_he": "רק אם הפריטים אכן נלמדו קודם; לאחר דילוג בעקבות מיון בוחרים מן הראיות האישיות."
         },
@@ -69930,7 +69972,7 @@
         {
           "phase": "input",
           "say_he": "כעת נקשיב לקטע. נסה לזהות את המצב המרכזי. אפשר לשמוע שוב. במצב קריאה נפתח את הכתב; אם בודקים האזנה עצמאית משאירים תמלול סגור בניסיון הראשון.",
-          "text_en": "Next month, Tom and his sister are going to have a short holiday. They are going to travel by train because they do not have a car. They plan to stay in a small hotel for three nights. The hotel is near the beach, but it is not in the city center. On the first day, they are going to walk by the sea. On the second day, they are going to visit a museum. Tom wants to buy tickets before the trip, so they do not need to wait outside. His sister is going to book the room this week. Tom is going to pack one small suitcase. He needs warm clothes because the evenings can be cold. They are not going to take many things. They want an easy holiday.",
+          "text_en": "Next month, Tom and his sister are going to have a short vacation. They are going to travel by train because they do not have a car. They plan to stay in a small hotel for three nights. The hotel is near the beach, but it is not in the city center. On the first day, they are going to walk by the sea. On the second day, they are going to visit a museum. Tom wants to buy tickets before the trip, so they do not need to wait outside. His sister is going to book the room this week. Tom is going to pack one small suitcase. He needs warm clothes because the evenings can be cold. They are not going to take many things. They want an easy vacation.",
           "note_he": "זהו חומר הוראה מוכר, לא unseen לאחר הצגתו."
         },
         {
@@ -70579,7 +70621,7 @@
         {
           "phase": "input",
           "say_he": "כעת נקשיב לקטע. נסה לזהות את המצב המרכזי. אפשר לשמוע שוב. במצב קריאה נפתח את הכתב; אם בודקים האזנה עצמאית משאירים תמלול סגור בניסיון הראשון.",
-          "text_en": "Maya invites her friends to dinner at her home on Friday evening. Ben would like to come, but he has a work appointment at seven. He asks Maya if they can meet on Saturday instead. Maya is available then, but another friend, Noa, is visiting her parents on Saturday afternoon. Maya calls Noa and asks about the evening. Noa can come after six. They agree to meet at half past seven on Saturday. Ben is bringing a salad, and Noa is bringing juice. Maya is going to cook rice and chicken. She sends one message with the new day, time, and address. She writes, \"Please let me know if you cannot come.\" The friends reply that the plan sounds good. They are happy they found a time for everyone.",
+          "text_en": "Maya invites her friends to dinner at her home on Friday evening. Ben would like to come, but he has a work appointment at seven. He does not want to cancel, so he asks Maya if they can change the day and meet on Saturday instead. Maya is available then, but another friend, Noa, is visiting her parents on Saturday afternoon. Maya calls Noa and asks about the evening. Noa can come after six. They agree to meet at half past seven on Saturday. Ben is bringing a salad, and Noa is bringing juice. Maya is going to cook rice and chicken. She sends one message with the new day, time, and address. She writes, \"Please let me know if you cannot come.\" The friends reply that the plan sounds good. They are happy they found a time for everyone.",
           "note_he": "זהו חומר הוראה מוכר, לא unseen לאחר הצגתו."
         },
         {
@@ -71230,14 +71272,14 @@
         {
           "phase": "input",
           "say_he": "כעת נקשיב לקטע. נסה לזהות את המצב המרכזי. אפשר לשמוע שוב. במצב קריאה נפתח את הכתב; אם בודקים האזנה עצמאית משאירים תמלול סגור בניסיון הראשון.",
-          "text_en": "Tom and Maya need a hotel for two nights. They look at two options. The Green Hotel is near the station. A room costs sixty pounds a night. The room is small, but it is big enough for two people. The Blue Hotel costs ninety pounds a night. Its rooms are bigger and more comfortable. It has a cafe, but the cafe is often crowded. It is also far from the station. Tom likes the Blue Hotel because he wants a comfortable room. Maya prefers the Green Hotel because it is cheaper and they can walk there. They are going to spend most of their time outside, so a large room is not important. After talking, they choose the Green Hotel. They can use the extra money for food and museum tickets.",
+          "text_en": "Tom and Maya need a hotel for two nights. They look at two options. The Green Hotel is near the station. A room costs sixty dollars a night. The room is small, but it is big enough for two people. The Blue Hotel costs ninety dollars a night, so it is more expensive. Its rooms are bigger and more comfortable. It has a cafe, but the cafe is often crowded. Its location is also worse because it is far from the station. Tom likes the Blue Hotel because he wants a comfortable room. Maya prefers the Green Hotel because it is cheaper and they can walk there. They are going to spend most of their time outside, so a large room is not important. After talking, they choose the Green Hotel. They can use the extra money for food and museum tickets.",
           "note_he": "זהו חומר הוראה מוכר, לא unseen לאחר הצגתו."
         },
         {
           "phase": "comprehension",
           "say_he": "כמה עולה לילה במלון הירוק?",
           "say_en": "How much is a night at the Green Hotel?",
-          "answer_anchor_en": "Sixty pounds.",
+          "answer_anchor_en": "Sixty dollars.",
           "accept_he": "יש לקבל פרפרזה נכונה, תשובה קצרה מתאימה ופרטים תומכים מן הטקסט. לא חייבים להעתיק את הדגם."
         },
         {
@@ -71883,7 +71925,7 @@
         {
           "phase": "input",
           "say_he": "כעת נקשיב לקטע. נסה לזהות את המצב המרכזי. אפשר לשמוע שוב. במצב קריאה נפתח את הכתב; אם בודקים האזנה עצמאית משאירים תמלול סגור בניסיון הראשון.",
-          "text_en": "Ben does not feel well on Monday morning. He has a headache and a cough. He calls the health center and asks for an appointment. The woman on the phone asks when the problem started. Ben says he started feeling ill on Sunday evening. She gives him an appointment at three in the afternoon. Ben sends a message to his manager. He says he cannot come to work today because he is ill. At the appointment, the doctor asks about his cough and checks his temperature. Ben listens carefully and writes down the instructions the doctor gives him. He asks the doctor to explain one word again because it is new to him. After the appointment, he goes home. He tells his sister that he hopes to get better soon.",
+          "text_en": "Ben does not feel well on Monday morning. He has a headache, a cough and a fever. He also has a stomach ache, and his throat hurts. He calls the health center and asks for an appointment. The woman on the phone asks when the problem started. Ben says he started feeling ill on Sunday evening. She gives him an appointment at three in the afternoon. Ben sends a message to his manager. He says he cannot come to work today because he is ill. At the appointment, the doctor asks about his cough and checks his temperature. She says he should rest at home for two days and take some medicine. Ben listens carefully and writes down the instructions the doctor gives him. He asks the doctor to explain one word again because it is new to him. After the appointment, he buys the medicine at the pharmacy and goes home. He tells his sister that he hopes to get better soon.",
           "note_he": "זהו חומר הוראה מוכר, לא unseen לאחר הצגתו."
         },
         {
@@ -72825,7 +72867,7 @@
             "ביטוי תמיכה לדגם: entrance, במשמעות כניסה למקום. נלמד להפיק אותו בהמשך; עכשיו אפשר להיעזר בדגם.",
             "ביטוי תמיכה לדגם: exit, במשמעות יציאה ממקום. נלמד להפיק אותו בהמשך; עכשיו אפשר להיעזר בדגם.",
             "ביטוי תמיכה לדגם: sign, במשמעות שלט. נלמד להפיק אותו בהמשך; עכשיו אפשר להיעזר בדגם.",
-            "ביטוי תמיכה לדגם: queue, במשמעות תור של אנשים. נלמד להפיק אותו בהמשך; עכשיו אפשר להיעזר בדגם.",
+            "ביטוי תמיכה לדגם: line, במשמעות תור של אנשים. נלמד להפיק אותו בהמשך; עכשיו אפשר להיעזר בדגם.",
             "ביטוי תמיכה לדגם: keep, במשמעות לשמור. נלמד להפיק אותו בהמשך; עכשיו אפשר להיעזר בדגם.",
             "ביטוי תמיכה לדגם: follow, במשמעות לעקוב אחר. נלמד להפיק אותו בהמשך; עכשיו אפשר להיעזר בדגם."
           ],
@@ -73025,7 +73067,7 @@
           "he": "שלט"
         },
         {
-          "en": "queue",
+          "en": "line",
           "he": "תור של אנשים"
         },
         {
@@ -73081,11 +73123,11 @@
         },
         {
           "phase": "teach_target",
-          "say_he": "הקשב: queue. במשמעות של היום: תור של אנשים. אמור את הצורה, ואז הסבר את המשמעות או בחר את המצב שמתאים לה.",
-          "say_en": "Listen: queue. We're learning this expression with a specific meaning. Say it, then explain when you would use it.",
-          "target_en": "queue",
+          "say_he": "הקשב: line. במשמעות של היום: תור של אנשים. אמור את הצורה, ואז הסבר את המשמעות או בחר את המצב שמתאים לה.",
+          "say_en": "Listen: line. We're learning this expression with a specific meaning. Say it, then explain when you would use it.",
+          "target_en": "line",
           "meaning_he": "תור של אנשים",
-          "correct_response_en": "queue",
+          "correct_response_en": "line",
           "note_he": "חזרה אחרי דגם היא תרגול נתמך. אם אין עדיין יכולת קריאה, לא דורשים הקלדה."
         },
         {
@@ -73173,7 +73215,7 @@
         {
           "phase": "input",
           "say_he": "כעת נקשיב לקטע. נסה לזהות את המצב המרכזי. אפשר לשמוע שוב. במצב קריאה נפתח את הכתב; אם בודקים האזנה עצמאית משאירים תמלול סגור בניסיון הראשון.",
-          "text_en": "Tom visits a small museum on Sunday. There is a queue outside, so he waits behind the other visitors. At the entrance, a worker asks to see his ticket. Tom shows the ticket on his phone. The worker explains the museum rules. Visitors must keep food and drinks in their bags. They must not eat in the rooms. They can take pictures, but they must not use a flash. Small bags are allowed, so Tom does not have to leave his bag at the entrance. He follows the signs to the first room. Later, he wants to call his sister. He reads a sign that asks visitors not to make calls inside. He goes outside before he calls her. When he finishes his visit, he follows the green signs to the exit.",
+          "text_en": "Tom visits a small museum on Sunday. There is a line outside, so he waits behind the other visitors. At the entrance, a worker asks to see his ticket. Tom shows the ticket on his phone. The worker explains the museum rules. Visitors must keep food and drinks in their bags. They must not eat in the rooms. They can take pictures, but they must not use a flash. Small bags are allowed, so Tom does not have to leave his bag at the entrance. He follows the signs to the first room. Later, he wants to call his sister. He reads a sign that asks visitors not to make calls inside. He goes outside before he calls her. When he finishes his visit, he follows the green signs to the exit.",
           "note_he": "זהו חומר הוראה מוכר, לא unseen לאחר הצגתו."
         },
         {
@@ -73262,10 +73304,10 @@
           "number": 4,
           "kind": "meaning_to_english",
           "prompt_he": "אמור באנגלית ואז, אם הקריאה כבר מתאימה, הקלד: תור של אנשים. השתמש במשמעות שנלמדה.",
-          "answer_en": "queue",
+          "answer_en": "line",
           "accepted_note_he": "זו תשובת היעד. תשובה טבעית אחרת יכולה למלא את המשימה אך אינה ראיה לפריט היעד; יש לבקש גם שימוש ביעד. הקלדה אינה חובה לפני ביסוס פענוח.",
           "hint_he": "הצורה מתחילה ב־q. חשיפת הרמז מסמנת ניסיון נתמך.",
-          "feedback_he": "יעד השיעור הוא queue במשמעות תור של אנשים. אחרי תיקון ננסה שוב במצב חדש, ולא נספור את התיקון כשליפה עצמאית."
+          "feedback_he": "יעד השיעור הוא line במשמעות תור של אנשים. אחרי תיקון ננסה שוב במצב חדש, ולא נספור את התיקון כשליפה עצמאית."
         },
         {
           "number": 5,
@@ -73820,7 +73862,7 @@
         {
           "phase": "input",
           "say_he": "כעת נקשיב לקטע. נסה לזהות את המצב המרכזי. אפשר לשמוע שוב. במצב קריאה נפתח את הכתב; אם בודקים האזנה עצמאית משאירים תמלול סגור בניסיון הראשון.",
-          "text_en": "Noa has a new job in a small office. She works with four colleagues and a manager. In the morning, she reads messages and answers simple questions from customers. Sometimes a customer speaks English. Noa can explain prices and opening times, but she finds longer questions difficult. She asks her manager for help when she needs it. Her manager tells her that asking a clear question is a useful skill. Noa decides to take an English course after work. She practices for twenty minutes every evening. This week, her task is to explain how to find the office from the station. First, she writes the directions. Then she practices saying them without reading. On Friday, she gives the directions to a visitor. The visitor understands and finds the office without calling again.",
+          "text_en": "Noa has a new job in a small office. She works with four colleagues and a manager. Every Monday, the team has a short meeting. In the morning, she reads messages and answers simple questions from customers. Sometimes a customer speaks English. Noa can explain prices and opening times, but she finds longer questions difficult. She asks her manager for help when she needs it. Her manager tells her that asking a clear question is a useful skill. Noa decides to take an English course after work. She practices for twenty minutes every evening when she finishes dinner. This week, her task is to explain how to find the office from the station. First, she writes the directions. Then she practices saying them without reading. On Friday, she gives the directions to a visitor. The visitor understands and finds the office without calling again.",
           "note_he": "זהו חומר הוראה מוכר, לא unseen לאחר הצגתו."
         },
         {
@@ -74459,7 +74501,7 @@
         {
           "phase": "input",
           "say_he": "כעת נקשיב לקטע. נסה לזהות את המצב המרכזי. אפשר לשמוע שוב. במצב קריאה נפתח את הכתב; אם בודקים האזנה עצמאית משאירים תמלול סגור בניסיון הראשון.",
-          "text_en": "Tom bought a small lamp for his desk yesterday. When he got home, he plugged it in and tried to turn it on. Nothing happened. He checked the plug and tried another wall socket, but the lamp still did not work. Today, he takes the lamp and the receipt back to the shop. He explains the problem calmly to a customer service worker. The worker checks the lamp and says it is broken. She offers to replace it or give him a refund. Tom still needs a lamp, so he asks for a replacement. Before he leaves the shop, the worker plugs in the new lamp and shows him that it works. Tom thanks her. He keeps the receipt in his bag in case he needs it again.",
+          "text_en": "Tom bought a small lamp for his desk yesterday. When he got home, he plugged it in and tried to turn it on. Nothing happened. He checked the plug and tried another wall socket, but the lamp still did not work. Today, he takes the lamp and the receipt back to the shop. He explains the problem calmly to a customer service worker. The worker checks the lamp and says it is broken. She cannot repair it in the shop, so she offers to replace it or give him a refund. Tom still needs a lamp, so he asks for a replacement. Before he leaves the shop, the worker plugs in the new lamp and shows him that it works. Then she shows him how to turn it off. Tom thanks her. He keeps the receipt in his bag in case he needs it again.",
           "note_he": "זהו חומר הוראה מוכר, לא unseen לאחר הצגתו."
         },
         {
@@ -75102,7 +75144,7 @@
         {
           "phase": "input",
           "say_he": "כעת נקשיב לקטע. נסה לזהות את המצב המרכזי. אפשר לשמוע שוב. במצב קריאה נפתח את הכתב; אם בודקים האזנה עצמאית משאירים תמלול סגור בניסיון הראשון.",
-          "text_en": "Maya and her friends are planning a picnic for tomorrow. They want to meet in the park at twelve. Maya will prepare sandwiches, Ben will bring water, and Noa will bring fruit. They are going to share the food. However, the weather forecast says it may rain in the morning. The friends make a second plan. If it rains, they will meet at Maya's home and eat indoors. If the weather is sunny, they will go to the park. Maya has a large table, so there is enough space for everyone at home. They agree to check the forecast again at nine tomorrow morning. Maya will then send a message with the meeting place. Nobody needs to leave home before they get her message. They can enjoy time together in either place.",
+          "text_en": "Maya and her friends are planning a picnic for tomorrow. They want to meet in the park at twelve. Maya will prepare sandwiches, Ben will bring water, and Noa will bring fruit. They are going to share the food. However, the weather forecast says it may rain in the morning. The friends make a second plan. If it rains, they will meet at Maya's home and eat indoors. If the weather is sunny, they will eat outdoors in the park. Maya has a large table, so there is enough space for everyone at home. Noa will bring an umbrella in case it rains on the way. They agree to check the forecast again at nine tomorrow morning. Maya will then send a message with the meeting place. They will not leave home before they get her message. They can enjoy time together in either place.",
           "note_he": "זהו חומר הוראה מוכר, לא unseen לאחר הצגתו."
         },
         {
@@ -75718,7 +75760,7 @@
             },
             {
               "speaker": "teacher",
-              "text_en": "The ticket is ten pounds, and the museum opens at ten.",
+              "text_en": "The ticket is ten dollars, and the museum opens at ten.",
               "text_he": "הכרטיס עולה עשרה פאונד, והמוזיאון נפתח בעשר."
             },
             {
@@ -75741,7 +75783,7 @@
         {
           "phase": "input",
           "say_he": "כעת נקשיב לקטע. נסה לזהות את המצב המרכזי. אפשר לשמוע שוב. במצב קריאה נפתח את הכתב; אם בודקים האזנה עצמאית משאירים תמלול סגור בניסיון הראשון.",
-          "text_en": "Last Saturday, Noa planned a day out with two friends. They had two options: a free picnic in the park or a museum visit with tickets costing ten pounds each. The forecast said rain, so Noa suggested the museum. Before buying tickets, she checked the opening time and asked whether they could bring small bags. The museum opened at ten, and small bags were allowed. The friends agreed to meet at the station at nine and take the train together. Noa sent a message with all the important details. One friend asked her to confirm the platform number because it was not in the message. Noa checked it and replied. In the end, they had a good day. They stayed indoors while it rained and talked about their favorite pictures on the train home.",
+          "text_en": "Last Saturday, Noa planned a day out with two friends. They had two options: a free picnic in the park or a museum visit with tickets costing ten dollars each. The forecast said rain, so Noa made a suggestion: the museum. The weather was her main reason. Before buying tickets, she checked the opening time and asked whether it was possible to bring small bags. The museum opened at ten, and small bags were allowed. The friends agreed to meet at the station at nine and take the train together. Noa sent a useful message with all the important details. One friend asked her to confirm the platform number because it was not in the message. Noa checked it and replied. In the end, they had a good day. They stayed indoors while it rained and talked about their favorite pictures on the train home.",
           "note_he": "זהו חומר הוראה מוכר, לא unseen לאחר הצגתו."
         },
         {
@@ -75755,7 +75797,7 @@
           "phase": "comprehension",
           "say_he": "מה מחיר כרטיס יחיד למוזיאון?",
           "say_en": "How much was one museum ticket?",
-          "answer_anchor_en": "Ten pounds.",
+          "answer_anchor_en": "Ten dollars.",
           "accept_he": "יש לקבל פרפרזה נכונה, תשובה קצרה מתאימה ופרטים תומכים מן הטקסט. לא חייבים להעתיק את הדגם."
         },
         {
@@ -75876,7 +75918,7 @@
           "kind": "reading_or_listening_comprehension",
           "prompt_he": "אשרו לחברים את פרטי המפגש הנתונים בלבד.",
           "prompt_en": "Confirm the meeting using only the details in the text.",
-          "answer_en": "We are meeting at the station at nine and taking the train to the museum. Tickets cost ten pounds each.",
+          "answer_en": "We are meeting at the station at nine and taking the train to the museum. Tickets cost ten dollars each.",
           "hint_he": "מצא או שמע את החלק הרלוונטי בקטע. שימוש חוזר בקטע הוא תרגול הבנה, לא מבחן זכירה ללא תמיכה.",
           "feedback_he": "השווה את תשובתך למידע בקטע. פרפרזה נכונה מתקבלת; ידע חיצוני שאינו מופיע בקטע אינו נדרש."
         },
@@ -76416,7 +76458,7 @@
         {
           "phase": "input",
           "say_he": "כעת נקשיב לקטע. נסה לזהות את המצב המרכזי. אפשר לשמוע שוב. במצב קריאה נפתח את הכתב; אם בודקים האזנה עצמאית משאירים תמלול סגור בניסיון הראשון.",
-          "text_en": "Last month, Maya planned to visit a friend in another city. She had bought a train ticket, but on the morning of the trip the railway company canceled several services. At first, she was upset. She had not seen her friend for months and had already prepared a small gift. Instead of staying home, she checked the bus timetable. The next bus was full, so she called her friend and suggested meeting halfway. They eventually found a town that both could reach. Neither had visited it before. They walked around a market, shared lunch and took photos by the river. Maya has traveled there twice since that day. She now checks more than one transport option before a journey. The experience did not make her enjoy canceled trains, but it showed her that changing a plan can sometimes lead to something worthwhile.",
+          "text_en": "Last month, Maya planned to visit a friend in another city. She had bought a train ticket, but on the morning of the trip the railway company canceled several services. At first, she was upset. She had not seen her friend for months and had already prepared a small gift. Instead of staying home, she checked the bus schedule. The next bus was full, so she called her friend and suggested meeting halfway. They eventually found a town that both could reach. Neither had visited it before. They walked around a market, shared lunch and took photos by the river. Maya has traveled there twice since that day. She now checks more than one transport option before a journey. The experience did not make her enjoy canceled trains, but it showed her that changing a plan can sometimes lead to something worthwhile.",
           "note_he": "זהו חומר הוראה מוכר, לא unseen לאחר הצגתו."
         },
         {
@@ -76694,8 +76736,8 @@
         {
           "phase": "language_focus",
           "say_he": "too לפני שם תואר מציין יותר מהמידה הרצויה, ולכן too expensive אינו רק very expensive. enough לפני שם עצם מציין כמות מספקת, למשל enough money. אחרי שם תואר נציב enough, למשל cheap enough. בבחירת חופשה צריך לבדוק אם נשאר מספיק כסף לכל ההוצאות, ולא רק אם מחיר החדר נמוך.",
-          "text_en": "The hotel is too expensive, but the flat leaves enough money for food.",
-          "contrast_en": "The flat is cheap enough for us. We do not have enough money for the hotel.",
+          "text_en": "The hotel is too expensive, but the apartment leaves enough money for food.",
+          "contrast_en": "The apartment is cheap enough for us. We do not have enough money for the hotel.",
           "task_he": "אמרו שהמלון יקר מדי ושאין לכם מספיק כסף בשבילו.",
           "answer_anchor_en": "The hotel is too expensive, and we do not have enough money for it.",
           "note_he": "נכון: too expensive מתאר מחיר העולה על המותר בתקציב, ו־enough money מציב את enough לפני שם העצם money."
@@ -76727,7 +76769,7 @@
           "turns": [
             {
               "speaker": "teacher",
-              "text_en": "I found a hotel for our holiday. The room costs 240 each.",
+              "text_en": "I found a hotel for our vacation. The room costs 240 each.",
               "text_he": "מצאתי מלון לחופשה שלנו. החדר עולה 240 לכל אחד."
             },
             {
@@ -76742,7 +76784,7 @@
             },
             {
               "speaker": "model",
-              "text_en": "Then 370 is too expensive. Is the flat near the lake still available?",
+              "text_en": "Then 370 is too expensive. Is the apartment near the lake still available?",
               "text_he": "אז 370 זה יקר מדי. האם הדירה ליד האגם עדיין פנויה?"
             },
             {
@@ -76771,7 +76813,7 @@
           "phase": "guided_production",
           "say_he": "החלף פרט אחד בדגם השיחה, ושמור על הכוונה. כעת נסה תור נוסף כשהדגם מוסתר.",
           "task_he": "בחר חופשה עם המורה בתקציב 300 יחידות כסף לאדם. בקש עלויות נסיעה ואוכל, השווה שתי אפשרויות והסכם על פשרה.",
-          "model_en": "The hotel looks comfortable, but the total cost is too high for me. I would prefer the flat near the lake. We could cook some meals and use the bus. My priority is spending time together without worrying about money.",
+          "model_en": "The hotel looks comfortable, but the total cost is too high for me. I would prefer the apartment near the lake. We could cook some meals and use the bus. My priority is spending time together without worrying about money.",
           "model_visibility_he": "להציג רק אחרי ניסיון ראשון או בקשת תמיכה; מותר להשתמש בדגם ללמידה, אך זו אינה העברה עצמאית."
         },
         {
@@ -76895,7 +76937,7 @@
           "number": 11,
           "kind": "roleplay_rehearsal",
           "prompt_he": "בחר חופשה עם המורה בתקציב 300 יחידות כסף לאדם. בקש עלויות נסיעה ואוכל, השווה שתי אפשרויות והסכם על פשרה.",
-          "answer_anchor_en": "The hotel looks comfortable, but the total cost is too high for me. I would prefer the flat near the lake. We could cook some meals and use the bus. My priority is spending time together without worrying about money.",
+          "answer_anchor_en": "The hotel looks comfortable, but the total cost is too high for me. I would prefer the apartment near the lake. We could cook some meals and use the bus. My priority is spending time together without worrying about money.",
           "rubric_he": "מילוי הכוונה, מובנות, התאמה למצב, שימוש עצמאי לפחות באחד מיעדי הפגישה. תשובה אחרת נכונה מתקבלת. זו משימה מתורגלת, לא הוכחת העברה לנושא חדש.",
           "hint_he": "בחר משפט פתיחה מדגם השיחה; לאחר מכן נסה ללא הדגם.",
           "feedback_he": "בחר נקודת יעד אחת לתיקון והפק שוב. בדיקת העברה נפרדת משתמשת בטופס חדש אחרי שלוש יחידות."
@@ -76905,7 +76947,7 @@
           "kind": "writing_plan",
           "prompt_he": "תכנן את המשימה הבאה; בשלב הזה כתוב רק פתיחה ושני פרטים, או אמור אותם בקול: כתוב הודעה לקבוצה ובה שתי אפשרויות, השוואת עלויות והמלצה מנומקת. השתמש לפחות בנימוק אחד שאינו מחיר.",
           "rubric_he": "מילוי משימה, מסר ברור, סדר מתאים לרמה ודיוק ביעדים שנלמדו; אין תשובה יחידה.",
-          "answer_anchor_en": "The hotel looks comfortable, but the total cost is too high for me. I would prefer the flat near the lake. We could cook some meals and use the bus. My priority is spending time together without worrying about money.",
+          "answer_anchor_en": "The hotel looks comfortable, but the total cost is too high for me. I would prefer the apartment near the lake. We could cook some meals and use the bus. My priority is spending time together without worrying about money.",
           "anchor_note_he": "הדגם ממחיש שפה ומסר; הוא אינו פתרון יחיד או בהכרח תוצר באורך הכתיבה המבוקש.",
           "planned_minutes": "3–5",
           "hint_he": "תכנן כוונה, שני פרטים וסיום. במתחיל גם משפט אחד או אמירה בעל פה יכולים להיות שלב לימוד.",
@@ -77020,7 +77062,7 @@
           "phase": "language_focus_retrieval",
           "say_he": "ננסה את תבנית השימוש מהפגישה הקודמת לפני הצגת הדגם. אמרו שהמלון יקר מדי ושאין לכם מספיק כסף בשבילו.",
           "text_en": "",
-          "contrast_en": "The flat is cheap enough for us. We do not have enough money for the hotel.",
+          "contrast_en": "The apartment is cheap enough for us. We do not have enough money for the hotel.",
           "task_he": "אמרו שהמלון יקר מדי ושאין לכם מספיק כסף בשבילו.",
           "answer_anchor_en": "The hotel is too expensive, and we do not have enough money for it.",
           "note_he": "נכון: too expensive מתאר מחיר העולה על המותר בתקציב, ו־enough money מציב את enough לפני שם העצם money."
@@ -77046,7 +77088,7 @@
           "turns": [
             {
               "speaker": "teacher",
-              "text_en": "I found a hotel for our holiday. The room costs 240 each.",
+              "text_en": "I found a hotel for our vacation. The room costs 240 each.",
               "text_he": "מצאתי מלון לחופשה שלנו. החדר עולה 240 לכל אחד."
             },
             {
@@ -77061,7 +77103,7 @@
             },
             {
               "speaker": "model",
-              "text_en": "Then 370 is too expensive. Is the flat near the lake still available?",
+              "text_en": "Then 370 is too expensive. Is the apartment near the lake still available?",
               "text_he": "אז 370 זה יקר מדי. האם הדירה ליד האגם עדיין פנויה?"
             },
             {
@@ -77089,7 +77131,7 @@
         {
           "phase": "input",
           "say_he": "כעת נקשיב לקטע. נסה לזהות את המצב המרכזי. אפשר לשמוע שוב. במצב קריאה נפתח את הכתב; אם בודקים האזנה עצמאית משאירים תמלול סגור בניסיון הראשון.",
-          "text_en": "Three friends want to spend a weekend together. Amir suggests a hotel near the beach, while Lior would prefer to rent a small flat. Dana has a limited budget because she is saving up for a course. They compare the total cost rather than just the price of a room. The hotel includes breakfast, but travel to the beach town is expensive. The flat is cheaper, although they would need to buy food. At first, Amir thinks that choosing a flat means giving up everything he wants. Then Dana asks everyone to name one priority. Amir wants to swim, Lior wants somewhere quiet, and Dana needs to control her expenses. They find a flat near a lake that they can reach by bus. It is not anyone’s original choice, but everyone can afford it. They agree to share food costs and decide on a spending limit before booking.",
+          "text_en": "Three friends want to spend a weekend together. Amir suggests a hotel near the beach, while Lior would prefer to rent a small apartment. Dana has a limited budget because she is saving up for a course. They compare the total cost rather than just the price of a room. The hotel includes breakfast, but travel to the beach town is expensive. The apartment is cheaper, although they would need to buy food. At first, Amir thinks that choosing an apartment means giving up everything he wants. Then Dana asks everyone to name one priority. Amir wants to swim, Lior wants somewhere quiet, and Dana needs to control her expenses. They find an apartment near a lake that they can reach by bus. It is not anyone’s original choice, but everyone can afford it. They agree to share food costs and decide on a spending limit before booking.",
           "note_he": "זהו חומר הוראה מוכר, לא unseen לאחר הצגתו."
         },
         {
@@ -77117,7 +77159,7 @@
           "phase": "independent_reconstruction",
           "say_he": "נסה את המשימה המוכרת ללא הדגם. זו הפקה עצמאית של חומר מתורגל; בדיקת העברה רחבה תיעשה במשימה נפרדת אחרי שלוש יחידות. בחר חופשה עם המורה בתקציב 300 יחידות כסף לאדם. בקש עלויות נסיעה ואוכל, השווה שתי אפשרויות והסכם על פשרה.",
           "say_en": "Try the practiced task without reading the model. Explain your choice or ask for clarification when needed.",
-          "model_en": "The hotel looks comfortable, but the total cost is too high for me. I would prefer the flat near the lake. We could cook some meals and use the bus. My priority is spending time together without worrying about money.",
+          "model_en": "The hotel looks comfortable, but the total cost is too high for me. I would prefer the apartment near the lake. We could cook some meals and use the bus. My priority is spending time together without worrying about money.",
           "model_visibility_he": "תשובת עוגן למורה. אין להקריא לפני הניסיון העצמאי. משימה זו אינה unseen רק מפני שהדגם מוסתר."
         },
         {
@@ -77214,7 +77256,7 @@
           "number": 8,
           "kind": "reading_or_listening_comprehension",
           "prompt_he": "למה הדירה ליד האגם היא פשרה?",
-          "prompt_en": "Why is the flat near the lake a compromise?",
+          "prompt_en": "Why is the apartment near the lake a compromise?",
           "answer_en": "It meets their main priorities even though it was not anyone’s first choice.",
           "hint_he": "מצא או שמע את החלק הרלוונטי בקטע. שימוש חוזר בקטע הוא תרגול הבנה, לא מבחן זכירה ללא תמיכה.",
           "feedback_he": "השווה את תשובתך למידע בקטע. פרפרזה נכונה מתקבלת; ידע חיצוני שאינו מופיע בקטע אינו נדרש."
@@ -77243,7 +77285,7 @@
           "number": 11,
           "kind": "roleplay_rehearsal",
           "prompt_he": "בחר חופשה עם המורה בתקציב 300 יחידות כסף לאדם. בקש עלויות נסיעה ואוכל, השווה שתי אפשרויות והסכם על פשרה.",
-          "answer_anchor_en": "The hotel looks comfortable, but the total cost is too high for me. I would prefer the flat near the lake. We could cook some meals and use the bus. My priority is spending time together without worrying about money.",
+          "answer_anchor_en": "The hotel looks comfortable, but the total cost is too high for me. I would prefer the apartment near the lake. We could cook some meals and use the bus. My priority is spending time together without worrying about money.",
           "rubric_he": "מילוי הכוונה, מובנות, התאמה למצב, שימוש עצמאי לפחות באחד מיעדי הפגישה. תשובה אחרת נכונה מתקבלת. זו משימה מתורגלת, לא הוכחת העברה לנושא חדש.",
           "hint_he": "בחר משפט פתיחה מדגם השיחה; לאחר מכן נסה ללא הדגם.",
           "feedback_he": "בחר נקודת יעד אחת לתיקון והפק שוב. בדיקת העברה נפרדת משתמשת בטופס חדש אחרי שלוש יחידות."
@@ -77253,7 +77295,7 @@
           "kind": "writing_or_recording_project",
           "prompt_he": "כתוב הודעה לקבוצה ובה שתי אפשרויות, השוואת עלויות והמלצה מנומקת. השתמש לפחות בנימוק אחד שאינו מחיר.",
           "rubric_he": "מילוי משימה, מסר ברור, סדר מתאים לרמה ודיוק ביעדים שנלמדו; אין תשובה יחידה.",
-          "answer_anchor_en": "The hotel looks comfortable, but the total cost is too high for me. I would prefer the flat near the lake. We could cook some meals and use the bus. My priority is spending time together without worrying about money.",
+          "answer_anchor_en": "The hotel looks comfortable, but the total cost is too high for me. I would prefer the apartment near the lake. We could cook some meals and use the bus. My priority is spending time together without worrying about money.",
           "anchor_note_he": "הדגם ממחיש שפה ומסר; הוא אינו פתרון יחיד או בהכרח תוצר באורך הכתיבה המבוקש.",
           "planned_minutes": "20–35",
           "hint_he": "תכנן כוונה, שני פרטים וסיום. במתחיל גם משפט אחד או אמירה בעל פה יכולים להיות שלב לימוד.",
@@ -78433,7 +78475,7 @@
         {
           "phase": "input",
           "say_he": "כעת נקשיב לקטע. נסה לזהות את המצב המרכזי. אפשר לשמוע שוב. במצב קריאה נפתח את הכתב; אם בודקים האזנה עצמאית משאירים תמלול סגור בניסיון הראשון.",
-          "text_en": "While Eitan was waiting outside a café, a woman waved at him. He recognized her as a neighbor he had met only once. He smiled and walked over, but she seemed surprised when he began talking about their building. A few seconds later, another man arrived behind him. The woman had been waving at that man. Eitan had mistaken her for someone else. He apologized and stepped aside. Later that day, he met his real neighbor in the lift. He told her the story, and they both laughed. She explained that people sometimes confused her with her sister, who lived nearby. Eitan realized that the woman at the café might actually have been the sister. He still did not know for certain. Next time, he decided, he would check someone’s name before starting a detailed conversation. The mistake was harmless, but it reminded him how quickly a reasonable assumption can turn out to be wrong.",
+          "text_en": "While Eitan was waiting outside a café, a woman waved at him. He recognized her as a neighbor he had met only once. He smiled and walked over, but she seemed surprised when he began talking about their building. A few seconds later, another man arrived behind him. The woman had been waving at that man. Eitan had mistaken her for someone else. He apologized and stepped aside. Later that day, he met his real neighbor in the elevator. He told her the story, and they both laughed. She explained that people sometimes confused her with her sister, who lived nearby. Eitan realized that the woman at the café might actually have been the sister. He still did not know for certain. Next time, he decided, he would check someone’s name before starting a detailed conversation. The mistake was harmless, but it reminded him how quickly a reasonable assumption can turn out to be wrong.",
           "note_he": "זהו חומר הוראה מוכר, לא unseen לאחר הצגתו."
         },
         {
@@ -78454,7 +78496,7 @@
           "phase": "comprehension",
           "say_he": "את מי פגש מאוחר יותר?",
           "say_en": "Who did Eitan meet later?",
-          "answer_anchor_en": "His real neighbor in the lift.",
+          "answer_anchor_en": "His real neighbor in the elevator.",
           "accept_he": "יש לקבל פרפרזה נכונה, תשובה קצרה מתאימה ופרטים תומכים מן הטקסט. לא חייבים להעתיק את הדגם."
         },
         {
@@ -80759,12 +80801,12 @@
             },
             {
               "speaker": "teacher",
-              "text_en": "Is there anything I should check before choosing a flat?",
+              "text_en": "Is there anything I should check before choosing an apartment?",
               "text_he": "יש משהו שכדאי לבדוק לפני בחירת דירה?"
             },
             {
               "speaker": "model",
-              "text_en": "Yes. The main road is noisy, so visit the flat at different times.",
+              "text_en": "Yes. The main road is noisy, so visit the apartment at different times.",
               "text_he": "כן. הכביש הראשי רועש, לכן בקר בדירה בשעות שונות."
             },
             {
@@ -80783,7 +80825,7 @@
           "phase": "guided_production",
           "say_he": "החלף פרט אחד בדגם השיחה, ושמור על הכוונה. כעת נסה תור נוסף כשהדגם מוסתר.",
           "task_he": "המלץ על שכונה לאדם חדש בעיר. שאל מה חשוב לו, תאר שני יתרונות וחיסרון, ואל תמציא נתוני בטיחות או מחירים אמיתיים.",
-          "model_en": "This neighborhood would suit someone who wants to walk to work. There's a library that stays open late and a group where newcomers can meet people. The main drawback is the noisy road, so I would check the flat at different times.",
+          "model_en": "This neighborhood would suit someone who wants to walk to work. There's a library that stays open late and a group where newcomers can meet people. The main drawback is the noisy road, so I would check the apartment at different times.",
           "model_visibility_he": "להציג רק אחרי ניסיון ראשון או בקשת תמיכה; מותר להשתמש בדגם ללמידה, אך זו אינה העברה עצמאית."
         },
         {
@@ -80907,7 +80949,7 @@
           "number": 11,
           "kind": "roleplay_rehearsal",
           "prompt_he": "המלץ על שכונה לאדם חדש בעיר. שאל מה חשוב לו, תאר שני יתרונות וחיסרון, ואל תמציא נתוני בטיחות או מחירים אמיתיים.",
-          "answer_anchor_en": "This neighborhood would suit someone who wants to walk to work. There is a library that stays open late and a group where newcomers can meet people. The main drawback is the noisy road, so I would check the flat at different times.",
+          "answer_anchor_en": "This neighborhood would suit someone who wants to walk to work. There is a library that stays open late and a group where newcomers can meet people. The main drawback is the noisy road, so I would check the apartment at different times.",
           "rubric_he": "מילוי הכוונה, מובנות, התאמה למצב, שימוש עצמאי לפחות באחד מיעדי הפגישה. תשובה אחרת נכונה מתקבלת. זו משימה מתורגלת, לא הוכחת העברה לנושא חדש.",
           "hint_he": "בחר משפט פתיחה מדגם השיחה; לאחר מכן נסה ללא הדגם.",
           "feedback_he": "בחר נקודת יעד אחת לתיקון והפק שוב. בדיקת העברה נפרדת משתמשת בטופס חדש אחרי שלוש יחידות."
@@ -80917,7 +80959,7 @@
           "kind": "writing_plan",
           "prompt_he": "תכנן את המשימה הבאה; בשלב הזה כתוב רק פתיחה ושני פרטים, או אמור אותם בקול: כתוב תיאור שכונה בדויה או מוכרת. כלול שני משפטי זיקה והמלצה המתאימה לאדם מסוים.",
           "rubric_he": "מילוי משימה, מסר ברור, סדר מתאים לרמה ודיוק ביעדים שנלמדו; אין תשובה יחידה.",
-          "answer_anchor_en": "This neighborhood would suit someone who wants to walk to work. There is a library that stays open late and a group where newcomers can meet people. The main drawback is the noisy road, so I would check the flat at different times.",
+          "answer_anchor_en": "This neighborhood would suit someone who wants to walk to work. There is a library that stays open late and a group where newcomers can meet people. The main drawback is the noisy road, so I would check the apartment at different times.",
           "anchor_note_he": "הדגם ממחיש שפה ומסר; הוא אינו פתרון יחיד או בהכרח תוצר באורך הכתיבה המבוקש.",
           "planned_minutes": "3–5",
           "hint_he": "תכנן כוונה, שני פרטים וסיום. במתחיל גם משפט אחד או אמירה בעל פה יכולים להיות שלב לימוד.",
@@ -81076,12 +81118,12 @@
             },
             {
               "speaker": "teacher",
-              "text_en": "Is there anything I should check before choosing a flat?",
+              "text_en": "Is there anything I should check before choosing an apartment?",
               "text_he": "יש משהו שכדאי לבדוק לפני בחירת דירה?"
             },
             {
               "speaker": "model",
-              "text_en": "Yes. The main road is noisy, so visit the flat at different times.",
+              "text_en": "Yes. The main road is noisy, so visit the apartment at different times.",
               "text_he": "כן. הכביש הראשי רועש, לכן בקר בדירה בשעות שונות."
             },
             {
@@ -81099,7 +81141,7 @@
         {
           "phase": "input",
           "say_he": "כעת נקשיב לקטע. נסה לזהות את המצב המרכזי. אפשר לשמוע שוב. במצב קריאה נפתח את הכתב; אם בודקים האזנה עצמאית משאירים תמלול סגור בניסיון הראשון.",
-          "text_en": "When Sam moved to a new neighborhood, he chose it mainly because it was close to work. The flat was small, but he could walk to the office in fifteen minutes. During the first week, he missed the shops and familiar faces in his old area. He decided to explore one new place every few days. He found a library that stayed open late, a park where people exercised and a café that displayed notices about local events. Through one of those notices, he joined a weekend gardening group. The group included people of different ages who had lived in the area for different lengths of time. They showed him where to buy inexpensive plants and told him about the neighborhood. After a month, Sam still had practical problems to solve, including a noisy road outside his window. Yet he was beginning to feel that he belonged somewhere, rather than simply sleeping near his workplace.",
+          "text_en": "When Sam moved to a new neighborhood, he chose it mainly because it was close to work. The apartment was small, but he could walk to the office in fifteen minutes. During the first week, he missed the shops and familiar faces in his old area. He decided to explore one new place every few days. He found a library that stayed open late, a park where people exercised and a café that displayed notices about local events. Through one of those notices, he joined a weekend gardening group. The group included people of different ages who had lived in the area for different lengths of time. They showed him where to buy inexpensive plants and told him about the neighborhood. After a month, Sam still had practical problems to solve, including a noisy road outside his window. Yet he was beginning to feel that he belonged somewhere, rather than simply sleeping near his workplace.",
           "note_he": "זהו חומר הוראה מוכר, לא unseen לאחר הצגתו."
         },
         {
@@ -81127,7 +81169,7 @@
           "phase": "independent_reconstruction",
           "say_he": "נסה את המשימה המוכרת ללא הדגם. זו הפקה עצמאית של חומר מתורגל; בדיקת העברה רחבה תיעשה במשימה נפרדת אחרי שלוש יחידות. המלץ על שכונה לאדם חדש בעיר. שאל מה חשוב לו, תאר שני יתרונות וחיסרון, ואל תמציא נתוני בטיחות או מחירים אמיתיים.",
           "say_en": "Try the practiced task without reading the model. Explain your choice or ask for clarification when needed.",
-          "model_en": "This neighborhood would suit someone who wants to walk to work. There's a library that stays open late and a group where newcomers can meet people. The main drawback is the noisy road, so I would check the flat at different times.",
+          "model_en": "This neighborhood would suit someone who wants to walk to work. There's a library that stays open late and a group where newcomers can meet people. The main drawback is the noisy road, so I would check the apartment at different times.",
           "model_visibility_he": "תשובת עוגן למורה. אין להקריא לפני הניסיון העצמאי. משימה זו אינה unseen רק מפני שהדגם מוסתר."
         },
         {
@@ -81253,7 +81295,7 @@
           "number": 11,
           "kind": "roleplay_rehearsal",
           "prompt_he": "המלץ על שכונה לאדם חדש בעיר. שאל מה חשוב לו, תאר שני יתרונות וחיסרון, ואל תמציא נתוני בטיחות או מחירים אמיתיים.",
-          "answer_anchor_en": "This neighborhood would suit someone who wants to walk to work. There is a library that stays open late and a group where newcomers can meet people. The main drawback is the noisy road, so I would check the flat at different times.",
+          "answer_anchor_en": "This neighborhood would suit someone who wants to walk to work. There is a library that stays open late and a group where newcomers can meet people. The main drawback is the noisy road, so I would check the apartment at different times.",
           "rubric_he": "מילוי הכוונה, מובנות, התאמה למצב, שימוש עצמאי לפחות באחד מיעדי הפגישה. תשובה אחרת נכונה מתקבלת. זו משימה מתורגלת, לא הוכחת העברה לנושא חדש.",
           "hint_he": "בחר משפט פתיחה מדגם השיחה; לאחר מכן נסה ללא הדגם.",
           "feedback_he": "בחר נקודת יעד אחת לתיקון והפק שוב. בדיקת העברה נפרדת משתמשת בטופס חדש אחרי שלוש יחידות."
@@ -81263,7 +81305,7 @@
           "kind": "writing_or_recording_project",
           "prompt_he": "כתוב תיאור שכונה בדויה או מוכרת. כלול שני משפטי זיקה והמלצה המתאימה לאדם מסוים.",
           "rubric_he": "מילוי משימה, מסר ברור, סדר מתאים לרמה ודיוק ביעדים שנלמדו; אין תשובה יחידה.",
-          "answer_anchor_en": "This neighborhood would suit someone who wants to walk to work. There is a library that stays open late and a group where newcomers can meet people. The main drawback is the noisy road, so I would check the flat at different times.",
+          "answer_anchor_en": "This neighborhood would suit someone who wants to walk to work. There is a library that stays open late and a group where newcomers can meet people. The main drawback is the noisy road, so I would check the apartment at different times.",
           "anchor_note_he": "הדגם ממחיש שפה ומסר; הוא אינו פתרון יחיד או בהכרח תוצר באורך הכתיבה המבוקש.",
           "planned_minutes": "20–35",
           "hint_he": "תכנן כוונה, שני פרטים וסיום. במתחיל גם משפט אחד או אמירה בעל פה יכולים להיות שלב לימוד.",
@@ -86433,14 +86475,14 @@
         {
           "phase": "input",
           "say_he": "כעת נקשיב לקטע. נסה לזהות את המצב המרכזי. אפשר לשמוע שוב. במצב קריאה נפתח את הכתב; אם בודקים האזנה עצמאית משאירים תמלול סגור בניסיון הראשון.",
-          "text_en": "Mika received two offers for a short training course. One course was near home and had a fixed timetable. The other was online and allowed learners to choose when to study. Her brother said she should choose the flexible option because she worked irregular hours. A friend recommended the local course because Mika often postponed tasks when nobody expected her to attend. Both pieces of advice were reasonable, but they focused on different parts of her situation. Mika listed the times she could realistically study and asked each provider about support. The online course offered a weekly live meeting, while the local course allowed one missed session to be replaced. She chose the online option and arranged to attend the live meeting regularly. The decision was not risk-free. She planned to review her progress after a month and change her routine if she was falling behind. Good advice helped her ask better questions rather than making the choice for her.",
+          "text_en": "Mika received two offers for a short training course. One course was near home and had a fixed schedule. The other was online and allowed learners to choose when to study. Her brother said she should choose the flexible option because she worked irregular hours. A friend recommended the local course because Mika often postponed tasks when nobody expected her to attend. Both pieces of advice were reasonable, but they focused on different parts of her situation. Mika listed the times she could realistically study and asked each provider about support. The online course offered a weekly live meeting, while the local course allowed one missed session to be replaced. She chose the online option and arranged to attend the live meeting regularly. The decision was not risk-free. She planned to review her progress after a month and change her routine if she was falling behind. Good advice helped her ask better questions rather than making the choice for her.",
           "note_he": "זהו חומר הוראה מוכר, לא unseen לאחר הצגתו."
         },
         {
           "phase": "comprehension",
           "say_he": "מה ההבדל המרכזי בין הקורסים?",
           "say_en": "How did the courses differ in scheduling?",
-          "answer_anchor_en": "One had a fixed local timetable; the online course allowed flexible study.",
+          "answer_anchor_en": "One had a fixed local schedule; the online course allowed flexible study.",
           "accept_he": "יש לקבל פרפרזה נכונה, תשובה קצרה מתאימה ופרטים תומכים מן הטקסט. לא חייבים להעתיק את הדגם."
         },
         {
@@ -89086,7 +89128,7 @@
         {
           "phase": "input",
           "say_he": "כעת נקשיב לקטע. נסה לזהות את המצב המרכזי. אפשר לשמוע שוב. במצב קריאה נפתח את הכתב; אם בודקים האזנה עצמאית משאירים תמלול סגור בניסיון הראשון.",
-          "text_en": "At a neighborhood meeting, residents discussed closing one street to cars for three hours every Sunday. Parents expected children to gain a safe place to play. Several shopkeepers hoped extra visitors would benefit their businesses. Others objected to the proposal because delivery vehicles and accessible taxis used the street.\n\nThe first ten minutes produced little common ground. Each group repeated its concern more loudly. Then a resident named Daniel suggested separating the aim from the arrangement. Almost everyone supported safer public space; they disagreed about how to create it.\n\nDaniel acknowledged that even a temporary closure could cause real disruption. He asked whether a protected access route and a delivery window before ten would address the main objections. A shopkeeper raised another issue: visitors might leave rubbish behind. The committee added bins and a cleaning rota to the trial plan.\n\nThe residents approved four Sunday events, followed by a review. They would collect delivery delays, complaints and visitor numbers. On balance, the possible benefits justified testing the idea, but approval was not a promise to continue indefinitely. Daniel had not persuaded everyone to share his opinion. He had helped the group turn disagreement into questions that experience could answer.",
+          "text_en": "At a neighborhood meeting, residents discussed closing one street to cars for three hours every Sunday. Parents expected children to gain a safe place to play. Several shopkeepers hoped extra visitors would benefit their businesses. Others objected to the proposal because delivery vehicles and accessible taxis used the street.\n\nThe first ten minutes produced little common ground. Each group repeated its concern more loudly. Then a resident named Daniel suggested separating the aim from the arrangement. Almost everyone supported safer public space; they disagreed about how to create it.\n\nDaniel acknowledged that even a temporary closure could cause real disruption. He asked whether a protected access route and a delivery window before ten would address the main objections. A shopkeeper raised another issue: visitors might leave trash behind. The committee added trash cans and a cleaning schedule to the trial plan.\n\nThe residents approved four Sunday events, followed by a review. They would collect delivery delays, complaints and visitor numbers. On balance, the possible benefits justified testing the idea, but approval was not a promise to continue indefinitely. Daniel had not persuaded everyone to share his opinion. He had helped the group turn disagreement into questions that experience could answer.",
           "note_he": "זהו חומר הוראה מוכר, לא unseen לאחר הצגתו."
         },
         {
@@ -89107,7 +89149,7 @@
           "phase": "comprehension",
           "say_he": "איזה חשש נוסף העלה בעל החנות?",
           "say_en": "What further issue did a shopkeeper raise?",
-          "answer_anchor_en": "Visitors leaving rubbish behind.",
+          "answer_anchor_en": "Visitors leaving trash behind.",
           "accept_he": "יש לקבל פרפרזה נכונה, תשובה קצרה מתאימה ופרטים תומכים מן הטקסט. לא חייבים להעתיק את הדגם."
         },
         {
@@ -90407,7 +90449,7 @@
         {
           "phase": "input",
           "say_he": "כעת נקשיב לקטע. נסה לזהות את המצב המרכזי. אפשר לשמוע שוב. במצב קריאה נפתח את הכתב; אם בודקים האזנה עצמאית משאירים תמלול סגור בניסיון הראשון.",
-          "text_en": "I was walking home when I noticed a bicycle lying beside the community center. Its front wheel was bent, and the entrance door was open. A young man hurried past me carrying a large bag. Apparently, something serious had happened. I called the center and told the receptionist that I thought I had witnessed a theft.\n\nBy the time she came outside, the young man had disappeared. She asked me to describe the sequence carefully. Had I seen him touch the bicycle? No. Had I seen him leave the building? I realized that I had only seen him on the pavement.\n\nThe receptionist then explained that the bicycle had been damaged the previous evening. Its owner had left it there while collecting a repair tool. The door was open because a volunteer was moving chairs. The young man turned out to be a music teacher carrying instruments to a lesson nearby.\n\nI felt embarrassed, but she reassured me that calling with a concern was reasonable. The mistake was presenting my assumptions almost as facts. When I later described the incident to a friend, I separated what I had actually observed from what I had imagined. A reliable account, I learned, can begin with uncertainty.",
+          "text_en": "I was walking home when I noticed a bicycle lying beside the community center. Its front wheel was bent, and the entrance door was open. A young man hurried past me carrying a large bag. Apparently, something serious had happened. I called the center and told the receptionist that I thought I had witnessed a theft.\n\nBy the time she came outside, the young man had disappeared. She asked me to describe the sequence carefully. Had I seen him touch the bicycle? No. Had I seen him leave the building? I realized that I had only seen him on the sidewalk.\n\nThe receptionist then explained that the bicycle had been damaged the previous evening. Its owner had left it there while collecting a repair tool. The door was open because a volunteer was moving chairs. The young man turned out to be a music teacher carrying instruments to a lesson nearby.\n\nI felt embarrassed, but she reassured me that calling with a concern was reasonable. The mistake was presenting my assumptions almost as facts. When I later described the incident to a friend, I separated what I had actually observed from what I had imagined. A reliable account, I learned, can begin with uncertainty.",
           "note_he": "זהו חומר הוראה מוכר, לא unseen לאחר הצגתו."
         },
         {
@@ -114548,7 +114590,7 @@
       "id": "U-A202",
       "band": "A2",
       "title_he": "שותפים משנים מדף",
-      "passage_en": "The people in a shared flat kept putting their keys and letters on the kitchen table. The table was often full when someone wanted to eat. At a house meeting, they decided to put a shelf next to the front door. Each person would have a small box on it. They measured the wall and found a cheap shelf online. However, it was too wide for the space. Instead of buying it, they visited a local shop and chose a smaller one. On Saturday, they put up the shelf and wrote their names on the boxes. After a week, the kitchen table was clear on most days. One housemate still left letters on it, so the others added a small note by the door: \"Keys and letters go here.\"",
+      "passage_en": "The people in a shared apartment kept putting their keys and letters on the kitchen table. The table was often full when someone wanted to eat. At a house meeting, they decided to put a shelf next to the front door. Each person would have a small box on it. They measured the wall and found a cheap shelf online. However, it was too wide for the space. Instead of buying it, they visited a local shop and chose a smaller one. On Saturday, they put up the shelf and wrote their names on the boxes. After a week, the kitchen table was clear on most days. One housemate still left letters on it, so the others added a small note by the door: \"Keys and letters go here.\"",
       "questions": [
         {
           "question_he": "איזו בעיה הייתה בשולחן?",

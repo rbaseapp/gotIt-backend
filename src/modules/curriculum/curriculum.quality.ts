@@ -162,6 +162,20 @@ function entryWords(entries: unknown[] | undefined) {
   );
 }
 
+/** Targets the unit's dialogue, model response and passage never use (inflections count). */
+export function targetsWithoutInput(
+  unit: Pick<AuditUnit, 'dialogue' | 'passage_en' | 'model_response_en'>,
+  targets: string[],
+) {
+  const text = [
+    ...unit.dialogue.map((d) => d.text_en),
+    unit.model_response_en ?? '',
+    unit.passage_en,
+  ].join('\n');
+  const bases = new Set(lowerTokens(text).flatMap(baseForms));
+  return targets.filter((t) => !tokens(t).every((w) => baseForms(w).some((b) => bases.has(b))));
+}
+
 export type UnitReport = {
   id: string;
   band: Band;
@@ -197,10 +211,10 @@ export function auditUnits(
     const spoken = [...unit.dialogue.map((d) => d.text_en), unit.model_response_en ?? ''];
     const allText = [...spoken, unit.passage_en].join('\n');
     const input = lowerTokens(allText);
-    const inputBases = new Set(input.flatMap(baseForms));
-    const targetsNotInInput = unit.targets
-      .map((t) => t.en)
-      .filter((t) => !tokens(t).every((w) => baseForms(w).some((b) => inputBases.has(b))));
+    const targetsNotInInput = targetsWithoutInput(
+      unit,
+      unit.targets.map((t) => t.en),
+    );
     const names = likelyNames(allText);
     const passage = lowerTokens(unit.passage_en).filter((w) => known(vocab, w) || !names.has(w));
     const unknown = passage.filter((w) => !known(vocab, w));

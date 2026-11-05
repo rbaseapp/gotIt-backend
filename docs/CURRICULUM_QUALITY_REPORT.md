@@ -8,10 +8,10 @@ Thresholds are product starting points to calibrate in a pilot, not validated no
 | Band | Units | Mean targets per unit | Lessons over new-word budget | Median passage coverage | Below 95% coverage | Units with uncontracted speech | Uncontracted lines | Targets absent from dialogue+passage | Reviewed |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
 | Pre-A1 | 6 | 12.0 | 0 | 100.0% | 0 | 0 | 0 | 0 | 0 |
-| A1 | 12 | 12.0 | 0 | 98.7% | 1 | 0 | 0 | 0 | 0 |
-| A2 | 12 | 12.0 | 0 | 99.2% | 1 | 0 | 0 | 25 | 0 |
+| A1 | 12 | 12.0 | 0 | 98.8% | 0 | 0 | 0 | 0 | 0 |
+| A2 | 12 | 12.0 | 0 | 98.4% | 0 | 0 | 0 | 0 | 0 |
 | B1 | 18 | 12.0 | 0 | 94.6% | 10 | 0 | 0 | 128 | 0 |
-| B2 | 18 | 12.0 | 0 | 94.3% | 11 | 0 | 0 | 44 | 0 |
+| B2 | 18 | 12.0 | 0 | 93.8% | 11 | 0 | 0 | 44 | 0 |
 | C1 | 18 | 12.0 | 0 | 92.5% | 17 | 1 | 1 | 98 | 0 |
 
 Phonics words that use a grapheme not yet taught: 0.
@@ -20,43 +20,6 @@ Phonics words that use a grapheme not yet taught: 0.
 
 
 ## Units
-
-### A104 (A1)
-
-- passage coverage 93.2%; unknown: cafe, shekels, waiter
-
-### A202 (A2)
-
-- targets absent from the dialogue and passage (drilled only in exercises): fall, break, lose
-
-### A204 (A2)
-
-- targets absent from the dialogue and passage (drilled only in exercises): change, cancel
-
-### A205 (A2)
-
-- targets absent from the dialogue and passage (drilled only in exercises): more expensive, worse
-
-### A206 (A2)
-
-- targets absent from the dialogue and passage (drilled only in exercises): stomach ache, fever, hurt, rest, medicine, pharmacy, should
-
-### A209 (A2)
-
-- targets absent from the dialogue and passage (drilled only in exercises): meeting, finish
-
-### A210 (A2)
-
-- passage coverage 90.4%; unknown: lamp, got, socket, calmly, him, replacement
-- targets absent from the dialogue and passage (drilled only in exercises): repair, turn off
-
-### A211 (A2)
-
-- targets absent from the dialogue and passage (drilled only in exercises): will not, outdoors, in case
-
-### A212 (A2)
-
-- targets absent from the dialogue and passage (drilled only in exercises): suggestion, reason, possible, useful
 
 ### B101 (B1)
 
@@ -72,7 +35,7 @@ Phonics words that use a grapheme not yet taught: 0.
 
 ### B104 (B1)
 
-- passage coverage 92.1%; unknown: caf, him, met, began, their, mistaken, told, harmless
+- passage coverage 91.4%; unknown: caf, him, met, began, their, mistaken, elevator, told, harmless
 - targets absent from the dialogue and passage (drilled only in exercises): assume, interrupt, embarrassed, mean, gesture, by mistake, clear up
 
 ### B105 (B1)
@@ -90,7 +53,7 @@ Phonics words that use a grapheme not yet taught: 0.
 
 ### B108 (B1)
 
-- passage coverage 94.1%; unknown: chose, caf, those, him, inexpensive, told, noisy, workplace
+- passage coverage 93.5%; unknown: chose, apartment, caf, those, him, inexpensive, told, noisy, workplace
 - targets absent from the dialogue and passage (drilled only in exercises): community, convenient, distance, facility, nearby, public transport, on foot, settle in, get to know
 
 ### B109 (B1)
@@ -146,11 +109,11 @@ Phonics words that use a grapheme not yet taught: 0.
 
 ### B202 (B2)
 
-- passage coverage 93.4%; unknown: children, shopkeepers, their, accessible, loudly, safer, closure, objections, shopkeeper, rubbish, rota, indefinitely
+- passage coverage 93.4%; unknown: children, shopkeepers, their, accessible, loudly, safer, closure, objections, shopkeeper, trash, indefinitely, disagreement
 
 ### B204 (B2)
 
-- passage coverage 90.7%; unknown: bicycle, lying, bent, told, receptionist, thought, theft, came, seen, him, pavement, felt
+- passage coverage 90.7%; unknown: bicycle, lying, bent, told, receptionist, thought, theft, came, seen, him, sidewalk, felt
 - targets absent from the dialogue and passage (drilled only in exercises): misunderstanding, previously, jump to conclusions
 
 ### B206 (B2)
@@ -178,7 +141,7 @@ Phonics words that use a grapheme not yet taught: 0.
 
 ### B211 (B2)
 
-- passage coverage 94.3%; unknown: organizer, publicity, numerical, brought, those, said, seen, attendees, heard, contributor
+- passage coverage 93.8%; unknown: organizer, publicity, numerical, brought, holidays, those, said, seen, attendees, heard, contributor
 - targets absent from the dialogue and passage (drilled only in exercises): decline, roughly, compared with, variation
 
 ### B212 (B2)

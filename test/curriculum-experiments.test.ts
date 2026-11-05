@@ -1,8 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { content } from '../src/modules/curriculum/curriculum.content.js';
 import {
   analyzeExperiment,
   EXPERIMENTS,
+  experimentById,
+  experimentUnitTargets,
+  lessonScriptFor,
   unitAssignment,
   wordOutcome,
   type Experiment,
@@ -124,4 +128,35 @@ test('A/A false-positive rate is close to the nominal 5%', () => {
   }
   const rate = positives / runs;
   assert.ok(rate >= 0.02 && rate <= 0.09, `false-positive rate ${rate}`);
+});
+
+test('the production experiment asks for an own sentence for half of each unit lesson words', () => {
+  const production = experimentById.get('teacher-production-2026-11')!;
+  const during = new Date('2026-11-10T00:00:00.000Z');
+  const lessons = content.lessons.filter((lesson) => lesson.unit === 'A101');
+  const changed = lessons.flatMap((lesson) =>
+    lessonScriptFor(lesson.teacher_script, lesson, 'user-1', during).filter(
+      (phase) => 'production_task_en' in phase,
+    ),
+  );
+  // 12 lesson words in the unit, dealt evenly: six get the extra speaking turn.
+  assert.equal(experimentUnitTargets(production).get('A101')!.length, 12);
+  assert.equal(changed.length, 6);
+  assert.ok(changed.every((phase) => phase.phase === 'teach_target'));
+  assert.match(String(changed[0]!.say_en), /in a short sentence of your own/);
+  for (const lesson of lessons) {
+    const script = lessonScriptFor(lesson.teacher_script, lesson, 'user-1', during);
+    assert.equal(script.length, lesson.teacher_script.length);
+    // Before the start and after the end every learner gets the authored lesson.
+    for (const at of ['2026-11-05T12:00:00.000Z', '2026-12-18T00:00:00.000Z'])
+      assert.equal(
+        lessonScriptFor(lesson.teacher_script, lesson, 'user-1', new Date(at)),
+        lesson.teacher_script,
+      );
+  }
+  // Words introduced after the end do not count.
+  assert.equal(
+    wordOutcome(production, word('retained', '2026-12-20T00:00:00.000Z'), new Date('2027-02-01')),
+    'excluded',
+  );
 });

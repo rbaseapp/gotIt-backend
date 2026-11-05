@@ -2,14 +2,11 @@
 // Usage: DATABASE_URL=... npm run report:experiments [-- <experiment-id>]
 // Reads learner states only; it never writes and prints no user identifiers.
 import { createPool } from '../src/shared/database/pool.js';
-import {
-  lexicon,
-  PROGRAM_ID,
-  PROGRAM_VERSION,
-} from '../src/modules/curriculum/curriculum.content.js';
+import { PROGRAM_ID, PROGRAM_VERSION } from '../src/modules/curriculum/curriculum.content.js';
 import {
   analyzeExperiment,
   EXPERIMENTS,
+  experimentUnitTargets,
 } from '../src/modules/curriculum/curriculum.experiments.js';
 import type { CurriculumState } from '../src/modules/curriculum/curriculum.store.js';
 
@@ -18,10 +15,6 @@ if (!url) throw new Error('DATABASE_URL is required');
 const wanted = process.argv[2];
 const experiments = EXPERIMENTS.filter((e) => !wanted || e.id === wanted);
 if (!experiments.length) throw new Error(`Unknown experiment ${wanted}`);
-
-const unitTargets = new Map<string, string[]>();
-for (const target of lexicon.targets)
-  unitTargets.set(target.unit, [...(unitTargets.get(target.unit) ?? []), target.id]);
 
 const pool = createPool(url);
 try {
@@ -34,7 +27,12 @@ try {
   ).rows;
   const learners = rows.map((row) => ({ userId: row.application_user_id, words: row.state.words }));
   for (const experiment of experiments) {
-    const report = analyzeExperiment(experiment, learners, unitTargets, new Date());
+    const report = analyzeExperiment(
+      experiment,
+      learners,
+      experimentUnitTargets(experiment),
+      new Date(),
+    );
     console.log(`\n${experiment.id}: ${experiment.description}`);
     console.log(
       `learners ${report.learners}, paired ${report.pairedLearners}, words still pending ${report.pendingWords}`,

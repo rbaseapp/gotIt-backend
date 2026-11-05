@@ -8,6 +8,7 @@
 // This needs far fewer learners than a between-group A/B test, because the
 // large differences between learners cancel out in the paired comparison.
 import { createHash } from 'node:crypto';
+import { lexicon, normalize, type Band } from './curriculum.content.js';
 import type { WordEvidence } from './curriculum.policy.js';
 
 export type Experiment = {
@@ -15,7 +16,11 @@ export type Experiment = {
   arms: readonly string[];
   /** Only words introduced on or after this time take part. */
   startsAt: string;
+  /** The treatment stops here, and words introduced later do not take part. */
+  endsAt?: string;
   description: string;
+  /** Which unit targets take part; all of them when absent. */
+  track?: 'communicative';
 };
 
 export const EXPERIMENTS: readonly Experiment[] = [
@@ -28,7 +33,20 @@ export const EXPERIMENTS: readonly Experiment[] = [
     startsAt: '2026-11-05T00:00:00.000Z',
     description: 'A/A calibration of within-learner word assignment and delayed-recall analysis',
   },
+  {
+    // Does producing the word in an own sentence with the teacher improve delayed recall
+    // over the standard teaching turn (listen, say, explain)? Both arms keep the whole
+    // lesson, the dialogue and every game; "produce" adds one short speaking turn per word.
+    // Only lesson words take part: frequency cards have no teacher turn.
+    id: 'teacher-production-2026-11',
+    arms: ['standard', 'produce'],
+    startsAt: '2026-11-06T00:00:00.000Z',
+    endsAt: '2026-12-18T00:00:00.000Z',
+    description: 'Own-sentence production with the teacher vs the standard teaching turn',
+    track: 'communicative',
+  },
 ];
+export const experimentById = new Map(EXPERIMENTS.map((e) => [e.id, e]));
 
 const DAY = 86_400_000;
 /** A word's outcome is read once this many days have passed since it was introduced. */
@@ -52,6 +70,22 @@ export function unitAssignment(
   return new Map(ordered.map((id, i) => [id, experiment.arms[i % experiment.arms.length]!]));
 }
 
+/** The targets of every unit that take part in the experiment. */
+export function experimentUnitTargets(experiment: Experiment) {
+  const units = new Map<string, string[]>();
+  for (const target of lexicon.targets)
+    if (!experiment.track || target.track === experiment.track)
+      units.set(target.unit, [...(units.get(target.unit) ?? []), target.id]);
+  return units;
+}
+const unitTargetCache = new Map<string, Map<string, string[]>>();
+/** The learner's arm for one target, or null when the target does not take part. */
+export function armOf(experiment: Experiment, userId: string, unitId: string, targetId: string) {
+  let units = unitTargetCache.get(experiment.id);
+  if (!units) unitTargetCache.set(experiment.id, (units = experimentUnitTargets(experiment)));
+  return unitAssignment(experiment, userId, units.get(unitId) ?? []).get(targetId) ?? null;
+}
+
 export type WordOutcome = 'retained' | 'not_retained' | 'pending' | 'excluded';
 
 export function wordOutcome(experiment: Experiment, word: WordEvidence, now: Date): WordOutcome {
@@ -59,6 +93,7 @@ export function wordOutcome(experiment: Experiment, word: WordEvidence, now: Dat
   if (word.source) return 'excluded';
   const introduced = Date.parse(word.introducedAt);
   if (introduced < Date.parse(experiment.startsAt)) return 'excluded';
+  if (experiment.endsAt && introduced >= Date.parse(experiment.endsAt)) return 'excluded';
   if (+now - introduced < OUTCOME_AFTER_DAYS * DAY) return 'pending';
   return word.status === 'retained' || word.status === 'maintenance' ? 'retained' : 'not_retained';
 }
@@ -132,4 +167,40 @@ export function analyzeExperiment(
     meanDifference: mean,
     interval95: interval,
   };
+}
+
+const running = (experiment: Experiment, now: Date) =>
+  +now >= Date.parse(experiment.startsAt) &&
+  (!experiment.endsAt || +now < Date.parse(experiment.endsAt));
+
+/**
+ * The teacher script a learner receives. In the "produce" arm of the production experiment,
+ * the teaching turn of a word also asks for one short sentence of the learner's own; the
+ * standard arm and everything else in the lesson stay as authored.
+ */
+export function lessonScriptFor(
+  script: Array<Record<string, unknown>>,
+  lesson: { unit: string; band: Band },
+  userId: string,
+  now: Date,
+) {
+  const experiment = experimentById.get('teacher-production-2026-11')!;
+  if (!running(experiment, now)) return script;
+  const beginner = lesson.band === 'Pre-A1' || lesson.band === 'A1';
+  return script.map((phase) => {
+    if (phase.phase !== 'teach_target' || typeof phase.target_en !== 'string') return phase;
+    const en = phase.target_en;
+    const target = lexicon.targets.find(
+      (item) => item.unit === lesson.unit && normalize(item.en) === normalize(en),
+    );
+    if (!target || armOf(experiment, userId, lesson.unit, target.id) !== 'produce') return phase;
+    return {
+      ...phase,
+      say_he:
+        `${phase.say_he ?? ''} ועכשיו תורכם: אמרו משפט קצר משלכם עם ${en}, על משהו מהחיים שלכם.${beginner ? ' מספיקות גם שתיים או שלוש מילים.' : ''}`.trim(),
+      say_en:
+        `${phase.say_en ?? ''} Now use "${en}" in a short sentence of your own, about your own life.`.trim(),
+      production_task_en: `The learner says one short sentence of their own that uses "${en}"${beginner ? '; two or three words are enough' : ''}.`,
+    };
+  });
 }

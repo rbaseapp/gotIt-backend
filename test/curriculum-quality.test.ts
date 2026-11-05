@@ -10,7 +10,7 @@ import {
   uncontractedForms,
   type AuditUnit,
 } from '../src/modules/curriculum/curriculum.quality.js';
-import { content, sameEnglish } from '../src/modules/curriculum/curriculum.content.js';
+import { content, lexicon, sameEnglish } from '../src/modules/curriculum/curriculum.content.js';
 
 const unit = (over: Partial<AuditUnit>): AuditUnit => ({
   id: 'X01',
@@ -136,11 +136,31 @@ test('renamed target words keep their former spelling for existing practice item
   assert.deepEqual(color.former_en, ['colour']);
 });
 
-test('every Pre-A1 and A1 target is met in its dialogue or reading passage', () => {
+test('every Pre-A1 to A2 target is met in its dialogue or reading passage', () => {
   const missing = auditCurriculum(content)
-    .units.filter((u) => u.band === 'Pre-A1' || u.band === 'A1')
+    .units.filter((u) => ['Pre-A1', 'A1', 'A2'].includes(u.band))
     .flatMap((u) => u.targetsNotInInput.map((t) => `${u.id}: ${t}`));
   assert.deepEqual(missing, []);
+});
+
+test('Pre-A1 to A2 reading passages reach 95% known words', () => {
+  // As in the report: a unit's frequency cards are taught before its reading.
+  const cards = new Map<string, string[]>();
+  for (const t of lexicon.targets)
+    if (t.track !== 'communicative') cards.set(t.unit, [...(cards.get(t.unit) ?? []), t.en]);
+  const low = auditCurriculum(content, cards)
+    .units.filter((u) => ['Pre-A1', 'A1', 'A2'].includes(u.band) && u.passageCoverage < 0.95)
+    .map((u) => u.id);
+  assert.deepEqual(low, []);
+});
+
+test('A2 to C1 use American everyday words', () => {
+  const text = assetText().replace(/"former_en": \[[^\]]*\]/g, '');
+  const british =
+    /(an? (small |shared )?flat|the flat|timetables?|in the lift|rubbish|pavement|rota|\d+ pounds|(sixty|ninety|ten) pounds)/gi;
+  assert.deepEqual([...new Set(text.match(british) ?? [])], []);
+  const renamed = (id: string) => lexicon.targets.find((t) => t.id === id)!;
+  assert.deepEqual([renamed('A203-T02').en, renamed('A208-T10').en], ['vacation', 'line']);
 });
 
 test('the phonics track stays decodable and keeps Hebrew-speaker reinforcement', () => {

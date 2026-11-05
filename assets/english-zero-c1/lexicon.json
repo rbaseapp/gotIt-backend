@@ -3392,7 +3392,7 @@
     },
     {
       "id": "A203-T02",
-      "en": "holiday",
+      "en": "vacation",
       "he": "חופשה",
       "unit": "A203",
       "band": "A2",
@@ -3402,7 +3402,10 @@
       "counting_note": "Target slot; repeated spelling is not a new unique word.",
       "first_text_encounter_unit": "A203",
       "exposure_note_he": "חשיפה נתמכת מוקדמת אינה רכישה עצמאית. מועד ההוראה הפעילה מופיע בשדה היחידה; כל גלוסה דורשת בדיקת משמעות בהקשר.",
-      "display_unit": "A203"
+      "display_unit": "A203",
+      "former_en": [
+        "holiday"
+      ]
     },
     {
       "id": "A203-T03",
@@ -4344,7 +4347,7 @@
     },
     {
       "id": "A208-T10",
-      "en": "queue",
+      "en": "line",
       "he": "תור של אנשים",
       "unit": "A208",
       "band": "A2",
@@ -4354,7 +4357,10 @@
       "counting_note": "Target slot; repeated spelling is not a new unique word.",
       "first_text_encounter_unit": null,
       "exposure_note_he": "חשיפה נתמכת מוקדמת אינה רכישה עצמאית. מועד ההוראה הפעילה מופיע בשדה היחידה; כל גלוסה דורשת בדיקת משמעות בהקשר.",
-      "display_unit": "A208"
+      "display_unit": "A208",
+      "former_en": [
+        "queue"
+      ]
     },
     {
       "id": "A208-T11",

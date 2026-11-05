@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { CurriculumService } from '../src/modules/curriculum/curriculum.service.js';
+import {
+  CurriculumService,
+  readingSelection,
+  withoutAuthoredContext,
+} from '../src/modules/curriculum/curriculum.service.js';
 import { allTargets } from '../src/modules/curriculum/curriculum.content.js';
 import { curriculumPathSteps } from '../src/modules/curriculum/curriculum.path.js';
 import {
@@ -131,4 +135,23 @@ test('an unchecked claim can be undone, a word in practice cannot be claimed', a
 test('known words stay out of the teaching experiments', () => {
   const experiment = { id: 'x', arms: ['a', 'b'], startsAt: now.toISOString(), description: '' };
   assert.equal(wordOutcome(experiment, claimKnown(now), new Date(+now + 40 * DAY)), 'excluded');
+});
+
+test('a generated reading puts recent words without authored context first, known words last', () => {
+  const gap = [...withoutAuthoredContext][0]!;
+  const others = allTargets.filter((target) => !withoutAuthoredContext.has(target.id)).slice(0, 3);
+  const at = (minutes: number) => ({
+    ...introduce(now),
+    lastExposureAt: new Date(+now + minutes * 60_000).toISOString(),
+  });
+  const words = {
+    [others[0]!.id]: {
+      ...claimKnown(now),
+      lastExposureAt: new Date(+now + 9 * 60_000).toISOString(),
+    },
+    [others[1]!.id]: at(8),
+    [others[2]!.id]: at(7),
+    [gap]: at(1),
+  };
+  assert.deepEqual(readingSelection(words, 3), [gap, others[1]!.id, others[2]!.id]);
 });
