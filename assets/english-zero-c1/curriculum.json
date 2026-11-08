@@ -761,7 +761,7 @@
     {
       "id": "P05",
       "band": "Pre-A1",
-      "title_he": "מה אני צריך?",
+      "title_he": "מה אני צריך/ה?",
       "goal_he": "לבקש מזון או משקה ולומר צורך פשוט בנימוס.",
       "grammar_he": "I want; I need; שאלת want כתבנית; שמות בלתי ספירים ללא a.",
       "targets": [
@@ -938,7 +938,7 @@
     {
       "id": "P06",
       "band": "Pre-A1",
-      "title_he": "אני יכול לעשות זאת",
+      "title_he": "אני יכול/ה לעשות זאת",
       "goal_he": "להבין ולבצע הוראה אחת ולומר יכולת בסיסית.",
       "grammar_he": "can + פועל בסיס; ציווי; I cannot כתבנית.",
       "targets": [
@@ -5953,7 +5953,7 @@
     {
       "id": "A108",
       "band": "A1",
-      "title_he": "מה אני אוהב ויכול לעשות",
+      "title_he": "מה אני אוהב/ת ויכול/ה לעשות",
       "goal_he": "לדבר על תחביבים ויכולות ולבקש להצטרף לפעילות.",
       "grammar_he": "can/cannot; like + ing בתבניות; do you like ו־can you.",
       "targets": [
@@ -59376,7 +59376,7 @@
       "id": "P05-L1",
       "unit": "P05",
       "band": "Pre-A1",
-      "title_he": "מה אני צריך? — רכישה ושיחה נתמכת",
+      "title_he": "מה אני צריך/ה? — רכישה ושיחה נתמכת",
       "planned_minutes": 10,
       "targets": [
         {
@@ -59407,7 +59407,7 @@
       "teacher_script": [
         {
           "phase": "opening",
-          "say_he": "היום נעבוד על: מה אני צריך?. המטרה: לבקש מזון או משקה ולומר צורך פשוט בנימוס. אפשר לבקש הסבר קצר בעברית או לחלק את המפגש.",
+          "say_he": "היום נעבוד על: מה אני צריך/ה?. המטרה: לבקש מזון או משקה ולומר צורך פשוט בנימוס. אפשר לבקש הסבר קצר בעברית או לחלק את המפגש.",
           "say_en": "We'll practice a useful task step by step. You can ask me to repeat or explain. At the end, you'll try a new version without the model."
         },
         {
@@ -59674,7 +59674,7 @@
       "id": "P05-L2",
       "unit": "P05",
       "band": "Pre-A1",
-      "title_he": "מה אני צריך? — שימוש, הבנה והפקה עצמאית",
+      "title_he": "מה אני צריך/ה? — שימוש, הבנה והפקה עצמאית",
       "planned_minutes": 10,
       "targets": [
         {
@@ -59705,7 +59705,7 @@
       "teacher_script": [
         {
           "phase": "opening",
-          "say_he": "היום נעבוד על: מה אני צריך?. המטרה: לבקש מזון או משקה ולומר צורך פשוט בנימוס. אפשר לבקש הסבר קצר בעברית או לחלק את המפגש.",
+          "say_he": "היום נעבוד על: מה אני צריך/ה?. המטרה: לבקש מזון או משקה ולומר צורך פשוט בנימוס. אפשר לבקש הסבר קצר בעברית או לחלק את המפגש.",
           "say_en": "We'll practice a useful task step by step. You can ask me to repeat or explain. At the end, you'll try a new version without the model."
         },
         {
@@ -60015,7 +60015,7 @@
       "id": "P06-L1",
       "unit": "P06",
       "band": "Pre-A1",
-      "title_he": "אני יכול לעשות זאת — רכישה ושיחה נתמכת",
+      "title_he": "אני יכול/ה לעשות זאת — רכישה ושיחה נתמכת",
       "planned_minutes": 10,
       "targets": [
         {
@@ -60046,7 +60046,7 @@
       "teacher_script": [
         {
           "phase": "opening",
-          "say_he": "היום נעבוד על: אני יכול לעשות זאת. המטרה: להבין ולבצע הוראה אחת ולומר יכולת בסיסית. אפשר לבקש הסבר קצר בעברית או לחלק את המפגש.",
+          "say_he": "היום נעבוד על: אני יכול/ה לעשות זאת. המטרה: להבין ולבצע הוראה אחת ולומר יכולת בסיסית. אפשר לבקש הסבר קצר בעברית או לחלק את המפגש.",
           "say_en": "We'll practice a useful task step by step. You can ask me to repeat or explain. At the end, you'll try a new version without the model."
         },
         {
@@ -60313,7 +60313,7 @@
       "id": "P06-L2",
       "unit": "P06",
       "band": "Pre-A1",
-      "title_he": "אני יכול לעשות זאת — שימוש, הבנה והפקה עצמאית",
+      "title_he": "אני יכול/ה לעשות זאת — שימוש, הבנה והפקה עצמאית",
       "planned_minutes": 10,
       "targets": [
         {
@@ -60344,7 +60344,7 @@
       "teacher_script": [
         {
           "phase": "opening",
-          "say_he": "היום נעבוד על: אני יכול לעשות זאת. המטרה: להבין ולבצע הוראה אחת ולומר יכולת בסיסית. אפשר לבקש הסבר קצר בעברית או לחלק את המפגש.",
+          "say_he": "היום נעבוד על: אני יכול/ה לעשות זאת. המטרה: להבין ולבצע הוראה אחת ולומר יכולת בסיסית. אפשר לבקש הסבר קצר בעברית או לחלק את המפגש.",
           "say_en": "We'll practice a useful task step by step. You can ask me to repeat or explain. At the end, you'll try a new version without the model."
         },
         {
@@ -65193,7 +65193,7 @@
       "id": "A108-L1",
       "unit": "A108",
       "band": "A1",
-      "title_he": "מה אני אוהב ויכול לעשות — רכישה ושיחה נתמכת",
+      "title_he": "מה אני אוהב/ת ויכול/ה לעשות — רכישה ושיחה נתמכת",
       "planned_minutes": 15,
       "targets": [
         {
@@ -65224,7 +65224,7 @@
       "teacher_script": [
         {
           "phase": "opening",
-          "say_he": "היום נעבוד על: מה אני אוהב ויכול לעשות. המטרה: לדבר על תחביבים ויכולות ולבקש להצטרף לפעילות. אפשר לבקש הסבר קצר בעברית או לחלק את המפגש.",
+          "say_he": "היום נעבוד על: מה אני אוהב/ת ויכול/ה לעשות. המטרה: לדבר על תחביבים ויכולות ולבקש להצטרף לפעילות. אפשר לבקש הסבר קצר בעברית או לחלק את המפגש.",
           "say_en": "We'll practice a useful task step by step. You can ask me to repeat or explain. At the end, you'll try a new version without the model."
         },
         {
@@ -65492,7 +65492,7 @@
       "id": "A108-L2",
       "unit": "A108",
       "band": "A1",
-      "title_he": "מה אני אוהב ויכול לעשות — שימוש, הבנה והפקה עצמאית",
+      "title_he": "מה אני אוהב/ת ויכול/ה לעשות — שימוש, הבנה והפקה עצמאית",
       "planned_minutes": 15,
       "targets": [
         {
@@ -65523,7 +65523,7 @@
       "teacher_script": [
         {
           "phase": "opening",
-          "say_he": "היום נעבוד על: מה אני אוהב ויכול לעשות. המטרה: לדבר על תחביבים ויכולות ולבקש להצטרף לפעילות. אפשר לבקש הסבר קצר בעברית או לחלק את המפגש.",
+          "say_he": "היום נעבוד על: מה אני אוהב/ת ויכול/ה לעשות. המטרה: לדבר על תחביבים ויכולות ולבקש להצטרף לפעילות. אפשר לבקש הסבר קצר בעברית או לחלק את המפגש.",
           "say_en": "We'll practice a useful task step by step. You can ask me to repeat or explain. At the end, you'll try a new version without the model."
         },
         {
