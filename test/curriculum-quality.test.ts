@@ -11,6 +11,7 @@ import {
   type AuditUnit,
 } from '../src/modules/curriculum/curriculum.quality.js';
 import { content, lexicon, sameEnglish } from '../src/modules/curriculum/curriculum.content.js';
+import { curriculumParticipants } from '../src/modules/curriculum/curriculum.participants.js';
 
 const unit = (over: Partial<AuditUnit>): AuditUnit => ({
   id: 'X01',
@@ -185,4 +186,21 @@ test('from B1 a full "would" in speech is a register choice, not a defect', () =
   assert.equal(uncontractedForms('If I were you, I would wait.', 'B2').length, 0);
   assert.equal(uncontractedForms('If I were you, I would wait.', 'A2').length, 1);
   assert.equal(uncontractedForms('I do not agree with that.', 'C1').length, 1);
+});
+
+test('Hebrew instructions address learners in the plural and agree with the tutor', () => {
+  const text = assetText();
+  // The recurring instruction phrases are plural, like the rest of the app.
+  for (const singular of ['הקשב:', 'אמור את הצורה', 'השתמש במשמעות שנלמדה', 'נסה שוב או הקלד'])
+    assert.equal(text.includes(singular), false, singular);
+  // Every tutor slot has a masculine and a feminine form and resolves for both tutors.
+  const slots = text.match(/\{\{t:[^}]*\}\}/gu) ?? [];
+  assert.ok(slots.length > 200);
+  for (const slot of slots) assert.match(slot, /^\{\{t:[^|{}]+\|[^|{}]+\}\}$/u, slot);
+  for (const voice of ['female', 'male'] as const) {
+    const resolved = JSON.stringify(curriculumParticipants(content, voice));
+    assert.equal(resolved.includes('{{t:'), false);
+  }
+  assert.equal(curriculumParticipants('המורה {{t:יציג|תציג}} עט.', 'female'), 'המורה תציג עט.');
+  assert.equal(curriculumParticipants('המורה {{t:יציג|תציג}} עט.', 'male'), 'המורה יציג עט.');
 });
