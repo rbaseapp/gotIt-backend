@@ -18,6 +18,8 @@ export type AuditUnit = {
   passage_en: string;
   model_response_en?: string;
   content_status?: string;
+  /** Example sentences the teacher says while teaching a word (teach_target example_en). */
+  examples?: string[];
 };
 export type AuditPhonics = {
   id: string;
@@ -29,7 +31,11 @@ export type AuditPhonics = {
 export type AuditCurriculum = {
   units: AuditUnit[];
   phonics: AuditPhonics[];
-  lessons?: { unit: string; targets: unknown[] }[];
+  lessons?: {
+    unit: string;
+    targets: unknown[];
+    teacher_script?: Array<Record<string, unknown>>;
+  }[];
 };
 
 // New target words per unit; ranges follow the level authoring guidance
@@ -90,7 +96,14 @@ export function uncontractedForms(text: string, band?: Band) {
 export function tokens(text: string) {
   // Keep apostrophes inside words. Template placeholders such as
   // {{teacherName}} are filled with a name at runtime, so they are not words.
-  return text.replace(/\{\{\w+\}\}/g, ' ').match(/[A-Za-z]+(?:['’][A-Za-z]+)*/g) ?? [];
+  // {{t:…|…}} is Hebrew wording for the tutor's gender. Accents are dropped (café -> cafe).
+  return (
+    text
+      .replace(/\{\{[^{}]*\}\}/g, ' ')
+      .normalize('NFD')
+      .replace(/[̀-ͯ]/g, '')
+      .match(/[A-Za-z]+(?:['’][A-Za-z]+)*/g) ?? []
+  );
 }
 
 const lowerTokens = (text: string) => tokens(text).map((t) => t.toLowerCase().replace(/’/g, "'"));
@@ -116,7 +129,42 @@ const CONTRACTION_BASE: Record<string, string[]> = {
   "'ve": ['have'],
   "'d": ['would'],
 };
-const IRREGULAR_BASE: Record<string, string> = { "can't": 'can', "won't": 'will' };
+// Irregular verb forms, irregular plurals and comparatives, and object/possessive pronouns,
+// each mapped to the form a learner meets first.
+const IRREGULAR_BASE: Record<string, string> = {
+  "can't": 'can',
+  "won't": 'will',
+  ...Object.fromEntries(
+    (
+      'be:is,am,are,was,were,been|become:became|begin:began,begun|break:broke,broken|bring:brought|' +
+      'build:built|buy:bought|catch:caught|choose:chose,chosen|come:came|cost:cost|' +
+      'cut:cut|do:did,done|draw:drew,drawn|drink:drank,drunk|drive:drove,driven|' +
+      'eat:ate,eaten|fall:fell,fallen|feel:felt|fight:fought|find:found|fly:flew,flown|' +
+      'forget:forgot,forgotten|forgive:forgave,forgiven|freeze:froze,frozen|get:got,gotten|' +
+      'give:gave,given|go:went,gone|grow:grew,grown|have:had,has|hear:heard|hide:hid,hidden|' +
+      'hold:held|hurt:hurt|keep:kept|know:knew,known|lay:laid|lead:led|leave:left|lend:lent|' +
+      'let:let|lie:lay,lain|lose:lost|make:made|mean:meant|meet:met|pay:paid|put:put|' +
+      'read:read|ride:rode,ridden|ring:rang,rung|rise:rose,risen|run:ran|say:said|see:saw,seen|' +
+      'sell:sold|send:sent|set:set|shake:shook,shaken|shine:shone|shoot:shot|show:shown|' +
+      'shut:shut|sing:sang,sung|sink:sank,sunk|sit:sat|sleep:slept|speak:spoke,spoken|' +
+      'spend:spent|stand:stood|steal:stole,stolen|stick:stuck|strike:struck|swim:swam,swum|' +
+      'take:took,taken|teach:taught|tear:tore,torn|tell:told|think:thought|throw:threw,thrown|' +
+      'understand:understood|wake:woke,woken|wear:wore,worn|win:won|write:wrote,written|' +
+      'mistake:mistook,mistaken|overcome:overcame|withdraw:withdrew,withdrawn|' +
+      'undertake:undertook,undertaken|arise:arose,arisen|seek:sought|bear:bore,borne|' +
+      'child:children|person:people|man:men|woman:women|foot:feet|tooth:teeth|mouse:mice|' +
+      'good:better,best|bad:worse,worst|far:further,farther|' +
+      'i:me,my,mine,myself|you:your,yours,yourself|he:him,his,himself|she:her,hers,herself|' +
+      'it:its,itself|we:us,our,ours,ourselves|they:them,their,theirs,themselves|' +
+      'this:these|that:those|who:whom,whose'
+    )
+      .split('|')
+      .flatMap((group) => {
+        const [base, forms] = group.split(':');
+        return forms!.split(',').map((form) => [form, base!]);
+      }),
+  ),
+};
 
 // Crude inflection folding; good enough to avoid counting "apples" as unknown
 // when "apple" is a target. Returns candidate base forms.
@@ -135,6 +183,8 @@ export function baseForms(word: string): string[] {
     ['es', ''],
     ['s', ''],
     ['ied', 'y'],
+    ['ier', 'y'],
+    ['iest', 'y'],
     ['ed', ''],
     ['ed', 'e'],
     ['ing', ''],
@@ -152,7 +202,49 @@ export function baseForms(word: string): string[] {
   return [...out];
 }
 
-const known = (vocab: Set<string>, word: string) => baseForms(word).some((b) => vocab.has(b));
+const inflected = (vocab: Set<string>, word: string) => baseForms(word).some((b) => vocab.has(b));
+// Transparent affixes (useless, politely, unreliable, washable). Coverage research counts
+// word families, and a reader who knows the base can work these out in context.
+const PREFIXES = ['un', 'in', 'im', 'dis', 're', 'non', 'over', 'pre'];
+const SUFFIXES: [string, string[]][] = [
+  ['ily', ['y']],
+  ['ly', ['', 'e']],
+  ['less', ['']],
+  ['ful', ['']],
+  ['ness', ['']],
+  ['ment', ['']],
+  ['able', ['', 'e']],
+  ['ible', ['', 'e']],
+  ['ation', ['', 'e']],
+  ['ion', ['', 'e']],
+];
+function derivedKnown(vocab: Set<string>, word: string, depth = 0): boolean {
+  if (inflected(vocab, word)) return true;
+  if (depth > 1) return false;
+  for (const w of baseForms(word)) {
+    for (const p of PREFIXES)
+      if (
+        w.length - p.length >= 3 &&
+        w.startsWith(p) &&
+        derivedKnown(vocab, w.slice(p.length), depth + 1)
+      )
+        return true;
+    for (const [s, repls] of SUFFIXES)
+      if (w.length - s.length >= 3 && w.endsWith(s))
+        for (const r of repls)
+          if (derivedKnown(vocab, w.slice(0, -s.length) + r, depth + 1)) return true;
+  }
+  return false;
+}
+// Compounds of two known words (classmate, workplace, checklist).
+const compoundKnown = (vocab: Set<string>, word: string) =>
+  baseForms(word).some((w) => {
+    for (let i = 3; i <= w.length - 3; i++)
+      if (inflected(vocab, w.slice(0, i)) && inflected(vocab, w.slice(i))) return true;
+    return false;
+  });
+const known = (vocab: Set<string>, word: string) =>
+  derivedKnown(vocab, word) || compoundKnown(vocab, word);
 
 function entryWords(entries: unknown[] | undefined) {
   return (entries ?? []).flatMap((e) =>
@@ -164,13 +256,14 @@ function entryWords(entries: unknown[] | undefined) {
 
 /** Targets the unit's dialogue, model response and passage never use (inflections count). */
 export function targetsWithoutInput(
-  unit: Pick<AuditUnit, 'dialogue' | 'passage_en' | 'model_response_en'>,
+  unit: Pick<AuditUnit, 'dialogue' | 'passage_en' | 'model_response_en' | 'examples'>,
   targets: string[],
 ) {
   const text = [
     ...unit.dialogue.map((d) => d.text_en),
     unit.model_response_en ?? '',
     unit.passage_en,
+    ...(unit.examples ?? []),
   ].join('\n');
   const bases = new Set(lowerTokens(text).flatMap(baseForms));
   return targets.filter((t) => !tokens(t).every((w) => baseForms(w).some((b) => bases.has(b))));
@@ -208,7 +301,11 @@ export function auditUnits(
       ...(unit.support_words ?? []).flatMap((w) => tokens(w).map((t) => t.toLowerCase())),
       ...entryWords(unit.support_glossary),
     ]);
-    const spoken = [...unit.dialogue.map((d) => d.text_en), unit.model_response_en ?? ''];
+    const spoken = [
+      ...unit.dialogue.map((d) => d.text_en),
+      unit.model_response_en ?? '',
+      ...(unit.examples ?? []),
+    ];
     const allText = [...spoken, unit.passage_en].join('\n');
     const input = lowerTokens(allText);
     const targetsNotInInput = targetsWithoutInput(
@@ -315,7 +412,19 @@ export function auditCurriculum(c: AuditCurriculum, wordCardsByUnit?: Map<string
   const perLesson = new Map<string, number>();
   for (const lesson of c.lessons ?? [])
     perLesson.set(lesson.unit, Math.max(perLesson.get(lesson.unit) ?? 0, lesson.targets.length));
-  const units = auditUnits(c.units, wordCardsByUnit, perLesson);
+  const examples = new Map<string, string[]>();
+  for (const lesson of c.lessons ?? [])
+    for (const phase of lesson.teacher_script ?? [])
+      if (phase.phase === 'teach_target' && typeof phase.example_en === 'string')
+        examples.set(lesson.unit, [...(examples.get(lesson.unit) ?? []), phase.example_en]);
+  const units = auditUnits(
+    c.units.map((unit) => ({
+      ...unit,
+      examples: [...(unit.examples ?? []), ...(examples.get(unit.id) ?? [])],
+    })),
+    wordCardsByUnit,
+    perLesson,
+  );
   const phonics = auditPhonics(c.phonics);
   const byBand = new Map<Band, UnitReport[]>();
   units.forEach((u) => byBand.set(u.band, [...(byBand.get(u.band) ?? []), u]));

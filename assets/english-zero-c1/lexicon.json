@@ -6344,7 +6344,7 @@
     },
     {
       "id": "B108-T08",
-      "en": "public transport",
+      "en": "public transportation",
       "he": "תחבורה ציבורית",
       "unit": "B108",
       "band": "B1",
@@ -6354,7 +6354,10 @@
       "counting_note": "Target slot; repeated spelling is not a new unique word.",
       "first_text_encounter_unit": null,
       "exposure_note_he": "חשיפה נתמכת מוקדמת אינה רכישה עצמאית. מועד ההוראה הפעילה מופיע בשדה היחידה; כל גלוסה דורשת בדיקת משמעות בהקשר.",
-      "display_unit": "B108"
+      "display_unit": "B108",
+      "former_en": [
+        "public transport"
+      ]
     },
     {
       "id": "B108-T09",

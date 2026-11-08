@@ -137,28 +137,31 @@ test('renamed target words keep their former spelling for existing practice item
   assert.deepEqual(color.former_en, ['colour']);
 });
 
-test('every Pre-A1 to A2 target is met in its dialogue or reading passage', () => {
-  const missing = auditCurriculum(content)
-    .units.filter((u) => ['Pre-A1', 'A1', 'A2'].includes(u.band))
-    .flatMap((u) => u.targetsNotInInput.map((t) => `${u.id}: ${t}`));
+test('every lesson word is met in context: dialogue, passage or the teacher example', () => {
+  const missing = auditCurriculum(content).units.flatMap((u) =>
+    u.targetsNotInInput.map((t) => `${u.id}: ${t}`),
+  );
   assert.deepEqual(missing, []);
 });
 
-test('Pre-A1 to A2 reading passages reach 95% known words', () => {
+test('every reading passage reaches 95% known words', () => {
   // As in the report: a unit's frequency cards are taught before its reading.
   const cards = new Map<string, string[]>();
   for (const t of lexicon.targets)
     if (t.track !== 'communicative') cards.set(t.unit, [...(cards.get(t.unit) ?? []), t.en]);
   const low = auditCurriculum(content, cards)
-    .units.filter((u) => ['Pre-A1', 'A1', 'A2'].includes(u.band) && u.passageCoverage < 0.95)
+    .units.filter((u) => u.passageCoverage < 0.95)
     .map((u) => u.id);
   assert.deepEqual(low, []);
 });
 
 test('A2 to C1 use American everyday words', () => {
-  const text = assetText().replace(/"former_en": \[[^\]]*\]/g, '');
+  // NGSL definitions keep their source wording ("a flat dish") under attribution.
+  const text = assetText()
+    .replace(/"former_en": \[[^\]]*\]/g, '')
+    .replace(/"definition_en": "[^"]*"/g, '');
   const british =
-    /(an? (small |shared )?flat|the flat|timetables?|in the lift|rubbish|pavement|rota|\d+ pounds|(sixty|ninety|ten) pounds)/gi;
+    /\b(an? (small |shared )?flat|the flat|timetables?|in the lift|rubbish|pavement|rota|flatmates?|enquir(y|ies)|trolleys?|public transport(?!ation)|\d+ pounds|(sixty|ninety|ten) pounds)\b/gi;
   assert.deepEqual([...new Set(text.match(british) ?? [])], []);
   const renamed = (id: string) => lexicon.targets.find((t) => t.id === id)!;
   assert.deepEqual([renamed('A203-T02').en, renamed('A208-T10').en], ['vacation', 'line']);
