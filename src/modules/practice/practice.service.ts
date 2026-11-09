@@ -51,6 +51,9 @@ import {
   type GeneratedStudyImage,
   type StudyImageProvider,
 } from './study-image.provider.js';
+import { cleanExample, clozeContext, hideAnswers } from './practice.cloze.js';
+import type { WordPackExampleProvider } from '../word-packs/word-pack-example.provider.js';
+export { hideAnswers };
 
 export function answerWordLengths(answer: string) {
   return answer
@@ -141,7 +144,56 @@ export class PracticeService {
     ) => boolean = () => false,
     private readonly imageProvider?: StudyImageProvider,
     private readonly automaticConcepts = false,
+    private readonly exampleProvider?: WordPackExampleProvider,
   ) {}
+
+  /**
+   * The sentence game needs an example sentence in the word's own language with the
+   * exact word in it. Saved words without one (typed in by hand, or captured
+   * without a sentence) get a short generated example, stored once per word.
+   */
+  private async ensureClozeExamples(scope: ProfileScope, ids: string[]) {
+    if (!this.exampleProvider || !ids.length) return;
+    const rows = (
+      await this.pool.query(
+        `SELECT li.id,li.source_text,li.source_language_code,li.translation_language_code,li.learning_revision,
+          (SELECT translation_text FROM product_gotit.item_translations t WHERE t.application_id=li.application_id AND t.application_user_id=li.application_user_id AND t.learning_item_id=li.id AND t.is_current ORDER BY is_primary DESC,id LIMIT 1) translation,
+          ARRAY(SELECT sentence_text FROM product_gotit.item_occurrences o WHERE o.application_id=li.application_id AND o.application_user_id=li.application_user_id AND o.learning_item_id=li.id AND o.learning_revision=li.learning_revision AND sentence_text IS NOT NULL
+            UNION ALL SELECT example_text FROM product_gotit.item_examples ex WHERE ex.application_id=li.application_id AND ex.application_user_id=li.application_user_id AND ex.learning_item_id=li.id AND ex.learning_revision=li.learning_revision) contexts
+        FROM product_gotit.learning_items li WHERE li.application_id=$1 AND li.application_user_id=$2 AND li.id=ANY($3::uuid[]) AND li.deleted_at IS NULL`,
+        [...scopeValues(scope), ids.slice(0, 10)],
+      )
+    ).rows.filter(
+      (row) =>
+        row.translation &&
+        !(row.contexts as string[]).some((text) => {
+          const clean = cleanExample(text, row.source_text);
+          return clean !== null && clozeContext(clean, [row.source_text]);
+        }),
+    );
+    await Promise.all(
+      rows.map(async (row) => {
+        const example = await this.exampleProvider!.generate({
+          learningItemId: row.id,
+          sourceText: row.source_text,
+          translationText: row.translation,
+          sourceLanguageCode: row.source_language_code,
+          translationLanguageCode: row.translation_language_code,
+          context: null,
+          scope,
+        }).catch(() => null);
+        const clean = example && cleanExample(example, row.source_text);
+        if (!clean || !clozeContext(clean, [row.source_text])) return;
+        await this.pool.query(
+          `INSERT INTO product_gotit.item_examples
+            (application_id,application_user_id,learning_item_id,example_text,source_kind,learning_revision)
+          SELECT $1,$2,$3,$4,'ai',$5 WHERE NOT EXISTS(SELECT 1 FROM product_gotit.item_examples
+            WHERE application_id=$1 AND application_user_id=$2 AND learning_item_id=$3 AND learning_revision=$5 AND example_text=$4)`,
+          [...scopeValues(scope), row.id, clean, row.learning_revision],
+        );
+      }),
+    );
+  }
   availableSkills(profile: GotItProfile, language: string): Skill[] {
     return (
       profile.learningPreferences?.enabledSkills ?? [
@@ -630,7 +682,8 @@ export class PracticeService {
           translationText: row.translation_text,
           sourceLanguageCode: row.source_language_code,
           translationLanguageCode: row.translation_language_code,
-          context: row.context,
+          // A generated example may carry a translation; cards show the word's language only.
+          context: row.context && cleanExample(row.context, row.source_text),
           audioUrl: this.speechAvailable(row.source_language_code, 'listening')
             ? `/api/v1/learning-items/${row.id}/audio`
             : null,
@@ -990,6 +1043,13 @@ export class PracticeService {
   }
   async issueExercises(scope: ProfileScope, id: string, input: ExercisesInput) {
     const profile = await this.profiles.getProfile(scope);
+    // Multiple-choice recall is the sentence game ("which word is missing?").
+    if (
+      input.exerciseType === 'recall' &&
+      input.kind === 'multiple_choice' &&
+      input.learningItemIds
+    )
+      await this.ensureClozeExamples(scope, input.learningItemIds);
     return withTransaction(this.pool, async (tx) => {
       const session = await this.session(tx, scope, id);
       if (session.status !== 'active')
@@ -1045,7 +1105,10 @@ export class PracticeService {
         await tx.query(
           `SELECT li.*,ARRAY(SELECT translation_text FROM product_gotit.item_translations t WHERE t.application_id=li.application_id AND t.application_user_id=li.application_user_id AND t.learning_item_id=li.id AND t.is_current ORDER BY is_primary DESC,id) translations,
       COALESCE((SELECT sentence_text FROM product_gotit.item_occurrences o WHERE o.application_id=li.application_id AND o.application_user_id=li.application_user_id AND o.learning_item_id=li.id AND o.learning_revision=li.learning_revision AND sentence_text IS NOT NULL ORDER BY captured_at DESC,id LIMIT 1),
-        (SELECT example_text FROM product_gotit.item_examples ex WHERE ex.application_id=li.application_id AND ex.application_user_id=li.application_user_id AND ex.learning_item_id=li.id AND ex.learning_revision=li.learning_revision ORDER BY (ex.source_kind='user') DESC,ex.created_at,ex.id LIMIT 1)) context
+        (SELECT example_text FROM product_gotit.item_examples ex WHERE ex.application_id=li.application_id AND ex.application_user_id=li.application_user_id AND ex.learning_item_id=li.id AND ex.learning_revision=li.learning_revision ORDER BY (ex.source_kind='user') DESC,ex.created_at,ex.id LIMIT 1)) context,
+      ARRAY(SELECT text FROM (SELECT sentence_text text,0 rank,captured_at at,id::text tie FROM product_gotit.item_occurrences o WHERE o.application_id=li.application_id AND o.application_user_id=li.application_user_id AND o.learning_item_id=li.id AND o.learning_revision=li.learning_revision AND sentence_text IS NOT NULL
+        UNION ALL SELECT example_text,CASE WHEN source_kind='user' THEN 1 ELSE 2 END,created_at,id::text FROM product_gotit.item_examples ex WHERE ex.application_id=li.application_id AND ex.application_user_id=li.application_user_id AND ex.learning_item_id=li.id AND ex.learning_revision=li.learning_revision) c
+        ORDER BY rank,CASE WHEN rank=0 THEN at END DESC,at,tie LIMIT 20) contexts
       FROM product_gotit.learning_items li WHERE application_id=$1 AND application_user_id=$2 AND id=ANY($3::uuid[]) AND deleted_at IS NULL AND ${practiceLanguagePredicate()} ORDER BY next_review_at NULLS LAST,created_at,id`,
           [...scopeValues(scope), ids],
         )
@@ -1320,7 +1383,15 @@ export class PracticeService {
               ? null
               : type === 'flashcards'
                 ? row.context
-                : hideAnswers(readingBody ?? row.context, accepted),
+                : readingBody
+                  ? hideAnswers(readingBody, accepted)
+                  : // Prefer a sentence that really contains the exact word, so the gap exists.
+                    (((row.contexts as string[] | undefined) ?? [])
+                      .map((text) => {
+                        const clean = cleanExample(text, row.source_text);
+                        return clean === null ? null : clozeContext(clean, accepted);
+                      })
+                      .find(Boolean) ?? hideAnswers(row.context, accepted)),
           ...(kind === 'typed' || type === 'pronunciation'
             ? {
                 ...(type === 'listening_spelling' || type === 'pronunciation'
@@ -1948,25 +2019,4 @@ export class PracticeService {
     );
     return amount;
   }
-}
-
-export function hideAnswers(context: string | null, answers: string[]) {
-  if (!context) return null;
-  const alternatives = [...new Set(answers.filter((answer) => answer.trim()))]
-    .sort((a, b) => b.length - a.length)
-    .map((answer) => answer.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&'));
-  if (!alternatives.length) return context.slice(0, 4000);
-  // Unicode word segmentation also handles contractions, combining marks and
-  // languages without spaces. Never turn a substring of a word into a gap.
-  const boundaries = new Set<number>();
-  for (const segment of new Intl.Segmenter(undefined, { granularity: 'word' }).segment(context)) {
-    boundaries.add(segment.index);
-    boundaries.add(segment.index + segment.segment.length);
-  }
-  const result = context.replace(
-    new RegExp(alternatives.join('|'), 'giu'),
-    (match, offset: number) =>
-      boundaries.has(offset) && boundaries.has(offset + match.length) ? '_____' : match,
-  );
-  return result.slice(0, 4000);
 }

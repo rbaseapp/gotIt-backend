@@ -12,6 +12,7 @@ import {
   type Band,
 } from './curriculum.content.js';
 import { scopeArgs, curriculumMissing, type CurriculumState } from './curriculum.store.js';
+import { curriculumExample } from './curriculum.examples.js';
 import { introduce, recallEvidence, reviewPriority, claimedKnown } from './curriculum.policy.js';
 import {
   curriculumParticipants,
@@ -169,16 +170,6 @@ export async function prepareCurriculumPractice(
         VALUES($1,$2,$3,$4,$5,true,'catalog')`,
         [...scopeArgs(scope), id, word.he, lookupText(word.he)],
       );
-      const example = unit.dialogue.find((turn) =>
-        turn.text_en.toLowerCase().includes(word.en.toLowerCase()),
-      )?.text_en;
-      if (example)
-        await tx.query(
-          `INSERT INTO product_gotit.item_examples
-        (application_id,application_user_id,learning_item_id,example_text,source_kind,learning_revision)
-        VALUES($1,$2,$3,$4,'catalog',1)`,
-          [...scopeArgs(scope), id, example],
-        );
       await tx.query(
         `INSERT INTO product_gotit.item_skill_progress
         (application_id,application_user_id,learning_item_id,skill_type,algorithm_version)
@@ -188,6 +179,19 @@ export async function prepareCurriculumPractice(
       state.practiceItems[word.id] = id;
       changed = true;
     }
+    // The course sentence that shows the exact word; earlier items may lack it.
+    const example = curriculumExample(word.en, unit, content.lessons, content.units);
+    if (example)
+      await tx.query(
+        `INSERT INTO product_gotit.item_examples
+        (application_id,application_user_id,learning_item_id,example_text,source_kind,learning_revision)
+        SELECT li.application_id,li.application_user_id,li.id,$4,'catalog',li.learning_revision
+        FROM product_gotit.learning_items li WHERE li.application_id=$1 AND li.application_user_id=$2 AND li.id=$3
+        AND NOT EXISTS(SELECT 1 FROM product_gotit.item_examples ex WHERE ex.application_id=li.application_id
+          AND ex.application_user_id=li.application_user_id AND ex.learning_item_id=li.id
+          AND ex.learning_revision=li.learning_revision AND ex.example_text=$4)`,
+        [...scopeArgs(scope), id, example],
+      );
     targets[id] = word.id;
   }
   if (changed) await save(tx, scope, state);

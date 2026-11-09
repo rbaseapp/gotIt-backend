@@ -130,3 +130,69 @@ test('learning queue uses a non-reserved translation alias and maps it to the re
   assert.doesNotMatch(queueSql, /\) primary,/u);
   assert.equal(result.items[0]?.primaryTranslation, 'ללמוד');
 });
+
+test('the sentence game generates one example for a saved word that has no sentence with it', async () => {
+  const inserted: unknown[][] = [];
+  const pool = {
+    query: async (sql: string, values: unknown[]) => {
+      if (sql.trim().startsWith('INSERT')) {
+        inserted.push(values);
+        return { rows: [] };
+      }
+      return {
+        rows: [
+          {
+            id: 'a',
+            source_text: 'harness',
+            translation: 'לרתום',
+            contexts: [],
+            learning_revision: 1,
+            source_language_code: 'en',
+            translation_language_code: 'he',
+          },
+          {
+            id: 'b',
+            source_text: 'afford',
+            translation: 'להרשות לעצמך',
+            contexts: ['That is affordable.'],
+            learning_revision: 2,
+            source_language_code: 'en',
+            translation_language_code: 'he',
+          },
+          {
+            id: 'c',
+            source_text: 'budget',
+            translation: 'תקציב',
+            contexts: ['Our budget is small.'],
+            learning_revision: 1,
+            source_language_code: 'en',
+            translation_language_code: 'he',
+          },
+        ],
+      };
+    },
+  };
+  const asked: string[] = [];
+  const provider = {
+    generate: async (input: { sourceText: string }) => {
+      asked.push(input.sourceText);
+      // A sentence without the exact word is never stored.
+      return input.sourceText === 'harness' ? 'We harness the wind.' : 'This is affordable.';
+    },
+  };
+  const service = new PracticeService(
+    pool as never,
+    {} as never,
+    undefined,
+    undefined,
+    undefined,
+    false,
+    provider,
+  );
+  await (
+    service as unknown as { ensureClozeExamples(scope: unknown, ids: string[]): Promise<void> }
+  ).ensureClozeExamples({ applicationId: 'app', applicationUserId: 'user' }, ['a', 'b', 'c']);
+  assert.deepEqual(asked.sort(), ['afford', 'harness']);
+  assert.equal(inserted.length, 1);
+  assert.deepEqual(inserted[0]!.slice(-3), ['a', 'We harness the wind.', 1]);
+});

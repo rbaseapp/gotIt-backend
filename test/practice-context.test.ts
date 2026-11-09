@@ -38,3 +38,22 @@ test('cloze leaves absent, empty and null contexts safe', () => {
   assert.equal(hideAnswers('A normal sentence.', ['', 'missing']), 'A normal sentence.');
   assert.equal(hideAnswers('x'.repeat(5000), []), 'x'.repeat(4000));
 });
+
+test('examples keep only the word language; a trailing translation is dropped', async () => {
+  const { cleanExample } = await import('../src/modules/practice/practice.cloze.js');
+  assert.equal(
+    cleanExample('I love this culture. (אני אוהב את התרבות הזאת)', 'culture'),
+    'I love this culture.',
+  );
+  assert.equal(
+    cleanExample('I love this culture (a lot).', 'culture'),
+    'I love this culture (a lot).',
+  );
+  assert.equal(cleanExample('תרבות: I love this culture.', 'culture'), null);
+  assert.equal(
+    cleanExample('Café au lait, s’il vous plaît.', 'café'),
+    'Café au lait, s’il vous plaît.',
+  );
+  // Words in other scripts are not filtered by the Latin rule.
+  assert.equal(cleanExample('אני אוהב תרבות (culture)', 'תרבות'), 'אני אוהב תרבות (culture)');
+});

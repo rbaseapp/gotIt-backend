@@ -221,10 +221,7 @@ const studyImageProvider = studyImageProviders.length
   ? new FallbackStudyImageProvider(studyImageProviders, studyImageBriefResolver)
   : undefined;
 const wordPackService = new WordPackRepository(pool);
-const wordPackStudyService = new WordPackStudyService(
-  pool,
-  wordPackService,
-  studyImageProvider,
+const wordExampleProvider =
   env.OPENAI_API_KEY && env.OPENAI_TRANSLATION_MODEL
     ? new OpenAiWordPackExampleProvider(
         env.OPENAI_API_KEY,
@@ -232,7 +229,12 @@ const wordPackStudyService = new WordPackStudyService(
         providerFetch('word-pack-examples'),
         aiDailyQuota,
       )
-    : undefined,
+    : undefined;
+const wordPackStudyService = new WordPackStudyService(
+  pool,
+  wordPackService,
+  studyImageProvider,
+  wordExampleProvider,
   Boolean(env.OPENAI_API_KEY),
 );
 const practiceService: PracticeService = new PracticeService(
@@ -242,6 +244,7 @@ const practiceService: PracticeService = new PracticeService(
   (...args): boolean => speechService.supports(...args),
   studyImageProvider,
   Boolean(env.OPENAI_API_KEY),
+  wordExampleProvider,
 );
 const googleSpeechAccessToken =
   env.GOOGLE_SERVICE_ACCOUNT_JSON || env.GOOGLE_APPLICATION_CREDENTIALS
