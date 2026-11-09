@@ -32,7 +32,15 @@ export async function curriculumTeacherVoice(
   return preference?.teacher_voice === 'male' ? 'male' : 'female';
 }
 
-/** Resolve authored participant slots from the server's selected tutor, never learner input. */
+/** Authored text that names the tutor or agrees with the tutor's gender. */
+export const hasParticipantSlots = (value: unknown) =>
+  /\{\{(teacherName|t:)/u.test(JSON.stringify(value));
+
+/**
+ * Resolve authored participant slots from the server's selected tutor, never learner input:
+ * {{teacherName}} and {{teacherNameHe}} name the tutor, and {{t:masculine|feminine}} is
+ * Hebrew wording that agrees with the tutor ("המורה {{t:יציג|תציג}}").
+ */
 export function curriculumParticipants<T>(value: T, voice: 'female' | 'male'): T {
   const names: Record<string, string> = {
     teacherName: privateLessonTeachers[voice].name,
@@ -40,7 +48,11 @@ export function curriculumParticipants<T>(value: T, voice: 'female' | 'male'): T
   };
   const resolve = (part: unknown): unknown => {
     if (typeof part === 'string')
-      return part.replace(/\{\{(teacherName|teacherNameHe)\}\}/gu, (_, key: string) => names[key]!);
+      return part
+        .replace(/\{\{(teacherName|teacherNameHe)\}\}/gu, (_, key: string) => names[key]!)
+        .replace(/\{\{t:([^|{}]*)\|([^{}]*)\}\}/gu, (_, male: string, female: string) =>
+          voice === 'male' ? male : female,
+        );
     if (Array.isArray(part)) return part.map(resolve);
     if (part && typeof part === 'object')
       return Object.fromEntries(Object.entries(part).map(([key, item]) => [key, resolve(item)]));

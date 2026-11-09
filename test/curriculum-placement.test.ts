@@ -212,6 +212,9 @@ function service() {
     async get() {
       return enrollment;
     },
+    async teacherVoice() {
+      return 'female';
+    },
     async command(
       _scope: unknown,
       eventId: string,

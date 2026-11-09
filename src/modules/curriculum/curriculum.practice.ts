@@ -12,8 +12,12 @@ import {
   type Band,
 } from './curriculum.content.js';
 import { scopeArgs, curriculumMissing, type CurriculumState } from './curriculum.store.js';
-import { introduce, recallEvidence, reviewPriority } from './curriculum.policy.js';
-import { curriculumParticipants, curriculumTeacherVoice } from './curriculum.participants.js';
+import { introduce, recallEvidence, reviewPriority, claimedKnown } from './curriculum.policy.js';
+import {
+  curriculumParticipants,
+  curriculumTeacherVoice,
+  hasParticipantSlots,
+} from './curriculum.participants.js';
 
 export function curriculumPlacedBelow(state: CurriculumState, band: Band) {
   return ['reading', 'listening', 'speaking', 'writing', 'vocabulary'].every((skill) => {
@@ -86,6 +90,9 @@ async function save(tx: DatabaseTransaction, scope: ProfileScope, state: Curricu
   );
 }
 
+/** A unit session holds at most this many words; missed ones repeat inside the session. */
+export const UNIT_SESSION_WORDS = 6;
+
 /** Real practice items, scoped to this version and target. No historical learning is imported. */
 export async function prepareCurriculumPractice(
   tx: DatabaseTransaction,
@@ -96,10 +103,28 @@ export async function prepareCurriculumPractice(
   const state = await enrollment(tx, scope);
   let unit = unitById.get(unitId);
   if (!unit || !curriculumUnitUnlocked(state, unitId)) throw curriculumMissing();
-  if (JSON.stringify(unit).includes('{{teacherName'))
+  if (hasParticipantSlots(unit))
     unit = curriculumParticipants(unit, await curriculumTeacherVoice(tx, scope));
-  const words = allTargets.filter((target) => target.unit === unitId);
-  if (!words.length || words.length > 100) throw curriculumMissing();
+  const unitWords = allTargets.filter((target) => target.unit === unitId);
+  if (!unitWords.length || unitWords.length > 100) throw curriculumMissing();
+  // Words the learner already knows wait for their review check instead of the games.
+  const toPractise = unitWords.filter((target) => !claimedKnown(state.words[target.id]));
+  const candidates = toPractise.length ? toPractise : unitWords;
+  const now = new Date();
+  // Due/failed words come first, then words not yet introduced, in authored order.
+  const ranked = candidates.map((word, index) => ({ word, index, evidence: state.words[word.id] }));
+  ranked.sort((a, b) => {
+    const priority = (value: typeof a) =>
+      value.evidence && Date.parse(value.evidence.dueAt) <= +now
+        ? reviewPriority(value.evidence, now)
+        : 0;
+    return (
+      priority(b) - priority(a) ||
+      Number(Boolean(a.evidence)) - Number(Boolean(b.evidence)) ||
+      a.index - b.index
+    );
+  });
+  const words = ranked.slice(0, UNIT_SESSION_WORDS).map(({ word }) => word);
   state.practiceItems ??= {};
   const targets: Record<string, string> = {};
   let changed = false;
@@ -108,14 +133,21 @@ export async function prepareCurriculumPractice(
     if (id) {
       const item = (
         await tx.query(
-          `SELECT id FROM product_gotit.learning_items li WHERE application_id=$1 AND application_user_id=$2
+          `SELECT id,source_text FROM product_gotit.learning_items li WHERE application_id=$1 AND application_user_id=$2
         AND id=$3 AND deleted_at IS NULL AND user_status='active' AND source_language_code='en' AND translation_language_code='he'
-        AND source_text=$4 AND EXISTS(SELECT 1 FROM product_gotit.item_translations t WHERE t.learning_item_id=li.id
+        AND source_text=ANY($4::text[]) AND EXISTS(SELECT 1 FROM product_gotit.item_translations t WHERE t.learning_item_id=li.id
           AND t.application_id=li.application_id AND t.application_user_id=li.application_user_id AND t.is_current AND t.is_primary AND t.translation_text=$5)`,
-          [...scopeArgs(scope), id, word.en, word.he],
+          [...scopeArgs(scope), id, [word.en, ...(word.former_en ?? [])], word.he],
         )
       ).rows[0];
       if (!item) throw new AppError(409, 'EXERCISE_STALE', 'Curriculum practice word changed');
+      // A spelling revision (colour -> color) keeps the learner's progress.
+      if (item.source_text !== word.en)
+        await tx.query(
+          `UPDATE product_gotit.learning_items SET source_text=$4,normalized_source_text=$5,updated_at=now()
+          WHERE application_id=$1 AND application_user_id=$2 AND id=$3`,
+          [...scopeArgs(scope), id, word.en, lookupText(word.en)],
+        );
     } else {
       const item = (
         await tx.query(
@@ -159,18 +191,8 @@ export async function prepareCurriculumPractice(
     targets[id] = word.id;
   }
   if (changed) await save(tx, scope, state);
-  const now = new Date();
-  // Every target remains in the session; due/failed words come first, followed by authored order.
-  const ranked = words.map((word, index) => ({ word, index, evidence: state.words[word.id] }));
-  ranked.sort((a, b) => {
-    const priority = (value: typeof a) =>
-      value.evidence && Date.parse(value.evidence.dueAt) <= +now
-        ? reviewPriority(value.evidence, now)
-        : 0;
-    return priority(b) - priority(a) || a.index - b.index;
-  });
   return {
-    ids: ranked.map(({ word }) => state.practiceItems![word.id]!),
+    ids: words.map((word) => state.practiceItems![word.id]!),
     selection: {
       version: PROGRAM_VERSION,
       unitId,

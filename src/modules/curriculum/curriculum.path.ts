@@ -1,6 +1,7 @@
 import { allTargets, content, lessonById, unitById } from './curriculum.content.js';
 import type { CurriculumState } from './curriculum.store.js';
 import { curriculumPlacedBelow } from './curriculum.practice.js';
+import { claimedKnown } from './curriculum.policy.js';
 
 export type CurriculumPathStep = {
   id: string;
@@ -79,11 +80,13 @@ export function curriculumPathSteps(state: CurriculumState, unitId: string): Cur
         ) / 6,
       ),
     );
+  // Words the learner already knows skip the games; their review checks them instead.
+  const toPractise = targets.filter((target) => !claimedKnown(state.words[target.id]));
   for (const mode of ['recognition', 'recall', 'listening', 'context'])
     add(
       `words:${unitId}:${mode}`,
       targets.length > 0 &&
-        targets.every(
+        toPractise.every(
           (target) =>
             (state.words[target.id]?.practiceModes?.[mode] ??
               (mode === 'recognition' ? state.words[target.id]?.practiceModes?.matching : 0) ??
