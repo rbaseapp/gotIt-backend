@@ -90,6 +90,9 @@ async function save(tx: DatabaseTransaction, scope: ProfileScope, state: Curricu
   );
 }
 
+/** A unit session holds at most this many words; missed ones repeat inside the session. */
+export const UNIT_SESSION_WORDS = 6;
+
 /** Real practice items, scoped to this version and target. No historical learning is imported. */
 export async function prepareCurriculumPractice(
   tx: DatabaseTransaction,
@@ -106,7 +109,22 @@ export async function prepareCurriculumPractice(
   if (!unitWords.length || unitWords.length > 100) throw curriculumMissing();
   // Words the learner already knows wait for their review check instead of the games.
   const toPractise = unitWords.filter((target) => !claimedKnown(state.words[target.id]));
-  const words = toPractise.length ? toPractise : unitWords;
+  const candidates = toPractise.length ? toPractise : unitWords;
+  const now = new Date();
+  // Due/failed words come first, then words not yet introduced, in authored order.
+  const ranked = candidates.map((word, index) => ({ word, index, evidence: state.words[word.id] }));
+  ranked.sort((a, b) => {
+    const priority = (value: typeof a) =>
+      value.evidence && Date.parse(value.evidence.dueAt) <= +now
+        ? reviewPriority(value.evidence, now)
+        : 0;
+    return (
+      priority(b) - priority(a) ||
+      Number(Boolean(a.evidence)) - Number(Boolean(b.evidence)) ||
+      a.index - b.index
+    );
+  });
+  const words = ranked.slice(0, UNIT_SESSION_WORDS).map(({ word }) => word);
   state.practiceItems ??= {};
   const targets: Record<string, string> = {};
   let changed = false;
@@ -173,18 +191,8 @@ export async function prepareCurriculumPractice(
     targets[id] = word.id;
   }
   if (changed) await save(tx, scope, state);
-  const now = new Date();
-  // Every target remains in the session; due/failed words come first, followed by authored order.
-  const ranked = words.map((word, index) => ({ word, index, evidence: state.words[word.id] }));
-  ranked.sort((a, b) => {
-    const priority = (value: typeof a) =>
-      value.evidence && Date.parse(value.evidence.dueAt) <= +now
-        ? reviewPriority(value.evidence, now)
-        : 0;
-    return priority(b) - priority(a) || a.index - b.index;
-  });
   return {
-    ids: ranked.map(({ word }) => state.practiceItems![word.id]!),
+    ids: words.map((word) => state.practiceItems![word.id]!),
     selection: {
       version: PROGRAM_VERSION,
       unitId,

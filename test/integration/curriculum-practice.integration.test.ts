@@ -13,6 +13,7 @@ import {
   attemptSchema,
 } from '../../src/modules/practice/practice.validation.js';
 import { lexicon } from '../../src/modules/curriculum/curriculum.content.js';
+import { UNIT_SESSION_WORDS } from '../../src/modules/curriculum/curriculum.practice.js';
 
 test(
   'unit vocabulary uses real multi-game sessions, all unit words and atomic curriculum evidence',
@@ -65,7 +66,7 @@ test(
       const key = randomUUID();
       const created = await practice.createSession(scope, key, input);
       assert.equal(created.session.curriculumUnitId, 'P01');
-      assert.equal(created.session.itemCount, 12); // Count is not a one-word cap for a whole-unit path.
+      assert.equal(created.session.itemCount, UNIT_SESSION_WORDS); // The unit's own cap, not count.
       assert.equal(
         (await practice.createSession(scope, key, input)).session.id,
         created.session.id,
@@ -80,7 +81,10 @@ test(
       );
       await assert.rejects(practice.getSession(other, String(created.session.id)));
       const cards = (await practice.studyCards(scope, String(created.session.id))).cards;
-      const expected = lexicon.targets.filter((word) => word.unit === 'P01');
+      // A fresh learner starts with the unit's first words, in authored order.
+      const expected = lexicon.targets
+        .filter((word) => word.unit === 'P01')
+        .slice(0, UNIT_SESSION_WORDS);
       assert.equal(cards.length, expected.length);
       assert.deepEqual(
         new Set(cards.map((card) => card.sourceText)),
